@@ -1,0 +1,37 @@
+---
+title: Contact us
+heading: Contact us
+subtitle: Questions, corrections, article ideas or partnership requests. We read every message.
+description: Contact Mayobe Bros by email or with the form. Report a mistake, suggest a topic or ask about working with us.
+kind: wide
+menu: true
+order: 2
+updated: 2026-11-03
+---
+<div class="contact-grid">
+  <div class="contact-main" id="contact-form-section">
+    <h2>Send us a message</h2>
+    {{contact-form}}
+  </div>
+  <aside class="contact-side">
+    <h3>Email us directly</h3>
+    <dl class="contact-list">
+      <dt>General questions, corrections and partnerships</dt>
+      <dd>{{email:general}}</dd>
+      <dt>Website problems</dt>
+      <dd>{{email:support}}</dd>
+      <dt>Editor</dt>
+      <dd>{{email:executive}}</dd>
+    </dl>
+    <p>We usually reply within a few working days. Please do not send passwords, ID numbers or bank details by email.</p>
+  </aside>
+</div>
+
+<h2>Common questions</h2>
+<div class="faq">
+  <details><summary>How do I report a mistake in an article?</summary><p>Send us the article link and what is wrong, with a source if you have one. We check it and, if you are right, we fix the article and note the correction. See our <a href="{{base}}/editorial-policy/">Editorial Policy</a>.</p></details>
+  <details><summary>Can I suggest a topic or write a guest post?</summary><p>Yes. Put "Topic idea" or "Guest post" in the subject. We accept only original, accurate work that helps readers, and we edit and fact-check everything we publish.</p></details>
+  <details><summary>Can you help with my personal student loan, job or business problem?</summary><p>We cannot give personal advice. Our articles are general information. For loans contact HESLB, for licences contact the relevant authority, and for legal or medical questions speak to a qualified professional.</p></details>
+{{#comments}}  <details><summary>Why has my comment not appeared?</summary><p>Every comment is read by a person before it is published, which can take a few days. Comments with links, abuse or off-topic content are not published. See the <a href="{{base}}/comment-policy/">Comment Policy</a>.</p></details>{{/comments}}
+  <details><summary>Do you offer advertising or sponsored posts?</summary><p>We are open to honest partnerships. Read <a href="{{base}}/advertise/">Work with us</a> first, then write to us.</p></details>
+</div>

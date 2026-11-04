@@ -1,0 +1,10 @@
+# secrets and local files: never commit
+.admin-token
+.env
+.dev.vars
+.wrangler/
+node_modules/
+*.log
+.DS_Store
+.playwright-cli/
+.taste-skill/

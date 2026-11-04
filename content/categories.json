@@ -1,0 +1,120 @@
+[
+  {
+    "name": "Education",
+    "slug": "educational",
+    "description": "Study guides, school and university information and career advice for students.",
+    "image": "assets/img/topics/educational-2560.webp",
+    "labels": [
+      {
+        "name": "Online Learning",
+        "slug": "online-learning",
+        "description": "Courses, platforms and tips for learning online.",
+        "image": "assets/img/topics/online-learning-2560.webp"
+      },
+      {
+        "name": "Study Tips",
+        "slug": "study-tips",
+        "description": "Study methods, exam preparation and school and university guidance.",
+        "image": "assets/img/topics/study-tips-2560.webp"
+      },
+      {
+        "name": "Career Development",
+        "slug": "career-development",
+        "description": "Building skills and a career, step by step.",
+        "image": "assets/img/topics/career-development-2560.webp"
+      },
+      {
+        "name": "Results",
+        "slug": "results",
+        "description": "Exam results: what they mean and how to check them.",
+        "image": "assets/img/topics/results-2560.webp"
+      }
+    ]
+  },
+  {
+    "name": "Business Ideas",
+    "slug": "business-ideas",
+    "description": "Practical ideas and honest guides for starting and running small businesses.",
+    "image": "assets/img/topics/business-ideas-2560.webp",
+    "labels": [
+      {
+        "name": "Startups",
+        "slug": "startups",
+        "description": "Starting a small business: ideas, costs and risks.",
+        "image": "assets/img/topics/startups-2560.webp"
+      },
+      {
+        "name": "E-commerce",
+        "slug": "e-commerce",
+        "description": "Selling online: platforms, payments and delivery.",
+        "image": "assets/img/topics/e-commerce-2560.webp"
+      },
+      {
+        "name": "Marketing",
+        "slug": "marketing",
+        "description": "Finding customers and promoting a small business.",
+        "image": "assets/img/topics/marketing-2560.webp"
+      }
+    ]
+  },
+  {
+    "name": "World Histories",
+    "slug": "world-histories",
+    "description": "Stories and facts from world history.",
+    "image": "assets/img/topics/world-histories-2560.webp",
+    "labels": []
+  },
+  {
+    "name": "Video Games Updates",
+    "slug": "video-games-updates",
+    "description": "Video game news, reviews and updates.",
+    "image": "assets/img/topics/video-games-updates-2560.webp",
+    "labels": []
+  },
+  {
+    "name": "Technology Solutions",
+    "slug": "technology-solutions",
+    "description": "Phones, apps and tools explained in simple terms.",
+    "image": "assets/img/topics/technology-solutions-2560.webp",
+    "labels": [
+      {
+        "name": "Smartphones",
+        "slug": "smartphones",
+        "description": "Phones: what is new, what to buy and how to use them.",
+        "image": "assets/img/topics/smartphones-2560.webp"
+      },
+      {
+        "name": "Software",
+        "slug": "software",
+        "description": "Software and apps explained in simple terms.",
+        "image": "assets/img/topics/software-2560.webp"
+      },
+      {
+        "name": "AI Tools",
+        "slug": "ai-tools",
+        "description": "AI tools for study, work and business, and how to use them safely.",
+        "image": "assets/img/topics/ai-tools-2560.webp"
+      },
+      {
+        "name": "Cyber Security",
+        "slug": "cyber-security",
+        "description": "Staying safe online: passwords, scams and privacy.",
+        "image": "assets/img/topics/cyber-security-2560.webp"
+      }
+    ]
+  },
+  {
+    "name": "Jobs and Internships",
+    "slug": "jobs-and-internships",
+    "description": "Job and internship information and career guidance.",
+    "image": "assets/img/topics/jobs-and-internships-2560.webp",
+    "labels": []
+  },
+  {
+    "name": "Tanzania News",
+    "slug": "tanzania-news",
+    "description": "Plain-language news explainers about life, money and services in Tanzania.",
+    "image": "assets/img/topics/tanzania-news-2560.webp",
+    "labels": []
+  }
+]

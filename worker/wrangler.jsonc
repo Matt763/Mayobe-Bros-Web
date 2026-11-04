@@ -1,0 +1,24 @@
+{
+  // Mayobe Bros comments + reactions API (Cloudflare Worker + D1)
+  "name": "mayobe-engage",
+  "main": "src/index.js",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "vars": {
+    "ALLOWED_ORIGINS": "https://mayobebros.com,https://www.mayobebros.com",
+    "SITE_ORIGIN": "https://mayobebros.com"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "mayobe-engage",
+      "database_id": "REPLACE_WITH_ID_PRINTED_BY_wrangler_d1_create",
+      "migrations_dir": "migrations"
+    }
+  ]
+  // Secrets (never put these in this file; set them with `wrangler secret put`):
+  //   ADMIN_TOKEN       long random string used by scripts/comments.mjs to moderate
+  //   HASH_SALT         any long random string (used to hash visitor IPs, rotates daily)
+  //   TURNSTILE_SECRET  optional, only if you turn on Cloudflare Turnstile
+}

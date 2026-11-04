@@ -1,0 +1,735 @@
+{
+ "note": "Hashes of what each assets/share/*.jpg was drawn from. Written by scripts/build.mjs. Do not edit.",
+ "cards": {
+  "site": {
+   "hash": "8379f246cd50c6d50991a6a7105ada781a915c4e",
+   "bytes": 97963,
+   "quality": 2
+  },
+  "category-educational": {
+   "hash": "231a7705af83634de36b0968c4e66e53cee1d402",
+   "bytes": 154166,
+   "quality": 2
+  },
+  "label-educational-online-learning": {
+   "hash": "bca638ee414b3723ff9e024faa5f19b1c813aceb",
+   "bytes": 73074,
+   "quality": 2
+  },
+  "label-educational-study-tips": {
+   "hash": "79307f513154a1a448279668d52db2a3c6e9cb3f",
+   "bytes": 94848,
+   "quality": 2
+  },
+  "label-educational-career-development": {
+   "hash": "26326a301cf672994bf2847fb31a5788fe614f9f",
+   "bytes": 129452,
+   "quality": 2
+  },
+  "label-educational-results": {
+   "hash": "5f46b5decbbe4472c105bc62777157fdd263e6fe",
+   "bytes": 79970,
+   "quality": 2
+  },
+  "category-business-ideas": {
+   "hash": "112905c9783dd2386f79422aa48ca600d237fb31",
+   "bytes": 186676,
+   "quality": 4
+  },
+  "label-business-ideas-startups": {
+   "hash": "82693b257599e7c3692b23830a6dd1eee4bd57ae",
+   "bytes": 63515,
+   "quality": 2
+  },
+  "label-business-ideas-e-commerce": {
+   "hash": "0d49ef2091c99316ce49a560aa748911bf81f7ba",
+   "bytes": 70036,
+   "quality": 2
+  },
+  "label-business-ideas-marketing": {
+   "hash": "ac08f77984860753c4ff9220e94665e2dc752149",
+   "bytes": 176919,
+   "quality": 3
+  },
+  "category-world-histories": {
+   "hash": "37b23ac27e04e67d89617ab097d70da43ff78855",
+   "bytes": 169287,
+   "quality": 4
+  },
+  "category-video-games-updates": {
+   "hash": "e5394c7469098b1b348eb3da027614631b0bb7b6",
+   "bytes": 98117,
+   "quality": 2
+  },
+  "category-technology-solutions": {
+   "hash": "904bba4218bd2778b01d6ed3c9f754930e73c16f",
+   "bytes": 143583,
+   "quality": 2
+  },
+  "label-technology-solutions-smartphones": {
+   "hash": "6a44d081373655723d1c57d680082a2685dfb5f4",
+   "bytes": 77113,
+   "quality": 2
+  },
+  "label-technology-solutions-software": {
+   "hash": "712cfe968f83f1074b9f27db55b63aa41574833b",
+   "bytes": 89256,
+   "quality": 2
+  },
+  "label-technology-solutions-ai-tools": {
+   "hash": "65ff89cdc416dd19229e16bfb2648dda0cae9c46",
+   "bytes": 53796,
+   "quality": 2
+  },
+  "label-technology-solutions-cyber-security": {
+   "hash": "ce183a13c7f34e6c81e7be01c3fb60535a8ef8f6",
+   "bytes": 54246,
+   "quality": 2
+  },
+  "category-jobs-and-internships": {
+   "hash": "bd2a01a8848c19a27173a38d2191090a73184f60",
+   "bytes": 88840,
+   "quality": 2
+  },
+  "category-tanzania-news": {
+   "hash": "cdf24bac5b627cb1fea511b4885af837f09448cd",
+   "bytes": 183233,
+   "quality": 2
+  },
+  "post-mobile-money-send-back-scam-wrong-number": {
+   "hash": "3c3ff3ba97d1b371b761ca9f15c66977fefe1b88",
+   "bytes": 81837,
+   "quality": 2
+  },
+  "post-one-page-marketing-plan-small-business": {
+   "hash": "58ba0f15adfa303a39602620e82c4fb5104530a5",
+   "bytes": 64040,
+   "quality": 2
+  },
+  "post-mobile-money-for-business-lipa-kwa-simu-tanzania": {
+   "hash": "aed27ffea1ebdaa26c15a8ed42de6eb2c2a67875",
+   "bytes": 154998,
+   "quality": 3
+  },
+  "post-how-to-confirm-university-admission-tcu-multiple-selection": {
+   "hash": "2b0da15a3a445f895d64fd98450c54474d5aa89e",
+   "bytes": 56485,
+   "quality": 2
+  },
+  "post-ai-voice-and-video-scams-how-to-check": {
+   "hash": "1296de3a6354d8871c001f2c0336e9895dea5c77",
+   "bytes": 86943,
+   "quality": 2
+  },
+  "post-ajira-portal-how-to-apply-public-service-jobs": {
+   "hash": "6898640fc254b886946a5142088c36cbaab21158",
+   "bytes": 100702,
+   "quality": 2
+  },
+  "post-apollo-11-moon-landing-what-happened": {
+   "hash": "83f91032da6c7ca9a058c18e871df0bcf5fb6ec7",
+   "bytes": 184952,
+   "quality": 2
+  },
+  "post-back-up-your-computer-files-free-cloud-storage": {
+   "hash": "c5a9a22654b70fb33ce513e866215fcb8c63ca2d",
+   "bytes": 95283,
+   "quality": 2
+  },
+  "post-back-up-your-phone-and-move-to-a-new-phone": {
+   "hash": "7c1a24e19f3bcf5f89e6e7dbc7b5e6e4964704dc",
+   "bytes": 101876,
+   "quality": 2
+  },
+  "post-branding-basics-name-logo-colours": {
+   "hash": "f975ee2bab5db7451f9c8138d84a81bd6c3c6026",
+   "bytes": 122700,
+   "quality": 2
+  },
+  "post-buying-a-used-phone-in-tanzania-what-to-check": {
+   "hash": "0042802e6eef57723f141aca8616655ac3b918b3",
+   "bytes": 81928,
+   "quality": 2
+  },
+  "post-dropshipping-from-tanzania-shipping-customs-returns": {
+   "hash": "ccec8b50e775f1e40e2ca6e204f1dfa1339a2602",
+   "bytes": 79889,
+   "quality": 2
+  },
+  "post-excel-formulas-for-beginners-budget-and-marks": {
+   "hash": "d360ef80fe2b54e98307d25bc171ebaaeda32fd2",
+   "bytes": 76192,
+   "quality": 2
+  },
+  "post-hacked-facebook-account-what-to-do": {
+   "hash": "904bba4218bd2778b01d6ed3c9f754930e73c16f",
+   "bytes": 143583,
+   "quality": 2
+  },
+  "post-fake-followers-and-guaranteed-sales-scams": {
+   "hash": "9016ea005b08082c73cccc29bd2f32c8bb1ac2c0",
+   "bytes": 60951,
+   "quality": 2
+  },
+  "post-fake-job-offers-tanzania-warning-signs-never-pay": {
+   "hash": "f2d9dc2ba619b72312f03e5b0596232f85df30bd",
+   "bytes": 74021,
+   "quality": 2
+  },
+  "post-fake-mobile-money-payment-messages-sellers-tanzania": {
+   "hash": "eac77f97a1d3b49608e9570e6111eabe6bb82528",
+   "bytes": 96256,
+   "quality": 2
+  },
+  "post-free-games-for-low-end-android-phones": {
+   "hash": "8f39e4d495e44b8362715437a8c0e7d6793b194d",
+   "bytes": 108701,
+   "quality": 2
+  },
+  "post-free-video-editing-software-davinci-resolve-capcut-shotcut": {
+   "hash": "a5a9d001e942a3a91cfbb500776de95ce8d5cab4",
+   "bytes": 73923,
+   "quality": 2
+  },
+  "post-diploma-to-degree-tanzania-entry-requirements": {
+   "hash": "f09f0ca7eb2e3985f4438eff595fddd132ba18c0",
+   "bytes": 149999,
+   "quality": 2
+  },
+  "post-history-of-video-games-from-tennis-for-two-to-playstation": {
+   "hash": "65b3bdcb64755cd99c816fddd4378023b87c5411",
+   "bytes": 126351,
+   "quality": 2
+  },
+  "post-game-age-ratings-esrb-pegi-and-parental-controls": {
+   "hash": "276f186af0060eaad318d8579527f1017deb12e2",
+   "bytes": 88313,
+   "quality": 2
+  },
+  "post-healthy-gaming-habits-when-play-becomes-a-problem": {
+   "hash": "1450864ff301a18e1d3b6697b0a00d4bdba2a4c4",
+   "bytes": 91484,
+   "quality": 2
+  },
+  "post-earn-customer-trust-new-online-seller-tanzania": {
+   "hash": "454863656eb17a95785d2d90dbb945ed361672b3",
+   "bytes": 94152,
+   "quality": 2
+  },
+  "post-how-ai-chatbots-work-in-plain-words": {
+   "hash": "4704e9ad27187b9fc3603be1234e7c94861ff855",
+   "bytes": 145532,
+   "quality": 2
+  },
+  "post-how-esports-works-and-africas-esports-scene": {
+   "hash": "83b149be5eeeea2b8ebf53cd837569d6c38a14bc",
+   "bytes": 186254,
+   "quality": 2
+  },
+  "post-tanganyika-zanzibar-union-explained": {
+   "hash": "1418920db8e276e914e2ff80882f2749cc8d2e01",
+   "bytes": 138995,
+   "quality": 2
+  },
+  "post-how-tanganyika-won-independence": {
+   "hash": "37b23ac27e04e67d89617ab097d70da43ff78855",
+   "bytes": 169287,
+   "quality": 4
+  },
+  "post-united-nations-how-it-began": {
+   "hash": "725669ac0bc1ec806e21ef0be75ac4a4efce473c",
+   "bytes": 115660,
+   "quality": 2
+  },
+  "post-how-to-avoid-plagiarism-university-assignments": {
+   "hash": "40216da95517054e1dbb9fd3320375152bf4d731",
+   "bytes": 147214,
+   "quality": 2
+  },
+  "post-linkedin-profile-for-tanzanian-job-seekers": {
+   "hash": "075f143808b40c615ed337d2b472f6800f340471",
+   "bytes": 69518,
+   "quality": 2
+  },
+  "post-how-to-check-ai-answers-for-mistakes": {
+   "hash": "782f5368cb8efbfaed63703126188b8f9482d0d7",
+   "bytes": 59688,
+   "quality": 2
+  },
+  "post-how-to-check-university-or-college-is-registered-tanzania": {
+   "hash": "841a4a6a183ad0bd396f710c0884546acac0378a",
+   "bytes": 92852,
+   "quality": 2
+  },
+  "post-how-to-find-an-internship-in-tanzania-real-or-fake": {
+   "hash": "e802732e11ec4db65c4bc0d364c4d36818d94909",
+   "bytes": 67750,
+   "quality": 2
+  },
+  "post-install-and-remove-programs-on-windows-safely": {
+   "hash": "c7e5d063c314e4d229b42fd510acfa1c366bd7bd",
+   "bytes": 68277,
+   "quality": 2
+  },
+  "post-how-to-price-your-products-small-business-tanzania": {
+   "hash": "c91a265d378f168e30df6ef715055254c78c9250",
+   "bytes": 151830,
+   "quality": 3
+  },
+  "post-how-to-read-tcu-programme-entry-requirements": {
+   "hash": "b91350d0df1ab75cdab281435243df0055e72a0b",
+   "bytes": 72197,
+   "quality": 2
+  },
+  "post-how-to-read-tcu-admission-guidebook": {
+   "hash": "202af0a7ed63ffa52e8986b5face426df45e9ac3",
+   "bytes": 162942,
+   "quality": 3
+  },
+  "post-how-to-read-csee-results-divisions-points": {
+   "hash": "9b2f7f47aab18a59ede77b003a5da0f9e2cd8699",
+   "bytes": 159213,
+   "quality": 2
+  },
+  "post-how-to-read-acsee-results-points-and-divisions": {
+   "hash": "039a61975f8cc8ec51bdcda62f2728bbed662836",
+   "bytes": 154217,
+   "quality": 3
+  },
+  "post-reduce-lag-and-high-ping-in-online-games": {
+   "hash": "44b0a05ac606c68bd0e89e6659b3b6da48f70ede",
+   "bytes": 78560,
+   "quality": 2
+  },
+  "post-register-small-business-tanzania-brela-tin-licence": {
+   "hash": "091db3e60bafc432ae9b437e756a347f0b4ffe44",
+   "bytes": 73335,
+   "quality": 2
+  },
+  "post-save-mobile-data-while-playing-games": {
+   "hash": "2a6d489de6fede223ff65b99a6c27557a1f74801",
+   "bytes": 87482,
+   "quality": 2
+  },
+  "post-speed-up-slow-windows-pc-for-games": {
+   "hash": "6487384cbc1157c7f0f670c7f429e0cbc60eeb58",
+   "bytes": 106187,
+   "quality": 2
+  },
+  "post-study-offline-with-kolibri-free": {
+   "hash": "15791325eaa175f8f08cc14473d9499902933012",
+   "bytes": 150677,
+   "quality": 2
+  },
+  "post-tie-online-library-free-textbooks-tanzania": {
+   "hash": "202af0a7ed63ffa52e8986b5face426df45e9ac3",
+   "bytes": 162942,
+   "quality": 3
+  },
+  "post-how-to-write-a-cv-for-your-first-job-tanzania": {
+   "hash": "2c4bba1a9e83b0bba46228e4926d104052bddbc8",
+   "bytes": 83368,
+   "quality": 2
+  },
+  "post-how-to-write-a-good-ai-prompt": {
+   "hash": "e4c255f35a1e9344ccabba8f6e13759c2817b739",
+   "bytes": 87428,
+   "quality": 2
+  },
+  "post-application-letter-for-a-job-tanzania-how-to-write": {
+   "hash": "187cc91d6f5c9b40cc7f1023cac0dd6b851f7226",
+   "bytes": 82993,
+   "quality": 2
+  },
+  "post-write-one-page-business-plan-small-business-tanzania": {
+   "hash": "3b3f3ffab3c39ca1da0b9e431120de1cba7ec92b",
+   "bytes": 85808,
+   "quality": 2
+  },
+  "post-learn-english-free-online-british-council-cambridge": {
+   "hash": "88db13aa93fe68c92d2f41f451c2310661a4e7f9",
+   "bytes": 73695,
+   "quality": 2
+  },
+  "post-is-an-online-degree-recognised-in-tanzania": {
+   "hash": "4809c0216b174ef332334d22268ea2bbacb7396b",
+   "bytes": 56507,
+   "quality": 2
+  },
+  "post-fake-loan-apps-tanzania-how-to-check": {
+   "hash": "c2558c50a3a63e55030803d0053239c442be1641",
+   "bytes": 63479,
+   "quality": 2
+  },
+  "post-job-interview-questions-and-answers-for-graduates-tanzania": {
+   "hash": "ecb6f161406b9261df8576bf3c01d79fc1c7d824",
+   "bytes": 103658,
+   "quality": 2
+  },
+  "post-julius-nyerere-ujamaa-explained": {
+   "hash": "0cfb4b4261b64c04b72b4b976762a69dbb87da09",
+   "bytes": 172655,
+   "quality": 2
+  },
+  "post-keeping-children-safe-online-parents-guide": {
+   "hash": "904bba4218bd2778b01d6ed3c9f754930e73c16f",
+   "bytes": 143583,
+   "quality": 2
+  },
+  "post-kilwa-kisiwani-swahili-trade-city": {
+   "hash": "a4871a1c3825b666274ae4b632d51e1433ac8e19",
+   "bytes": 147107,
+   "quality": 2
+  },
+  "post-learn-to-code-for-free-where-to-start": {
+   "hash": "35c80bcbc02f1a90b7806a7ff5169a4da7a4346a",
+   "bytes": 93965,
+   "quality": 2
+  },
+  "post-learn-to-make-games-for-free-with-godot": {
+   "hash": "c8a0f39c8bdac722be3f272be9d1a27510e60315",
+   "bytes": 58924,
+   "quality": 2
+  },
+  "post-recognition-of-prior-learning-tanzania": {
+   "hash": "d4845942df8cde45df4d05e2ff931de04818edfd",
+   "bytes": 117299,
+   "quality": 2
+  },
+  "post-libreoffice-free-alternative-to-word-and-excel": {
+   "hash": "e4c255f35a1e9344ccabba8f6e13759c2817b739",
+   "bytes": 87428,
+   "quality": 2
+  },
+  "post-loot-boxes-and-in-game-purchases-protect-your-money": {
+   "hash": "dc5a3c4664047fea3df5a41e4556def33f91be9d",
+   "bytes": 71631,
+   "quality": 2
+  },
+  "post-lost-or-stolen-phone-what-to-do-first": {
+   "hash": "c2558c50a3a63e55030803d0053239c442be1641",
+   "bytes": 63479,
+   "quality": 2
+  },
+  "post-replace-lost-necta-certificate-or-statement-of-results": {
+   "hash": "472d677d9806b324797f8dad7b7a66ea6d8a1835",
+   "bytes": 66513,
+   "quality": 2
+  },
+  "post-necta-result-codes-abs-x-w-i-meaning": {
+   "hash": "b13b28d354a84cb6fd0da03dd1a874aa6efff346",
+   "bytes": 105468,
+   "quality": 2
+  },
+  "post-heslb-loan-not-allocated-what-to-do-appeal": {
+   "hash": "64ff29124d3674fc094e0d1ec1d7d49344c19e88",
+   "bytes": 69285,
+   "quality": 2
+  },
+  "post-no-job-after-graduation-volunteering-and-skills-employers-want": {
+   "hash": "7daf0c432793858ae85edff5f492663b271e2e68",
+   "bytes": 125653,
+   "quality": 2
+  },
+  "post-not-selected-for-university-what-to-do-next": {
+   "hash": "73ab4ca3ceb04f0623bfd4df423a00f7643bee41",
+   "bytes": 49405,
+   "quality": 2
+  },
+  "post-nta-levels-explained-tanzania": {
+   "hash": "7ec2ea92ac9bd792d62d09fb9fe68ec508405c16",
+   "bytes": 122879,
+   "quality": 2
+  },
+  "post-start-small-duka-tanzania-licence-stock-costs-risks": {
+   "hash": "ea696fcc694b38dec26c774655bd4829ab3d59d0",
+   "bytes": 169303,
+   "quality": 2
+  },
+  "post-merge-split-and-shrink-pdf-files-for-free": {
+   "hash": "e31bc71dc928027f1260c45fcda06563c68be755",
+   "bytes": 120567,
+   "quality": 2
+  },
+  "post-phone-battery-health-and-charging-habits": {
+   "hash": "da2a022fbf1521968c75a48000864dbdc85999ee",
+   "bytes": 57340,
+   "quality": 2
+  },
+  "post-phone-storage-full-how-to-free-up-space": {
+   "hash": "335eb77d1a1a16a185423fb336139e731cf3eb42",
+   "bytes": 98746,
+   "quality": 2
+  },
+  "post-what-to-do-after-poor-form-four-results": {
+   "hash": "7f351b512c1608f85d0465a1e9704bbea348bea4",
+   "bytes": 83440,
+   "quality": 2
+  },
+  "post-product-photos-with-phone-online-selling-tanzania": {
+   "hash": "8a426659eb55b5194f39fe2043ec50ed0a969a11",
+   "bytes": 85381,
+   "quality": 2
+  },
+  "post-protect-shop-name-and-logo-trademark-online-sellers-tanzania": {
+   "hash": "840ec561f4579a64892a70f2c684cb20d1f85d15",
+   "bytes": 170584,
+   "quality": 2
+  },
+  "post-protect-whatsapp-account-two-step-verification": {
+   "hash": "73af294dd7dc65e342991f53176a6a602f27e63a",
+   "bytes": 74801,
+   "quality": 2
+  },
+  "post-claim-google-business-profile-small-shop": {
+   "hash": "ea696fcc694b38dec26c774655bd4829ab3d59d0",
+   "bytes": 169303,
+   "quality": 2
+  },
+  "post-how-much-ram-and-storage-do-you-need-in-a-phone": {
+   "hash": "0fd364c46ddab5dd8eed5072e2283823be41c6d3",
+   "bytes": 60524,
+   "quality": 2
+  },
+  "post-job-rejection-what-to-do-next-tanzania": {
+   "hash": "cf6521963bfce8426874da425d2a786df94b9d05",
+   "bytes": 96636,
+   "quality": 2
+  },
+  "post-save-mobile-data-on-your-phone-settings-that-help": {
+   "hash": "fe16cf76ca8e5a7d051ddc3755ae5b271e74d6b6",
+   "bytes": 75665,
+   "quality": 2
+  },
+  "post-sell-on-jiji-tanzania-rules-safe-deals-ad-limits": {
+   "hash": "112905c9783dd2386f79422aa48ca600d237fb31",
+   "bytes": 186676,
+   "quality": 4
+  },
+  "post-sim-swap-fraud-what-to-do": {
+   "hash": "904bba4218bd2778b01d6ed3c9f754930e73c16f",
+   "bytes": 143583,
+   "quality": 2
+  },
+  "post-simple-business-records-small-traders-cash-book-tanzania": {
+   "hash": "3500c38ac6e42e7ab62346c22cc5bb9db607fecd",
+   "bytes": 73843,
+   "quality": 2
+  },
+  "post-simple-seo-small-business-website": {
+   "hash": "e2b4d5a37331c258523c848a3b7516d046b40d0a",
+   "bytes": 70748,
+   "quality": 2
+  },
+  "post-small-business-tax-tanzania-presumptive-tax-explained": {
+   "hash": "f3b330efff8337c4e97d56ff77bfd247494a9af5",
+   "bytes": 102330,
+   "quality": 2
+  },
+  "post-sms-and-email-marketing-consent-tanzania": {
+   "hash": "6993f31da2c907eb20a6aa499ddc392dece1719f",
+   "bytes": 57765,
+   "quality": 2
+  },
+  "post-spot-fake-sms-links-and-login-pages": {
+   "hash": "de533196e6bdf5efee9b07ef83110079094b3938",
+   "bytes": 68063,
+   "quality": 2
+  },
+  "post-strong-passwords-and-password-manager": {
+   "hash": "73af294dd7dc65e342991f53176a6a602f27e63a",
+   "bytes": 74801,
+   "quality": 2
+  },
+  "post-recognition-of-foreign-qualifications-tcu": {
+   "hash": "7f16944e52ccfce48cf1b8b38a433122d3000d02",
+   "bytes": 86095,
+   "quality": 2
+  },
+  "post-save-mobile-data-when-studying-online": {
+   "hash": "7d987c9d862dd0c4e89231e478ebaaaa2d2fd8bf",
+   "bytes": 59728,
+   "quality": 2
+  },
+  "post-studying-at-the-open-university-of-tanzania": {
+   "hash": "654a797fe730a4d64388d9236a425cb2206e01b3",
+   "bytes": 80891,
+   "quality": 2
+  },
+  "post-berlin-conference-did-it-divide-africa": {
+   "hash": "59cef7380e5e3980fb534a8277322e8a0b0a46d4",
+   "bytes": 162434,
+   "quality": 3
+  },
+  "post-maji-maji-war-why-it-started": {
+   "hash": "420919267f746845ad92afeee50936572207ff90",
+   "bytes": 191075,
+   "quality": 3
+  },
+  "post-university-gpa-classification-first-class-pass-tanzania": {
+   "hash": "f09f0ca7eb2e3985f4438eff595fddd132ba18c0",
+   "bytes": 149999,
+   "quality": 2
+  },
+  "post-using-ai-for-cv-and-job-application-emails": {
+   "hash": "7602c61d38367497d110773c84affaac05d527ae",
+   "bytes": 84017,
+   "quality": 2
+  },
+  "post-use-necta-examiners-reports-to-revise": {
+   "hash": "bcf23c2330c3519874a95296c4176429be7c3812",
+   "bytes": 80071,
+   "quality": 2
+  },
+  "post-using-ai-to-study-without-cheating": {
+   "hash": "75e16290adf178c3df81123d9c2b9a331d4fedaa",
+   "bytes": 93926,
+   "quality": 2
+  },
+  "post-causes-of-world-war-i-simple-explanation": {
+   "hash": "69a09adacaffed9dfa713845c0e392ec64229a2f",
+   "bytes": 173396,
+   "quality": 3
+  },
+  "post-what-not-to-paste-into-ai-chatbots": {
+   "hash": "73af294dd7dc65e342991f53176a6a602f27e63a",
+   "bytes": 74801,
+   "quality": 2
+  },
+  "post-whatsapp-business-app-sell-products-tanzania": {
+   "hash": "13e9483fb80ce54b8c65fef08eaf4ee7d096ad26",
+   "bytes": 89348,
+   "quality": 2
+  },
+  "post-who-built-great-zimbabwe-myths-and-facts": {
+   "hash": "52d51ae2c9e3c331d768bac6baab1c54ac88b31d",
+   "bytes": 180326,
+   "quality": 2
+  },
+  "post-know-your-customers-small-business": {
+   "hash": "7c1ae30cfcc59580ab5bb508edbc6cc925de85a1",
+   "bytes": 138557,
+   "quality": 2
+  },
+  "post-format-an-assignment-in-word-headings-page-numbers-contents": {
+   "hash": "ebb6bb5f01c376a48ee26e02df3fc544c5211eda",
+   "bytes": 76234,
+   "quality": 2
+  },
+  "post-change-university-course-transfer-tanzania": {
+   "hash": "46ac017b357f5f9803d79239387cbc93456f794a",
+   "bytes": 136577,
+   "quality": 2
+  },
+  "post-employment-contract-and-your-rights-first-job-tanzania": {
+   "hash": "1f1120b35ed42f123e44bea8abcfae2d6a14fe3f",
+   "bytes": 55915,
+   "quality": 2
+  },
+  "post-first-job-in-tanzania-nssf-paperwork-and-nerves": {
+   "hash": "0c77166384d17003b511b6c42558255815baaa88",
+   "bytes": 101764,
+   "quality": 2
+  },
+  "post-first-week-at-a-new-job-tanzania-what-to-do": {
+   "hash": "f99dd4c780b439945b77a63e61e43e5fccbe6060",
+   "bytes": 75257,
+   "quality": 2
+  },
+  "post-zanzibar-slave-trade-and-how-it-ended": {
+   "hash": "e5b4359caefbe9fb31dc755326526488e1cdd856",
+   "bytes": 144878,
+   "quality": 2
+  },
+  "post-low-cost-online-business-ideas-tanzania": {
+   "hash": "527f8449dd6d52b70a08f5e26927c8f30415601f",
+   "bytes": 86146,
+   "quality": 2
+  },
+  "post-next-generation-online-learning-platform": {
+   "hash": "a5043b9f12668397656a31606ac4ead0c0feb91a",
+   "bytes": 144175,
+   "quality": 2
+  },
+  "post-jkt-selections-for-form-six-students-2026": {
+   "hash": "08aad604cc0059432f75b57e530f983ec3350dc7",
+   "bytes": 153348,
+   "quality": 3
+  },
+  "post-helping-university-students-learn-without-limits": {
+   "hash": "e1f0c8ba4abee004c649b34b09c38cc33412b422",
+   "bytes": 148347,
+   "quality": 2
+  },
+  "post-jobs-for-pcb-combination": {
+   "hash": "1a63759be64830b7ba2401288398ace9b9bc668a",
+   "bytes": 113292,
+   "quality": 2
+  },
+  "post-students-loan-tanzania-complete-guide": {
+   "hash": "5d574d35513e7cf51c2b5214021fcd2eb6a852f4",
+   "bytes": 67597,
+   "quality": 2
+  },
+  "post-tanzania-new-transport-fares": {
+   "hash": "29fa01d86f04802fcfd23585f810289b06ef6ffe",
+   "bytes": 179103,
+   "quality": 3
+  },
+  "post-10-proven-techniques-to-study-effectively-for-students": {
+   "hash": "11b09e88de968767eab21d36faa310f59472e473",
+   "bytes": 101839,
+   "quality": 2
+  },
+  "post-top-10-ai-tools-for-productivity": {
+   "hash": "8b560bc59d654b9f6dfa286c360e27289cd957b0",
+   "bytes": 141875,
+   "quality": 2
+  },
+  "post-how-to-build-a-career-from-scratch": {
+   "hash": "c9eb4b0fc84a7f2595bd88c75e36010c892a4c8f",
+   "bytes": 109082,
+   "quality": 2
+  },
+  "post-samsung-galaxy-z-roll-what-is-real-and-what-is-rumour": {
+   "hash": "4e21b37b320671f52c4eea4c9a496455b6e82ab3",
+   "bytes": 69047,
+   "quality": 2
+  },
+  "post-water-vending-business-tanzania-costs-permits-risks": {
+   "hash": "a278c5b0a2ff36ff4b97ebc29015c11b1f707a87",
+   "bytes": 176590,
+   "quality": 2
+  },
+  "post-combination-na-aina-ya-kazi-utakayofanya": {
+   "hash": "4445bd04e9ade5d61c67134339380c2618ee034a",
+   "bytes": 129669,
+   "quality": 2
+  },
+  "post-tanzania-fuel-security-measures-navigating-current-challenges": {
+   "hash": "22e67ae681c033e2d82ffd624fe9da133ee1c8d2",
+   "bytes": 73302,
+   "quality": 2
+  },
+  "post-tanzania-tourism-boom-kilimanjaro-serengeti-zanzibar-world": {
+   "hash": "545dbf7ac03f289ffc28254a496b25b241cc7ec8",
+   "bytes": 79863,
+   "quality": 2
+  },
+  "post-chicken-farming-tanzania-housing-health-costs": {
+   "hash": "6619d6762d3e5470f13ffb6e8cbcff4daff78135",
+   "bytes": 163616,
+   "quality": 3
+  },
+  "post-freelancing-online-from-tanzania-platforms-fees-scams": {
+   "hash": "3d5a7f60ac790b6984e68e7dac840321a2ad3595",
+   "bytes": 126669,
+   "quality": 2
+  },
+  "post-ask-customers-for-reviews-honestly": {
+   "hash": "baf3fe44223f816a7603675fae6ed7903d6176e7",
+   "bytes": 79784,
+   "quality": 2
+  }
+ }
+}

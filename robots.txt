@@ -1,0 +1,55 @@
+User-agent: *
+Allow: /
+# Site sources and notes are not for search results
+Disallow: /content/
+Disallow: /scripts/
+Disallow: /worker/
+Disallow: /docs/
+Disallow: /CLAUDE.md
+Disallow: /DEPLOY.md
+Disallow: /README.md
+Disallow: /site.config.json
+
+# Googlebot, Bingbot (also feeds Yahoo and DuckDuckGo), YandexBot and Mediapartners-Google (AdSense) follow the rules above.
+Sitemap: https://mayobebros.com/sitemap.xml
+
+# AI training crawlers (set "blockAiCrawlers": false in site.config.json to allow). Search crawlers are not affected.
+User-agent: GPTBot
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: Applebot-Extended
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+User-agent: meta-externalagent
+Disallow: /
+
+User-agent: cohere-ai
+Disallow: /
+
+User-agent: Diffbot
+Disallow: /
+
+User-agent: omgilibot
+Disallow: /
+
+User-agent: ImagesiftBot
+Disallow: /
+
+# Generic "do not use for AI training" signal announced by Microsoft and Google
+User-agent: __usage_ai-training
+Disallow: /

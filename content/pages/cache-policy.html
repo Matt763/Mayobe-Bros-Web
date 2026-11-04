@@ -1,0 +1,30 @@
+---
+title: Cache Policy
+description: How Mayobe Bros uses browser and network caching to load faster, and how to see the latest version of a page.
+kind: legal
+order: 13
+updated: 2026-11-03
+---
+<p>Caching means keeping a copy of a file so it does not have to be downloaded again. This helps pages open faster and uses less mobile data. This page explains how it works on {{site-name}}.</p>
+
+<h2>How the site is built</h2>
+<p>{{site-name}} is a static website. Every page is a ready-made file served from GitHub Pages, so there is no database behind the article pages. We do not use a service worker, so the site does not store an offline copy of itself on your device.</p>
+
+<h2>What is cached and for how long</h2>
+<ul>
+  <li><strong>Pages and files.</strong> GitHub Pages and its network tell your browser it may reuse a file for a short time, normally around ten minutes. After a new article is published it can take a few minutes to show for everyone.</li>
+  <li><strong>Styles and scripts.</strong> Their web addresses change when we update them, so you always get the newest design and behaviour.</li>
+  <li><strong>Pictures.</strong> Images on the site do not change, so your browser may keep them longer.</li>
+  <li><strong>Search.</strong> The search list is downloaded the first time you search and reused afterwards.</li>
+  {{#comments}}<li><strong>Comment and reaction counts.</strong> These are kept for about thirty seconds to a minute, so a new comment or reaction may take a moment to show in the totals.</li>{{/comments}}
+</ul>
+
+<h2>Privacy</h2>
+<p>We never cache private information. Cached files are the same public files every visitor receives. The small items stored in your browser are listed in the <a href="{{base}}/cookie-policy/">Cookie Policy</a>.</p>
+
+<h2>See the latest version</h2>
+<ul>
+  <li>Reload the page. On a computer press <code>Ctrl + Shift + R</code> (Windows or Linux) or <code>Cmd + Shift + R</code> (Mac).</li>
+  <li>On a phone, close the tab and open the page again, or clear the browser's cache in its settings.</li>
+</ul>
+<p>If a page still looks out of date after a few minutes, please <a href="{{base}}/contact/">tell us</a>.</p>

@@ -1,0 +1,14 @@
+{
+  "name": "mayobe-bros-site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mayobe Bros — static site in plain HTML, CSS and JavaScript, built with a dependency-free Node script.",
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check": "node scripts/build.mjs --check",
+    "serve": "node scripts/serve.mjs",
+    "test": "node --test scripts/tests/markdown.test.mjs"
+  }
+}

@@ -1,0 +1,65 @@
+<!doctype html>
+<!--
+  Template of the picture people see when a Mayobe Bros link is shared on WhatsApp, Facebook, X, LinkedIn, Telegram, Slack and so on.
+  It is NOT a page of the site. scripts/tools/share-images.mjs opens it in headless Chromium at 1200 x 630 and saves the result as
+  assets/share/<slug>.jpg. Query: ?img=<picture path or URL>&cat=<category name>&fy=<focus, 0 to 100: how far down the picture to look>
+  Open it in a browser as ?img=../../assets/posts/<file>.webp&cat=Education to see one.
+  The post title is NOT drawn on the picture: every app prints the title, description and domain under it, so repeating it only
+  clutters the card. Keep everything important away from the outer 56 px, because some apps crop the edges.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<title>Share card template</title>
+<style>
+  :root { --navy: #070d2b; --gold: #f1d9a2; --green: #3f9b4d; --blue: #1e3a9e; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1200px; height: 630px; overflow: hidden; background: var(--navy); }
+  .card { position: relative; width: 1200px; height: 630px; overflow: hidden; font-family: "Lato", "Noto Sans", "Liberation Sans", Arial, sans-serif; color: #fff; }
+  .photo { position: absolute; inset: 0; background-size: cover; background-repeat: no-repeat; background-position: 50% var(--fy, 40%); filter: saturate(1.07) contrast(1.05); }
+  /* brand tint: deep navy rising from the bottom so the footer stays readable on any picture, and a soft top shade for the chip */
+  .shade { position: absolute; inset: 0; background:
+    linear-gradient(0deg, rgba(7, 13, 43, .94) 0, rgba(7, 13, 43, .72) 17%, rgba(7, 13, 43, .26) 36%, rgba(7, 13, 43, 0) 54%),
+    linear-gradient(180deg, rgba(7, 13, 43, .46) 0, rgba(7, 13, 43, 0) 24%),
+    radial-gradient(130% 120% at 50% 42%, rgba(7, 13, 43, 0) 58%, rgba(7, 13, 43, .34) 100%); }
+  /* thin inner frame: the quiet "luxury" detail */
+  .frame { position: absolute; inset: 22px; border: 1px solid rgba(241, 217, 162, .34); border-radius: 6px; }
+  .chip { position: absolute; left: 60px; top: 56px; display: inline-flex; align-items: center; gap: 14px; padding: 13px 24px 13px 20px; border-radius: 999px;
+    background: rgba(7, 13, 43, .52); border: 1px solid rgba(241, 217, 162, .55); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    color: var(--gold); font-weight: 800; font-size: 23px; letter-spacing: .2em; text-transform: uppercase; line-height: 1; }
+  .chip i { width: 9px; height: 9px; background: var(--gold); transform: rotate(45deg); display: block; }
+  .foot { position: absolute; left: 60px; right: 60px; bottom: 56px; display: flex; align-items: center; justify-content: space-between; }
+  .logo { background: rgba(255, 255, 255, .96); border-radius: 18px; padding: 12px 24px; box-shadow: 0 14px 34px rgba(0, 0, 0, .38); display: block; }
+  .logo img { height: 50px; width: auto; display: block; }
+  .url { display: flex; align-items: center; gap: 16px; font-weight: 700; font-size: 25px; letter-spacing: .16em; text-transform: uppercase; color: rgba(255, 255, 255, .94); text-shadow: 0 2px 12px rgba(0, 0, 0, .5); }
+  .url::before { content: ""; width: 54px; height: 2px; background: var(--gold); display: block; }
+  .bar { position: absolute; left: 0; right: 0; bottom: 0; height: 8px; background: linear-gradient(90deg, var(--green), var(--blue)); }
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <div class="photo" id="photo"></div>
+  <div class="shade"></div>
+  <div class="frame"></div>
+  <div class="chip" id="chip"><i></i><span id="cat"></span></div>
+  <div class="foot">
+    <span class="logo"><img src="../../assets/img/logo.png" alt="Mayobe Bros" width="258" height="50"></span>
+    <span class="url" id="url">mayobebros.com</span>
+  </div>
+  <div class="bar"></div>
+</div>
+<script>
+  (function () {
+    var q = new URLSearchParams(location.search);
+    var img = q.get('img') || '../../assets/img/hero.webp';
+    var cat = q.get('cat') || '';
+    var fy = parseFloat(q.get('fy'));
+    document.getElementById('photo').style.backgroundImage = 'url("' + img.replace(/"/g, '%22') + '")';
+    if (fy >= 0 && fy <= 100) document.getElementById('photo').style.setProperty('--fy', fy + '%');
+    if (cat) document.getElementById('cat').textContent = cat; else document.getElementById('chip').style.display = 'none';
+    if (q.get('host')) document.getElementById('url').textContent = q.get('host');
+  })();
+</script>
+</body>
+</html>

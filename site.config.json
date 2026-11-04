@@ -1,0 +1,117 @@
+{
+  "name": "Mayobe Bros",
+  "slogan": "Clear, honest guides on education, jobs, money and technology for readers in Tanzania.",
+  "title": "Mayobe Bros: Plain-English guides for readers in Tanzania",
+  "description": "Plain-English guides on student loans, careers, small business, technology and daily-life news for readers in Tanzania, checked against official sources.",
+  "keywords": "Tanzania, education, student loans, HESLB, careers, business ideas, technology, news",
+  "author": "Mclean Mbaga",
+  "language": "en",
+  "themeColor": "#1e3a9e",
+
+  "siteUrl": "https://mayobebros.com",
+  "basePath": "",
+
+  "logo": "assets/img/logo.png",
+  "logoSmall": "assets/img/logo-500.webp",
+  "orgLogo": "assets/img/icon-512.png",
+  "heroImage": "assets/img/hero.webp",
+  "ogImage": "assets/img/og-default.jpg",
+  "heroBadge": "Knowledge & Insights",
+  "footerText": "Clear, honest guides on education, jobs, money and technology for readers in Tanzania. Every article is checked against official sources and corrected in the open.",
+  "footerCopyright": "",
+
+  "authors": [
+    {
+      "name": "Mclean Mbaga",
+      "slug": "mclean-mbaga",
+      "role": "Writer and editor, Mayobe Bros",
+      "email": "mclean@mayobebros.com",
+      "bio": "Mclean Mbaga writes and edits Mayobe Bros, a blog about education, careers, business and technology for readers in Tanzania. Articles are checked against official sources where they exist, and mistakes are corrected openly. Questions and corrections are welcome by email."
+    }
+  ],
+
+  "pageHeroes": {
+      "privacy-policy": "assets/img/heroes/privacy-policy.webp",
+      "terms-of-service": "assets/img/heroes/terms-of-service.webp",
+      "cookie-policy": "assets/img/heroes/cookie-policy.webp",
+      "cache-policy": "assets/img/heroes/cache-policy.webp",
+      "editorial-policy": "assets/img/heroes/editorial-policy.webp",
+      "fact-checking-policy": "assets/img/heroes/fact-checking-policy.webp",
+      "comment-policy": "assets/img/heroes/comment-policy.webp",
+      "about": "assets/img/heroes/about.webp",
+      "contact": "assets/img/heroes/contact.webp",
+      "advertise": "assets/img/heroes/advertise.webp",
+      "author/mclean-mbaga": "assets/img/heroes/author.webp",
+      "search": "assets/img/heroes/search.webp"
+  },
+
+  "postsPerPage": 15,
+  "homeRecentCount": 6,
+
+  "contact": {
+    "general": "info@mayobebros.com",
+    "support": "support@mayobebros.com",
+    "executive": "mclean@mayobebros.com",
+    "formAction": ""
+  },
+  "newsletterAction": "",
+  "social": {
+    "facebook": "",
+    "twitter": "",
+    "instagram": "",
+    "linkedin": ""
+  },
+
+  "commentsApi": "",
+  "turnstileSiteKey": "",
+
+  "adsense": {
+    "client": "ca-pub-4671753262151081",
+    "autoAds": false,
+    "sidebarSlot": ""
+  },
+
+  "verification": {
+    "yandex": "66d6f591f2987283",
+    "google": "",
+    "bing": ""
+  },
+  "showEmptyTopics": true,
+  "indexNowKey": "f2e092d4489603c02141ac4e4ae1fe91",
+  "homePaths": [
+      {
+          "title": "For students",
+          "kicker": "Start here",
+          "sub": "From paying for university to studying well.",
+          "category": "educational",
+          "posts": [
+              "students-loan-tanzania-complete-guide",
+              "10-proven-techniques-to-study-effectively-for-students",
+              "next-generation-online-learning-platform"
+          ]
+      },
+      {
+          "title": "For small business ideas",
+          "kicker": "Start here",
+          "sub": "Honest costs, permits and risks before you spend.",
+          "category": "business-ideas",
+          "posts": [
+              "low-cost-online-business-ideas-tanzania",
+              "chicken-farming-tanzania-housing-health-costs",
+              "water-vending-business-tanzania-costs-permits-risks"
+          ]
+      },
+      {
+          "title": "For daily life in Tanzania",
+          "kicker": "Start here",
+          "sub": "Fares, fuel prices and tourism, explained.",
+          "category": "tanzania-news",
+          "posts": [
+              "tanzania-new-transport-fares",
+              "tanzania-fuel-security-measures-navigating-current-challenges",
+              "tanzania-tourism-boom-kilimanjaro-serengeti-zanzibar-world"
+          ]
+      }
+  ],
+  "blockAiCrawlers": true
+}
