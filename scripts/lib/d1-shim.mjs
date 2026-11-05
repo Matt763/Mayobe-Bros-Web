@@ -2,9 +2,9 @@
 import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 
-export function makeD1(migration = new URL('../../worker/migrations/0001_init.sql', import.meta.url)) {
+export function makeD1(dir = new URL('../../worker/migrations/', import.meta.url)) {
   const db = new DatabaseSync(':memory:');
-  db.exec(fs.readFileSync(migration, 'utf8'));
+  for (const f of fs.readdirSync(dir).filter((n) => n.endsWith('.sql')).sort()) db.exec(fs.readFileSync(new URL(f, dir), 'utf8')); // every migration, in order
   const stmt = (sql, args = []) => ({
     bind: (...a) => stmt(sql, a),
     first: async () => db.prepare(sql).get(...args) ?? null,

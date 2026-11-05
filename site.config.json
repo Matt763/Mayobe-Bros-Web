@@ -71,7 +71,8 @@
   "sitemapUrlsPerFile": 200,
 
   "analytics": {
-    "gtmId": "GTM-N8Z3H9L6"
+    "gtmId": "GTM-N8Z3H9L6",
+    "cloudflareToken": "8278babd2d454653881df2e2a030ad02"
   },
 
   "adsense": {

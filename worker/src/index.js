@@ -8,7 +8,11 @@
 //   GET  /v1/admin/comments?status=pending  (Authorization: Bearer ADMIN_TOKEN)
 //   POST /v1/admin/comments/:id             { action: "approve" | "spam" | "delete" }
 //
-// Every comment is held as "pending" until the owner approves it, so nothing unreviewed ever appears on a page.
+// A comment is screened automatically (worker/src/moderation.js: English + Swahili abusive words, scam lines, contact details,
+// shouting). A clean comment is published at once ("approved"); a flagged one is held as "pending" until the owner approves it.
+// Set the variable AUTO_APPROVE to "false" to hold every comment again (for example during a spam wave).
+
+import { screen } from './moderation.js';
 
 export const REACTIONS = ['like', 'amazed', 'sad', 'angry'];
 const COL = { like: 'r_like', amazed: 'r_amazed', sad: 'r_sad', angry: 'r_angry' };
@@ -201,12 +205,26 @@ async function handle(request, env, ctx) {
       if (!p) return fail('You can only reply to an approved comment.', 400, cors);
     }
     const dup = await env.DB.prepare('SELECT 1 AS ok FROM comments WHERE slug = ? AND cid = ? AND body = ? AND created > ?').bind(slug, b.cid, body, now() - 600000).first();
+    let status = dup ? 'duplicate' : 'pending';
+    let shown = null;
     if (!dup) {
+      // automatic screen: flagged text, a visitor who was marked as spam before, or AUTO_APPROVE=false -> hold for review
+      let reasons;
+      try { reasons = [...screen(`${name}\n${body}`).reasons]; } catch (err) { console.error('screen failed', err && err.stack ? err.stack : err); reasons = ['screen-error']; } // fail closed: if the check breaks, hold the comment
+      if (String(env.AUTO_APPROVE).toLowerCase() === 'false') reasons.push('auto-approve-off');
+      if ((await env.DB.prepare("SELECT COUNT(*) AS n FROM comments WHERE (cid = ? OR ip_hash = ?) AND status = 'spam'").bind(b.cid, ih).first())?.n) reasons.push('earlier-spam');
       const pending = await env.DB.prepare("SELECT COUNT(*) AS n FROM comments WHERE cid = ? AND status = 'pending'").bind(b.cid).first();
-      if ((pending?.n || 0) >= 5) return fail('You already have several comments waiting for review.', 429, cors);
-      await env.DB.prepare("INSERT INTO comments(slug, parent_id, name, email, body, status, created, ip_hash, cid) VALUES(?, ?, ?, ?, ?, 'pending', ?, ?, ?)").bind(slug, parent, name, email || null, body, now(), ih, b.cid).run();
+      if (reasons.length && (pending?.n || 0) >= 5) return fail('You already have several comments waiting for review.', 429, cors);
+      status = reasons.length ? 'pending' : 'approved';
+      const t = now();
+      const row = await env.DB.prepare('INSERT INTO comments(slug, parent_id, name, email, body, status, created, ip_hash, cid, flag) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id')
+        .bind(slug, parent, name, email || null, body, status, t, ih, b.cid, reasons.length ? reasons.join(', ').slice(0, 300) : null).first();
+      if (status === 'approved') {
+        await env.DB.prepare('UPDATE post_stats SET comments = comments + 1 WHERE slug = ?').bind(slug).run();
+        shown = { id: row.id, name, body, at: t, parent };
+      }
     }
-    return reply({ ok: true, status: 'pending' }, 202, cors);
+    return reply({ ok: true, status, comment: shown }, status === 'approved' ? 201 : 202, cors);
   }
 
   /* ------------------------------------------------------------- moderation */
@@ -215,7 +233,7 @@ async function handle(request, env, ctx) {
     if (method === 'GET' && path === '/v1/admin/comments') {
       const status = ['pending', 'approved', 'spam'].includes(url.searchParams.get('status')) ? url.searchParams.get('status') : 'pending';
       const limit = Math.min(200, Math.max(1, Number(url.searchParams.get('limit')) || 50));
-      const rows = await env.DB.prepare('SELECT id, slug, parent_id, name, email, body, status, created FROM comments WHERE status = ? ORDER BY created DESC LIMIT ?').bind(status, limit).all();
+      const rows = await env.DB.prepare('SELECT id, slug, parent_id, name, email, body, status, created, flag FROM comments WHERE status = ? ORDER BY created DESC LIMIT ?').bind(status, limit).all();
       return reply({ comments: rows.results || [] }, 200, cors);
     }
     if ((m = path.match(/^\/v1\/admin\/comments\/(\d+)$/)) && method === 'POST') {

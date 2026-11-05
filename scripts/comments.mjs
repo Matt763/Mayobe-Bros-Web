@@ -36,7 +36,9 @@ try {
     if (!comments.length) console.log(`No ${status} comments.`);
     for (const c of comments) {
       console.log(`#${c.id}  [${c.status}]  ${new Date(c.created).toISOString().slice(0, 16).replace('T', ' ')}  on "${c.slug}"${c.parent_id ? `  (reply to #${c.parent_id})` : ''}`);
-      console.log(`   ${c.name}${c.email ? ` <${c.email}>` : ''}: ${c.body.replace(/\n/g, ' ')}\n`);
+      console.log(`   ${c.name}${c.email ? ` <${c.email}>` : ''}: ${c.body.replace(/\n/g, ' ')}`);
+      if (c.flag) console.log(`   held because: ${c.flag}`);
+      console.log('');
     }
   } else if (['approve', 'spam', 'delete'].includes(cmd)) {
     if (!rest.length) throw new Error(`Give at least one comment id, e.g. "${cmd} 12".`);

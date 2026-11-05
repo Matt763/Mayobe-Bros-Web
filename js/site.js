@@ -354,43 +354,57 @@
       try { (window.adsbygoogle = window.adsbygoogle || []).push({}); } catch (err) { box.classList.remove('is-on'); }
     });
   }
-  function showCookieNotice() {
+  // Small line icons (stroke only, drawn for this page); the markup is static, so it is safe to insert as HTML.
+  var SVG = function (paths, w) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="' + (w || 1.8) + '" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + paths + '</svg>'; };
+  var IC_COOKIE = SVG('<path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5"/><path d="M8.5 8.5v.01M16 15.5v.01M12 12v.01M11 17v.01M7 14v.01"/>');
+  var IC_X = SVG('<path d="M18 6 6 18M6 6l12 12"/>', 2.2);
+  var IC_SHIELD = SVG('<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>');
+  function showCookieNotice(focus) {
     if ($('.cookie')) return;
     var wrap = el('div', 'cookie');
     wrap.setAttribute('role', 'region');
-    wrap.setAttribute('aria-label', 'Cookie notice');
-    var link = function (href, text) { var a = el('a', '', text); a.href = BASE + href; return a; };
-    var p = el('p');
-    p.appendChild(doc.createTextNode('We use browser storage to remember your choices, such as dark mode, and, when ads are switched on, cookies for advertising. You can say no. Read our '));
-    p.appendChild(link('/cookie-policy/', 'Cookie Policy'));
-    p.appendChild(doc.createTextNode(' and '));
-    p.appendChild(link('/privacy-policy/', 'Privacy Policy'));
-    p.appendChild(doc.createTextNode('.'));
-    var button = function (cls, value, text) { var b = el('button', 'btn ' + cls, text); b.type = 'button'; b.setAttribute('data-consent', value); return b; };
-    var actions = el('div', 'cookie-actions');
-    // Reject and Accept look exactly alike: refusing must be as easy and as visible as accepting
-    actions.appendChild(button('btn-primary', 'rejected', 'Reject'));
-    actions.appendChild(button('btn-primary', 'accepted', 'Accept'));
-    var body = el('div', 'cookie-body');
-    body.appendChild(el('h2', '', 'Your privacy choices'));
-    body.appendChild(p);
-    body.appendChild(actions);
-    var card = el('div', 'cookie-card');
-    card.appendChild(body);
-    wrap.appendChild(card);
+    wrap.setAttribute('aria-labelledby', 'cookie-h');
+    wrap.innerHTML =
+      '<div class="cookie-card">' +
+        '<div class="cookie-ico" aria-hidden="true">' + IC_COOKIE + '</div>' +
+        '<div class="cookie-main">' +
+          '<div class="cookie-top"><h2 id="cookie-h">Your privacy choices</h2>' +
+            '<button class="cookie-x" type="button" data-consent="rejected" aria-label="Reject and close">' + IC_X + '</button></div>' +
+          '<p>We use browser storage to remember your choices, such as dark mode, and, when ads are switched on, cookies for advertising. You can say no. Read our ' +
+            '<a data-path="/cookie-policy/">Cookie Policy</a> and <a data-path="/privacy-policy/">Privacy Policy</a>.</p>' +
+          '<div class="cookie-foot">' +
+            '<span class="cookie-note">' + IC_SHIELD + '<span>Change this any time from the footer.</span></span>' +
+            '<div class="cookie-actions">' +
+              '<button class="cookie-btn cookie-reject" type="button" data-consent="rejected">Reject</button>' +
+              '<button class="cookie-btn cookie-accept" type="button" data-consent="accepted">Accept</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    $$('a[data-path]', wrap).forEach(function (a) { a.href = BASE + a.getAttribute('data-path'); a.removeAttribute('data-path'); });
     doc.body.appendChild(wrap);
+    var card = $('.cookie-card', wrap);
+    var closing = false;
     wrap.addEventListener('click', function (e) {
       var b = e.target.closest('[data-consent]');
-      if (!b) return;
-      store(CONSENT, b.getAttribute('data-consent'));
-      wrap.remove();
-      if (b.getAttribute('data-consent') === 'rejected') adSlots(false);
+      if (!b || closing) return;
+      closing = true;
+      var value = b.getAttribute('data-consent');
+      store(CONSENT, value);
+      $$('button', wrap).forEach(function (x) { x.disabled = true; });
+      // the choice takes effect at once; the card slides away and is then removed
+      if (value === 'rejected') adSlots(false);
       loadAds();
       loadTags();
+      wrap.classList.add('is-leaving');
+      var gone = false, end = function () { if (!gone) { gone = true; wrap.remove(); } };
+      card.addEventListener('animationend', function (ev) { if (ev.target === card) end(); });
+      setTimeout(end, 700);
     });
+    if (focus) { wrap.tabIndex = -1; wrap.focus({ preventScroll: true }); } // opened by the reader from the footer: start reading from the notice
   }
-  if (!store(CONSENT)) setTimeout(function () { if (!store(CONSENT)) showCookieNotice(); }, 1500);
-  $$('[data-cookie-settings]').forEach(function (b) { b.addEventListener('click', function () { store(CONSENT, null); showCookieNotice(); }); });
+  if (!store(CONSENT)) setTimeout(function () { if (!store(CONSENT)) showCookieNotice(); }, 1200);
+  $$('[data-cookie-settings]').forEach(function (b) { b.addEventListener('click', function () { store(CONSENT, null); showCookieNotice(true); }); });
   loadAds();
   loadTags();
 

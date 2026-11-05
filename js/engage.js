@@ -94,6 +94,8 @@
 
   function showStats(st) {
     buttons.forEach(function (b) { $('.n', b).textContent = st.r[b.getAttribute('data-r')]; });
+    var tot = $('[data-total]');
+    if (tot) { var sum = st.r.like + st.r.amazed + st.r.sad + st.r.angry; tot.textContent = sum ? plural(sum, 'reaction', 'reactions') : 'Be the first to react'; }
     var link = $('[data-comment-count-link]');
     if (link) link.textContent = plural(st.c, 'comment', 'comments');
     var h = $('[data-comment-count]');
@@ -103,6 +105,38 @@
     buttons.forEach(function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-r') === mine ? 'true' : 'false'); });
   }
   function say(text, bad) { if (note) { note.textContent = text; note.style.color = bad ? 'var(--err)' : ''; } }
+
+  // a few particles leave the icon in the mood's own direction: hearts and stars spread, tears fall, embers rise
+  var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var BURST = {
+    like: { n: 8, from: 0, to: 360, min: 30, max: 46, star: false },
+    amazed: { n: 9, from: 0, to: 360, min: 34, max: 54, star: true },
+    sad: { n: 6, from: 60, to: 120, min: 26, max: 44, star: false },
+    angry: { n: 7, from: 235, to: 305, min: 30, max: 50, star: false }
+  };
+  function burst(btn, type) {
+    var cfg = BURST[type], medal = $('.medal', btn);
+    if (calm || !cfg || !medal) return;
+    $$('.rx-dot', medal).forEach(function (d) { d.remove(); });
+    for (var i = 0; i < cfg.n; i++) {
+      var ang = (cfg.from + (cfg.to - cfg.from) * (i + Math.random() * 0.7) / cfg.n) * Math.PI / 180;
+      var dist = cfg.min + Math.random() * (cfg.max - cfg.min);
+      var dot = el('i', 'rx-dot' + (cfg.star ? ' is-star' : ''));
+      dot.style.setProperty('--dx', (Math.cos(ang) * dist).toFixed(1) + 'px');
+      dot.style.setProperty('--dy', (Math.sin(ang) * dist).toFixed(1) + 'px');
+      dot.style.setProperty('--s', (5 + Math.random() * 4).toFixed(1) + 'px');
+      dot.style.setProperty('--d', (i * 22) + 'ms');
+      dot.setAttribute('aria-hidden', 'true');
+      medal.appendChild(dot);
+    }
+    setTimeout(function () { $$('.rx-dot', medal).forEach(function (d) { d.remove(); }); }, 1500);
+  }
+  var THANKS = {
+    like: 'Glad you liked it.',
+    amazed: 'Glad it surprised you.',
+    sad: 'Sorry this one made you feel sad.',
+    angry: 'We hear you. Tell us what bothered you in the comments.'
+  };
 
   buttons.forEach(function (b) {
     b.addEventListener('click', function () {
@@ -116,10 +150,11 @@
       if (before) { var o = buttons.filter(function (x) { return x.getAttribute('data-r') === before; })[0]; if (o) $('.n', o).textContent = Math.max(0, Number($('.n', o).textContent) - 1); }
       if (next) counter.textContent = Number(counter.textContent) + 1;
       mine = next; showMine();
-      b.classList.remove('is-pop'); void b.offsetWidth; if (next) b.classList.add('is-pop');
+      b.classList.remove('is-pop'); void b.offsetWidth; if (next) { b.classList.add('is-pop'); burst(b, next); }
+      counter.classList.remove('is-bump'); void counter.offsetWidth; counter.classList.add('is-bump');
       post('/posts/' + slug + '/react', { cid: cid(), type: next }).then(function (j) {
         try { sessionStorage.removeItem('mb_stats'); } catch (e) {}
-        showStats(j.stats); say(next ? 'Thanks for your reaction.' : 'Reaction removed.');
+        showStats(j.stats); say(next ? THANKS[next] : 'Reaction removed.');
       }).catch(function (err) {
         mine = before; showMine(); refresh(); say(err.message, true);
       }).then(function () { busy = false; });
@@ -230,10 +265,21 @@
       if (TURNSTILE && window.turnstile && widget) payload.tt = window.turnstile.getResponse(widget);
       submit.disabled = true;
       setStatus('', 'Sending…');
-      post('/posts/' + slug + '/comments', payload).then(function () {
+      post('/posts/' + slug + '/comments', payload).then(function (j) {
         try { sessionStorage.removeItem('mb_stats'); } catch (e) {}
         f.body.value = ''; f.parent.value = ''; $('[data-cancel-reply]', form).hidden = true;
-        setStatus('is-ok', 'Thank you! Your comment was received and will appear after it has been reviewed.');
+        if (j && j.status === 'approved' && j.comment) {
+          setStatus('is-ok', 'Thank you! Your comment is now live.');
+          shownTop = Math.max(shownTop, COMMENT_BATCH);
+          refresh().then(function () {
+            var node = doc.getElementById('comment-' + j.comment.id);
+            if (node) node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          });
+        } else if (j && j.status === 'duplicate') {
+          setStatus('is-ok', 'You already sent this comment.');
+        } else {
+          setStatus('is-ok', 'Thank you! Your comment needs a quick check by our team and will appear once it is approved.');
+        }
         if (TURNSTILE && window.turnstile && widget) window.turnstile.reset(widget);
       }).catch(function (err) {
         setStatus('is-err', err.message);

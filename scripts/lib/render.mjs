@@ -3,6 +3,10 @@ import { escapeHtml as e, addHeadingIds } from './markdown.mjs';
 
 /* ------------------------------------------------------------------ icons */
 const ICONS = {
+  rxLike: '<path d="M12 20.2S4.6 15.9 4.6 10.2A4.2 4.2 0 0 1 12 7.7a4.2 4.2 0 0 1 7.4 2.5c0 5.7-7.4 10-7.4 10Z"/>',
+  rxAmazed: '<path d="M10.5 6.5c.5 4 2 5.5 6 6-4 .5-5.5 2-6 6-.5-4-2-5.5-6-6 4-.5 5.5-2 6-6Z"/><path d="M18.5 3.5v4M16.5 5.5h4"/>',
+  rxSad: '<path d="M12 3.8c3.2 3.9 5.4 6.8 5.4 9.8a5.4 5.4 0 0 1-10.8 0c0-3 2.2-5.9 5.4-9.8Z"/><path d="M9.6 14.6a2.6 2.6 0 0 0 1.9 1.9"/>',
+  rxAngry: '<path d="M12 20.8c-3.7 0-6.2-2.5-6.2-5.9 0-2.5 1.5-4.2 2.9-5.7.4 1.5 1.3 2.3 2.3 2.6C11 8.4 11.7 5.7 13.8 3.2c.2 2.9 3.5 4.8 4.3 8 .9 4.2-1.7 9.6-6.1 9.6Z"/>',
   search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
   menu: '<line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/>',
   x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
@@ -63,10 +67,10 @@ export function icon(name, size = 20, cls = '') {
 }
 
 export const REACTIONS = [
-  ['like', '👍', 'Like'],
-  ['amazed', '😮', 'Amazed'],
-  ['sad', '😢', 'Sad'],
-  ['angry', '😡', 'Angry'],
+  ['like', 'rxLike', 'Like'],
+  ['amazed', 'rxAmazed', 'Amazed'],
+  ['sad', 'rxSad', 'Sad'],
+  ['angry', 'rxAngry', 'Angry'],
 ];
 
 const LABEL_HEADINGS = (label, cat) => [
@@ -85,6 +89,7 @@ export function createRenderer(ctx) {
   const siteUrl = config.siteUrl.replace(/\/$/, '');
   const api = (config.commentsApi || '').replace(/\/$/, '');
   const adsenseId = (config.adsense?.client || '').trim();
+  const cfToken = /^[a-f0-9]{32}$/.test(config.analytics?.cloudflareToken || '') ? config.analytics.cloudflareToken : ''; // Cloudflare Web Analytics: no cookies, so it loads for every visitor
   const gtmId = /^GTM-[A-Z0-9]{4,12}$/.test(config.analytics?.gtmId || '') ? config.analytics.gtmId : '';
 
   const u = (p) => `${base}${p}`;
@@ -317,7 +322,7 @@ ${body}
 </main>
 ${footer()}
 ${SEARCH_MODAL()}
-<script src="${assetUrl('js/site.js')}" defer></script>${meta.listen ? `\n<script src="${assetUrl('js/listen.js')}" defer></script>` : ''}${body.includes('class="pagination"') || body.includes('hero-listing') ? `\n<script src="${assetUrl('js/pager.js')}" defer></script>` : ''}${api ? `\n<script src="${assetUrl('js/engage.js')}" defer></script>` : ''}
+<script src="${assetUrl('js/site.js')}" defer></script>${meta.listen ? `\n<script src="${assetUrl('js/listen.js')}" defer></script>` : ''}${body.includes('class="pagination"') || body.includes('hero-listing') ? `\n<script src="${assetUrl('js/pager.js')}" defer></script>` : ''}${api ? `\n<script src="${assetUrl('js/engage.js')}" defer></script>` : ''}${cfToken ? `\n<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${cfToken}"}'></script>` : ''}
 </body>
 </html>
 `;
@@ -878,6 +883,8 @@ ${discover()}`;
       h
         .replace(/\{\{#comments\}\}([\s\S]*?)\{\{\/comments\}\}/g, (_m, t) => (api ? t : ''))
         .replace(/\{\{\^comments\}\}([\s\S]*?)\{\{\/comments\}\}/g, (_m, t) => (api ? '' : t))
+        .replace(/\{\{#cfanalytics\}\}([\s\S]*?)\{\{\/cfanalytics\}\}/g, (_m, t) => (cfToken ? t : ''))
+        .replace(/\{\{\^cfanalytics\}\}([\s\S]*?)\{\{\/cfanalytics\}\}/g, (_m, t) => (cfToken ? '' : t))
         .replace(/\{\{#analytics\}\}([\s\S]*?)\{\{\/analytics\}\}/g, (_m, t) => (gtmId ? t : ''))
         .replace(/\{\{\^analytics\}\}([\s\S]*?)\{\{\/analytics\}\}/g, (_m, t) => (gtmId ? '' : t))
         .replace(/\{\{base\}\}/g, base)
@@ -1013,9 +1020,12 @@ ${withIds.html}
     !api
       ? ''
       : `<section class="engage" data-engage data-slug="${p.slug}" aria-labelledby="react-h">
-  <h2 id="react-h">How did this post make you feel?</h2>
+  <div class="engage-head">
+    <h2 id="react-h">How did this post make you feel?</h2>
+    <p class="engage-total" data-total aria-live="polite"></p>
+  </div>
   <div class="reactions" role="group" aria-label="Reactions">
-    ${REACTIONS.map(([k, emo, label]) => `<button class="reaction" type="button" data-r="${k}" aria-pressed="false" aria-label="${label}"><span class="emo" aria-hidden="true">${emo}</span><span class="lbl">${label}</span><b class="n" aria-live="polite">0</b></button>`).join('')}
+    ${REACTIONS.map(([k, ic, label]) => `<button class="reaction" type="button" data-r="${k}" aria-pressed="false" aria-label="${label}"><span class="medal">${icon(ic, 26)}</span><span class="lbl">${label}</span><b class="n" aria-live="polite">0</b></button>`).join('')}
   </div>
   <p class="engage-note" role="status"></p>
 </section>

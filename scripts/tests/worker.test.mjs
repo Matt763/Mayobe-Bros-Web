@@ -65,49 +65,91 @@ test('reactions: add, change, remove; one per visitor', async () => {
   assert.equal((await call('POST', '/v1/posts/hello-post/react', { body: { cid: 'short', type: 'like' } })).status, 400);
 });
 
-test('comments are held for review, then approved, then counted', async () => {
+const RUDE = 'You are an idiot and a fool, mjinga wewe.';
+
+test('a clean comment is published at once and counted', async () => {
   const r = await call('POST', '/v1/posts/hello-post/comments', { body: comment() });
+  assert.equal(r.status, 201);
+  assert.equal(r.json.status, 'approved');
+  assert.equal(r.json.comment.name, 'Asha');
+  assert.equal(r.json.comment.parent, null);
+  const pub = (await call('GET', '/v1/posts/hello-post')).json;
+  assert.equal(pub.comments.length, 1);
+  assert.equal(pub.stats.c, 1);
+  assert.equal('email' in pub.comments[0], false, 'email is never public');
+  assert.equal((await call('GET', '/v1/stats?slugs=hello-post')).json['hello-post'].c, 1);
+  assert.equal((await call('GET', '/v1/admin/comments?status=pending', { auth: env.ADMIN_TOKEN, origin: null })).json.comments.length, 0);
+});
+
+test('a flagged comment is held, shows the reason to the moderator only, then can be approved', async () => {
+  const r = await call('POST', '/v1/posts/hello-post/comments', { body: comment({ body: RUDE, email: 'asha@example.com' }) });
   assert.equal(r.status, 202);
-  assert.equal((await call('GET', '/v1/posts/hello-post')).json.comments.length, 0, 'pending comments are invisible');
+  assert.equal(r.json.status, 'pending');
+  assert.equal(r.json.comment, null);
+  assert.equal((await call('GET', '/v1/posts/hello-post')).json.comments.length, 0, 'held comments are invisible');
   assert.equal((await call('GET', '/v1/admin/comments')).status, 401);
   assert.equal((await call('GET', '/v1/admin/comments', { auth: 'wrong-token-wrong-token' })).status, 401);
   const list = await call('GET', '/v1/admin/comments?status=pending', { auth: env.ADMIN_TOKEN, origin: null });
   assert.equal(list.json.comments.length, 1);
+  assert.match(list.json.comments[0].flag, /word:/);
   const id = list.json.comments[0].id;
   const ap = await call('POST', `/v1/admin/comments/${id}`, { auth: env.ADMIN_TOKEN, origin: null, body: { action: 'approve' } });
   assert.equal(ap.json.stats.c, 1);
   const pub = (await call('GET', '/v1/posts/hello-post')).json;
   assert.equal(pub.comments.length, 1);
-  assert.equal(pub.comments[0].name, 'Asha');
-  assert.equal('email' in pub.comments[0], false, 'email is never public');
-  assert.equal((await call('GET', '/v1/stats?slugs=hello-post')).json['hello-post'].c, 1);
+  assert.equal(JSON.stringify(pub).includes('flag'), false, 'the reason is never public');
 });
 
-test('replies need an approved parent and nest one level', async () => {
-  await call('POST', '/v1/posts/hello-post/comments', { body: comment() });
-  assert.equal((await call('POST', '/v1/posts/hello-post/comments', { body: comment({ body: 'A reply here', parent: 1 }) })).status, 400, 'parent not approved yet');
-  await call('POST', '/v1/admin/comments/1', { auth: env.ADMIN_TOKEN, origin: null, body: { action: 'approve' } });
-  assert.equal((await call('POST', '/v1/posts/hello-post/comments', { body: comment({ body: 'A reply here', parent: 1 }) })).status, 202);
-  await call('POST', '/v1/admin/comments/2', { auth: env.ADMIN_TOKEN, origin: null, body: { action: 'approve' } });
+test('names are screened too, and so are phone numbers and shouting', async () => {
+  assert.equal((await call('POST', '/v1/posts/hello-post/comments', { body: comment({ name: 'idiot man' }) })).json.status, 'pending');
+  assert.equal((await call('POST', '/v1/posts/hello-post/comments', { body: comment({ body: 'Call me on 0712 345 678 please' }) })).json.status, 'pending');
+  assert.equal((await call('POST', '/v1/posts/hello-post/comments', { body: comment({ body: 'THIS IS A VERY LONG MESSAGE WRITTEN IN CAPITALS' }) })).json.status, 'pending');
+});
+
+test('AUTO_APPROVE=false holds every comment again', async () => {
+  env.AUTO_APPROVE = 'false';
+  const r = await call('POST', '/v1/posts/hello-post/comments', { body: comment() });
+  assert.equal(r.json.status, 'pending');
+  const list = await call('GET', '/v1/admin/comments', { auth: env.ADMIN_TOKEN, origin: null });
+  assert.match(list.json.comments[0].flag, /auto-approve-off/);
+});
+
+test('a visitor whose earlier comment was marked as spam is held from then on', async () => {
+  const first = await call('POST', '/v1/posts/hello-post/comments', { body: comment() });
+  await call('POST', `/v1/admin/comments/${first.json.comment.id}`, { auth: env.ADMIN_TOKEN, origin: null, body: { action: 'spam' } });
+  const again = await call('POST', '/v1/posts/hello-post/comments', { body: comment({ body: 'A perfectly polite second comment.' }) });
+  assert.equal(again.json.status, 'pending');
+  const list = await call('GET', '/v1/admin/comments', { auth: env.ADMIN_TOKEN, origin: null });
+  assert.match(list.json.comments[0].flag, /earlier-spam/);
+});
+
+test('replies work on a published comment and nest one level', async () => {
+  const p = await call('POST', '/v1/posts/hello-post/comments', { body: comment() });
+  const reply = await call('POST', '/v1/posts/hello-post/comments', { body: comment({ body: 'A reply here', parent: p.json.comment.id }) });
+  assert.equal(reply.json.status, 'approved');
+  assert.equal(reply.json.comment.parent, p.json.comment.id);
   const pub = (await call('GET', '/v1/posts/hello-post')).json;
   assert.equal(pub.comments.length, 1);
   assert.equal(pub.comments[0].replies.length, 1);
   assert.equal(pub.stats.c, 2);
-  assert.equal((await call('POST', '/v1/posts/hello-post/comments', { body: comment({ body: 'Nested too deep', parent: 2 }) })).status, 400);
+  assert.equal((await call('POST', '/v1/posts/hello-post/comments', { body: comment({ body: 'Nested too deep', parent: reply.json.comment.id }) })).status, 400);
+  assert.equal((await call('POST', '/v1/posts/hello-post/comments', { body: comment({ body: 'Reply to nothing', parent: 999 }) })).status, 400);
+});
+
+test('a reply to a held comment is refused until the parent is approved', async () => {
+  await call('POST', '/v1/posts/hello-post/comments', { body: comment({ body: RUDE }) });
+  assert.equal((await call('POST', '/v1/posts/hello-post/comments', { body: comment({ body: 'A reply here', parent: 1 }) })).status, 400);
 });
 
 test('spam and delete adjust the count and hide replies', async () => {
-  await call('POST', '/v1/posts/hello-post/comments', { body: comment() });
-  await call('POST', '/v1/admin/comments/1', { auth: env.ADMIN_TOKEN, origin: null, body: { action: 'approve' } });
-  await call('POST', '/v1/posts/hello-post/comments', { body: comment({ body: 'Reply text', parent: 1 }) });
-  await call('POST', '/v1/admin/comments/2', { auth: env.ADMIN_TOKEN, origin: null, body: { action: 'approve' } });
+  const p = await call('POST', '/v1/posts/hello-post/comments', { body: comment() });
+  await call('POST', '/v1/posts/hello-post/comments', { body: comment({ body: 'Reply text', parent: p.json.comment.id }) });
   assert.equal((await call('GET', '/v1/stats?slugs=hello-post')).json['hello-post'].c, 2);
-  const r = await call('POST', '/v1/admin/comments/1', { auth: env.ADMIN_TOKEN, origin: null, body: { action: 'delete' } });
+  const r = await call('POST', `/v1/admin/comments/${p.json.comment.id}`, { auth: env.ADMIN_TOKEN, origin: null, body: { action: 'delete' } });
   assert.equal(r.json.stats.c, 0);
   assert.equal((await call('GET', '/v1/posts/hello-post')).json.comments.length, 0);
-  await call('POST', '/v1/posts/hello-post/comments', { body: comment({ body: 'Another one here', cid: CID2, ip: '9.9.9.9' }), ip: '9.9.9.9' });
-  await call('POST', '/v1/admin/comments/3', { auth: env.ADMIN_TOKEN, origin: null, body: { action: 'approve' } });
-  assert.equal((await call('POST', '/v1/admin/comments/3', { auth: env.ADMIN_TOKEN, origin: null, body: { action: 'spam' } })).json.stats.c, 0);
+  const q = await call('POST', '/v1/posts/hello-post/comments', { body: comment({ body: 'Another one here', cid: CID2, ip: '9.9.9.9' }), ip: '9.9.9.9' });
+  assert.equal((await call('POST', `/v1/admin/comments/${q.json.comment.id}`, { auth: env.ADMIN_TOKEN, origin: null, body: { action: 'spam' } })).json.stats.c, 0);
 });
 
 test('validation: links, names, length, email, honeypot, speed', async () => {
@@ -121,16 +163,18 @@ test('validation: links, names, length, email, honeypot, speed', async () => {
   const fast = await call('POST', '/v1/posts/hello-post/comments', { body: comment({ ts: Date.now() - 300 }) });
   assert.equal(bot.status, 202);
   assert.equal(fast.status, 202);
-  assert.equal((await call('GET', '/v1/admin/comments', { auth: env.ADMIN_TOKEN, origin: null })).json.comments.length, 0, 'bot posts are silently dropped');
+  assert.equal((await call('GET', '/v1/posts/hello-post')).json.comments.length, 0, 'bot posts are silently dropped');
+  assert.equal((await call('GET', '/v1/admin/comments', { auth: env.ADMIN_TOKEN, origin: null })).json.comments.length, 0);
 });
 
 test('rate limit and duplicate protection', async () => {
-  for (let i = 0; i < 5; i++) assert.equal((await call('POST', '/v1/posts/hello-post/comments', { body: comment({ body: `Comment number ${i} here` }) })).status, 202);
+  for (let i = 0; i < 5; i++) assert.equal((await call('POST', '/v1/posts/hello-post/comments', { body: comment({ body: `Comment number ${i} here` }) })).status, 201);
   assert.equal((await call('POST', '/v1/posts/hello-post/comments', { body: comment({ body: 'One more comment' }) })).status, 429);
   env = { DB: makeD1(), ADMIN_TOKEN: 'a-very-long-admin-token-123' };
   await call('POST', '/v1/posts/hello-post/comments', { body: comment() });
-  await call('POST', '/v1/posts/hello-post/comments', { body: comment() });
-  assert.equal((await call('GET', '/v1/admin/comments', { auth: env.ADMIN_TOKEN, origin: null })).json.comments.length, 1, 'duplicate within 10 minutes is ignored');
+  const again = await call('POST', '/v1/posts/hello-post/comments', { body: comment() });
+  assert.equal(again.json.status, 'duplicate');
+  assert.equal((await call('GET', '/v1/posts/hello-post')).json.comments.length, 1, 'duplicate within 10 minutes is ignored');
 });
 
 test('admin routes reject missing/short tokens even if ADMIN_TOKEN is unset', async () => {

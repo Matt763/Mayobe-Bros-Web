@@ -114,7 +114,7 @@ Change the text, set `updated:` to today, add a correction note at the top if th
 Time-sensitive facts (fees, fares, deadlines, prices) must say when they were checked.
 
 ## Moderating comments
-Comments are held until approved. `node scripts/comments.mjs list` shows them; `approve <id>`, `spam <id>` or
+Comments publish at once unless the automatic screen (`worker/src/moderation.js`, English + Swahili lists in `worker/wordlists/`, see `worker/README.md`) flags them; flagged ones are held until approved. After editing a list run `node worker/build-wordlist.mjs`, the moderation tests, then `npx wrangler deploy` in `worker/` (wrangler login lives in `~/.config/.wrangler`: use `XDG_CONFIG_HOME=$HOME/.config`). Published comments can be hidden any time with `spam <id>`. `node scripts/comments.mjs list` shows the held ones and why; `approve <id>`, `spam <id>` or
 `delete <id>` act on them. Read each comment before approving. Approve only polite, on-topic comments with no
 links or personal data, and apply `content/pages/comment-policy.html`. Needs the Worker deployed (`worker/README.md`)
 and `.admin-token` (git-ignored) or `ADMIN_TOKEN`.
