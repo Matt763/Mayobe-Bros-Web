@@ -53,8 +53,13 @@ const state = fs.existsSync(STATE_FILE) ? JSON.parse(fs.readFileSync(STATE_FILE,
 // Every address that should be known: the pages in the sitemap, plus the old addresses that now redirect.
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, '.build-manifest.json'), 'utf8')).files.filter((f) => f.endsWith('.html'));
 const fileToUrl = (f) => (f === 'index.html' ? '/' : `/${f.replace(/index\.html$/, '')}`);
-const sitemap = fs.readFileSync(path.join(ROOT, 'sitemap.xml'), 'utf8');
-const inSitemap = new Set([...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]));
+// sitemap.xml is an index: read every child sitemap it lists (posts-sitemap1.xml and so on), skipping image and video entries
+const readLocs = (xml) => [...xml.replace(/<(image|video):\w+>[\s\S]*?<\/\1:\w+>/g, '').matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+const inSitemap = new Set();
+for (const child of readLocs(fs.readFileSync(path.join(ROOT, 'sitemap.xml'), 'utf8'))) {
+  const f = path.join(ROOT, path.basename(new URL(child).pathname));
+  if (fs.existsSync(f)) for (const loc of readLocs(fs.readFileSync(f, 'utf8'))) inSitemap.add(loc);
+}
 const now = {};
 for (const f of manifest) {
   const html = fs.readFileSync(path.join(ROOT, f), 'utf8');

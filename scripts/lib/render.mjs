@@ -267,7 +267,7 @@ export function createRenderer(ctx) {
           <button class="btn btn-primary" type="submit">Subscribe ${icon('arrowRight', 16)}</button>
           <p class="foot-status" role="status"></p>
         </form>`
-      : `<a class="btn btn-primary btn-lg" href="${u('/feed.xml')}">${icon('rss', 18)} Follow with RSS</a>`;
+      : `<a class="btn btn-primary btn-lg" href="${u('/rss/')}">${icon('rss', 18)} Follow with RSS</a>`;
     return `<footer class="site-footer">
   <div class="foot-cta">
     <div class="wrap foot-cta-in">
@@ -290,7 +290,7 @@ export function createRenderer(ctx) {
         ${socials.length ? `<div class="foot-social">${socials.map(([k, l]) => `<a href="${e(config.social[k])}" target="_blank" rel="noopener noreferrer" aria-label="${l}" class="brand-${k === 'twitter' ? 'x' : k}">${brandIcon(k === 'twitter' ? 'x' : k, 18)}</a>`).join('')}</div>` : ''}
       </div>
       <nav aria-labelledby="fh-explore"><h2 class="foot-title" id="fh-explore">Explore</h2><ul class="foot-list">${categories.map((c) => li(u(`/category/${c.slug}/`), c.name)).join('')}${li(u('/popular/'), 'Popular posts')}${li(u('/post/'), 'All posts')}${li(u('/label/'), 'Topics')}</ul></nav>
-      <nav aria-labelledby="fh-company"><h2 class="foot-title" id="fh-company">Company</h2><ul class="foot-list">${company.map(([l, h]) => li(u(h), l)).join('')}${li(u('/search/'), 'Search')}${li(u('/feed.xml'), 'RSS feed')}${li(u('/sitemap.xml'), 'Sitemap')}</ul></nav>
+      <nav aria-labelledby="fh-company"><h2 class="foot-title" id="fh-company">Company</h2><ul class="foot-list">${company.map(([l, h]) => li(u(h), l)).join('')}${li(u('/search/'), 'Search')}${li(u('/rss/'), 'RSS feed')}${li(u('/sitemap/'), 'Sitemap')}</ul></nav>
       <nav aria-labelledby="fh-legal"><h2 class="foot-title" id="fh-legal">Legal and trust</h2><ul class="foot-list">${legal.map((p) => li(u(`/${p.slug}/`), p.title)).join('')}</ul></nav>
     </div>
     <div class="foot-bottom">
@@ -527,7 +527,7 @@ ${SEARCH_MODAL()}
           <button type="submit" aria-label="Search">${icon('search', 18)}</button>
         </form>
         ${tags.length ? `<p class="dsc-try">Common topics in our articles:</p><div class="dsc-tags">${tags.map((t) => `<a href="${tagHref(t)}">${e(t)}</a>`).join('')}</div>` : ''}
-        <a class="dsc-rss" href="${u('/feed.xml')}">${icon('rss', 16)} Follow with RSS</a>
+        <a class="dsc-rss" href="${u('/rss/')}">${icon('rss', 16)} Follow with RSS</a>
       </div>
     </div>
   </div>
@@ -825,7 +825,7 @@ ${discover()}`;
       <h2 id="ap-t3">Contact and corrections</h2>
       <p>Questions, ideas and corrections are welcome. For a correction, send the article link, what is wrong and, if you can, a source.</p>
       <p class="ap-mail"><a href="mailto:${e(mail)}">${icon('mail', 17)} ${e(mail)}</a></p>
-      <p class="ap-links"><a href="mailto:${e(mail)}?subject=${encodeURIComponent(`Correction for ${config.name}`)}">Report a correction</a> <a href="${u('/contact/')}">Contact page</a> <a href="${u('/feed.xml')}">RSS feed</a></p>
+      <p class="ap-links"><a href="mailto:${e(mail)}?subject=${encodeURIComponent(`Correction for ${config.name}`)}">Report a correction</a> <a href="${u('/contact/')}">Contact page</a> <a href="${u('/rss/')}">RSS feed</a></p>
     </section>
   </div>
 
@@ -906,7 +906,7 @@ ${withIds.html}
     const body = `${hero({ image: heroFor(pg.slug, pg.hero), title: e(pg.heading || pg.title), sub: pg.subtitle })}
 <section class="section">${inner}</section>`;
     return layout(
-      { title: pg.title, description: pg.description, path: `/${pg.slug}/`, adKind: isDoc ? 'legal' : 'page', preload: heroFor(pg.slug, pg.hero), jsonLd: [{ '@context': 'https://schema.org', '@type': pg.slug === 'about' ? 'AboutPage' : pg.slug === 'contact' ? 'ContactPage' : 'WebPage', name: pg.title, description: pg.description, url: abs(`/${pg.slug}/`) }] },
+      { title: pg.title, description: pg.description, path: `/${pg.slug}/`, noindex: true, adKind: isDoc ? 'legal' : 'page', preload: heroFor(pg.slug, pg.hero), jsonLd: [{ '@context': 'https://schema.org', '@type': pg.slug === 'about' ? 'AboutPage' : pg.slug === 'contact' ? 'ContactPage' : 'WebPage', name: pg.title, description: pg.description, url: abs(`/${pg.slug}/`) }] },
       { page: pg.slug },
       body,
     );
@@ -1087,7 +1087,7 @@ ${withIds.html}
     mods.push(`<section class="rail-mod rail-tags" aria-labelledby="rg-h"><h2 class="rail-title" id="rg-h">${icon('tag', 16)} Topics</h2><div class="chips">${chipList.map(([n, h]) => `<a class="chip" href="${h}">${e(n)}</a>`).join('')}</div></section>`);
     mods.push(`<section class="rail-mod rail-follow" aria-labelledby="rf-h">
       <h2 class="rail-title" id="rf-h">Follow</h2>
-      <a class="rf-rss" href="${u('/feed.xml')}">${icon('rss', 18)} <span>Follow with RSS<small>New articles in your feed reader</small></span></a>
+      <a class="rf-rss" href="${u('/rss/')}">${icon('rss', 18)} <span>Follow with RSS<small>New articles in your feed reader</small></span></a>
     </section>`);
     mods.push(`<section class="rail-mod rail-stick" aria-label="Your reading progress" data-rail-progress data-min="${p.readingMinutes}">
       <div class="rs-ring" style="--p:0" aria-hidden="true"><span data-rs-pct>0%</span></div>
@@ -1231,39 +1231,208 @@ ${listenPlayer()}
   /* ------------------------------------------------------- xml & friends */
   const xml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-  function sitemap() {
-    const entries = [];
-    const add = (path, lastmod, changefreq, priority) => entries.push({ path, lastmod, changefreq, priority });
+  // sitemap.xml is an index. It lists child sitemaps by type (pages, posts, categories, labels, images, videos), and each child holds at most
+  // `sitemapUrlsPerFile` addresses (default 200). When a type grows past that, the next file appears on its own: posts-sitemap2.xml, and so on.
+  // Company and legal pages are noindex on purpose, so they are left out. People get the same lists as ordinary web pages under /sitemap/
+  // (sitemapHtml below), because browsers are dropping the XSLT that styled the XML.
+  function sitemapData() {
+    const perFile = Math.max(1, Number(config.sitemapUrlsPerFile) || 200);
+    const day = (d) => (d instanceof Date ? d : new Date(d)).toISOString().slice(0, 10);
     const newest = posts[0]?.updated || posts[0]?.date || new Date();
-    add('/', newest, 'daily', '1.0');
-    add('/post/', newest, 'daily', '0.8');
-    if (posts.some((x) => x.featured)) add('/popular/', newest, 'weekly', '0.6');
-    add('/category/', newest, 'weekly', '0.6');
-    add('/label/', newest, 'weekly', '0.4');
+    const when = (p) => p.updated || p.date;
+    const url = (loc, lastmod, changefreq, priority, extra = '', info = {}) =>
+      ({ loc, lastmod, info, xml: `  <url><loc>${xml(loc)}</loc><lastmod>${day(lastmod)}</lastmod>${changefreq ? `<changefreq>${changefreq}</changefreq><priority>${priority}</priority>` : ''}${extra}</url>` });
+
+    const pageUrls = [url(abs('/'), newest, 'daily', '1.0', '', { title: 'Home' }), url(abs('/post/'), newest, 'daily', '0.8', '', { title: 'All posts' })];
+    if (posts.some((x) => x.featured)) pageUrls.push(url(abs('/popular/'), newest, 'weekly', '0.6', '', { title: 'Popular posts' }));
+    pageUrls.push(url(abs('/category/'), newest, 'weekly', '0.6', '', { title: 'Categories' }), url(abs('/label/'), newest, 'weekly', '0.4', '', { title: 'Topics' }));
+    for (const t of tagTopics) if (t.list.length >= 3) pageUrls.push(url(abs(`/tag/${t.slug}/`), when(t.list[0]), 'weekly', '0.5', '', { title: `Tag: ${t.name || t.slug}` }));
+    for (const a of authors) pageUrls.push(url(abs(`/author/${a.slug}/`), newest, 'monthly', '0.4', '', { title: `Author: ${a.name}` }));
+
+    const postUrls = posts.map((p) => url(abs(p.path), when(p), 'monthly', '0.9', '', { title: p.title, note: p.category.name }));
+
+    const categoryUrls = [];
+    const labelUrls = [];
     for (const c of categories.filter((x) => !x.empty)) {
       const latest = posts.find((p) => p.category.slug === c.slug);
-      add(`/category/${c.slug}/`, latest?.updated || latest?.date || newest, 'weekly', '0.8');
+      categoryUrls.push(url(abs(`/category/${c.slug}/`), latest ? when(latest) : newest, 'weekly', '0.8', '', { title: c.name }));
       for (const l of c.labels) {
-        const lp = posts.find((p) => p.category.slug === c.slug && p.label?.slug === l.slug);
-        if (lp && posts.filter((x) => x.category.slug === c.slug && x.label?.slug === l.slug).length >= 3) add(`/category/${c.slug}/${l.slug}/`, lp.updated || lp.date, 'weekly', '0.6');
+        const mine = posts.filter((x) => x.category.slug === c.slug && x.label?.slug === l.slug);
+        if (mine.length >= 3) labelUrls.push(url(abs(`/category/${c.slug}/${l.slug}/`), when(mine[0]), 'weekly', '0.6', '', { title: `${l.name} in ${c.name}` }));
       }
     }
-    for (const p of posts) add(p.path, p.updated || p.date, 'monthly', '0.9');
-    for (const pg of pages) add(`/${pg.slug}/`, pg.updated || newest, 'yearly', pg.kind === 'legal' ? '0.3' : '0.5');
-    for (const t of tagTopics) if (t.list.length >= 3) add(`/tag/${t.slug}/`, t.list[0].updated || t.list[0].date, 'weekly', '0.5');
-    for (const a of authors) add(`/author/${a.slug}/`, newest, 'monthly', '0.4');
-    const day = (d) => d.toISOString().slice(0, 10);
-    return `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${entries.map((x) => `  <url><loc>${xml(abs(x.path))}</loc><lastmod>${day(x.lastmod)}</lastmod><changefreq>${x.changefreq}</changefreq><priority>${x.priority}</priority></url>`).join('\n')}
-</urlset>
-`;
+
+    // pictures: the cover and every picture inside the article, on the article's address
+    const imageUrls = [];
+    for (const p of posts) {
+      const srcs = new Map();
+      if (p.image) srcs.set(absImage(p.image), p.imageAlt || p.title);
+      for (const m of p.html.matchAll(/<img\b[^>]*?\ssrc="([^"]+)"[^>]*>/gi)) {
+        const src = /^https?:\/\//i.test(m[1]) ? m[1] : m[1].startsWith('/') ? `${siteUrl}${m[1]}` : '';
+        if (!src || srcs.has(src)) continue;
+        const alt = /\salt="([^"]*)"/i.exec(m[0]);
+        srcs.set(src, (alt && alt[1].trim()) || p.title);
+      }
+      if (!srcs.size) continue;
+      const extra = [...srcs].slice(0, 1000).map(([loc, title]) => `\n    <image:image><image:loc>${xml(loc)}</image:loc><image:title>${xml(String(title).slice(0, 200))}</image:title></image:image>`).join('');
+      imageUrls.push(url(abs(p.path), when(p), '', '', `${extra}\n  `, { title: p.title, thumb: [...srcs.keys()][0], note: `${srcs.size} ${srcs.size === 1 ? 'picture' : 'pictures'}` }));
+    }
+
+    // videos: own files and YouTube videos named with ::video and ::youtube lines
+    const videoUrls = [];
+    for (const p of posts) {
+      for (const v of p.videos || []) {
+        const yt = v.kind === 'youtube' ? /(?:youtu\.be\/|[?&]v=|\/embed\/)([A-Za-z0-9_-]{11})/.exec(v.src) : null;
+        if (v.kind === 'youtube' && !yt) continue;
+        const thumb = absImage(v.poster || p.image);
+        if (!thumb) continue;
+        const target = yt ? `<video:player_loc>https://www.youtube.com/embed/${yt[1]}</video:player_loc>` : `<video:content_loc>${xml(/^https?:\/\//i.test(v.src) ? v.src : abs(`/${v.src.replace(/^\//, '')}`))}</video:content_loc>`;
+        const title = (v.caption || p.title).slice(0, 100);
+        const desc = (v.caption || p.excerpt || p.title).slice(0, 2000);
+        videoUrls.push(url(abs(p.path), when(p), '', '', `\n    <video:video><video:thumbnail_loc>${xml(thumb)}</video:thumbnail_loc><video:title>${xml(title)}</video:title><video:description>${xml(desc)}</video:description>${target}</video:video>\n  `, { title: p.title, thumb, note: title }));
+      }
+    }
+
+    const groups = [
+      { type: 'pages', stem: 'pages-sitemap', name: 'Pages', title: 'Home, lists, topics and authors', blurb: 'The home page, article lists, tag pages and author pages.', list: pageUrls },
+      { type: 'posts', stem: 'posts-sitemap', name: 'Posts', title: 'All published articles', blurb: 'Every article, with the date it was last changed.', list: postUrls },
+      { type: 'category', stem: 'category-sitemap', name: 'Categories', title: 'Category pages', blurb: 'One page for each topic area.', list: categoryUrls },
+      { type: 'label', stem: 'label-sitemap', name: 'Labels', title: 'Topic label pages', blurb: 'Label pages that have at least three articles.', list: labelUrls },
+      { type: 'image', stem: 'image-sitemap', name: 'Images', title: 'Pictures in the articles', blurb: 'Each article with its cover and body pictures.', list: imageUrls },
+      { type: 'video', stem: 'video-sitemap', name: 'Videos', title: 'Videos in the articles', blurb: 'Each article that has a video.', list: videoUrls },
+    ].filter((g) => g.list.length);
+    // every file of every type: its name, its position and the addresses in it
+    const parts = [];
+    for (const g of groups) {
+      const total = Math.ceil(g.list.length / perFile);
+      for (let i = 0; i < g.list.length; i += perFile) parts.push({ g, n: i / perFile + 1, total, start: i + 1, items: g.list.slice(i, i + perFile) });
+    }
+    return { day, parts, NS: { image: ' xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"', video: ' xmlns:video="http://www.google.com/schemas/sitemap-video/1.1"' } };
+  }
+
+  function sitemaps() {
+    const { day, parts, NS } = sitemapData();
+    const head = `<?xml version="1.0" encoding="UTF-8"?>\n<?xml-stylesheet type="text/xsl" href="${u('/sitemap.xsl')}"?>\n`;
+    const files = new Map();
+    const index = [];
+    for (const { g, n, total, start, items } of parts) {
+      const name = `${g.stem}${n}.xml`;
+      // a note for the styled view (sitemap.xsl): which type, which part, the number of its first address and the neighbouring files
+      const note = `<!-- mb-sitemap type=${g.type} part=${n} of=${total} start=${start}${n > 1 ? ` prev=${u(`/${g.stem}${n - 1}.xml`)}` : ''}${n < total ? ` next=${u(`/${g.stem}${n + 1}.xml`)}` : ''} -->\n`;
+      files.set(name, `${head}${note}<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"${NS[g.type] || ''}>\n${items.map((x) => x.xml).join('\n')}\n</urlset>\n`);
+      const last = items.reduce((a, x) => (x.lastmod > a ? x.lastmod : a), items[0].lastmod);
+      index.push(`  <sitemap><loc>${xml(abs(`/${name}`))}</loc><lastmod>${day(last)}</lastmod></sitemap>`);
+    }
+    files.set('sitemap.xml', `${head}<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${index.join('\n')}\n</sitemapindex>\n`);
+    return files;
+  }
+
+  // The same lists as ordinary web pages for people: /sitemap/ (the index), then /sitemap/posts-1/, /sitemap/posts-2/ and so on.
+  // They are noindex (search engines read the XML), and they work in every browser.
+  function sitemapHtml() {
+    const { day, parts } = sitemapData();
+    const out = new Map();
+    const local = (s) => (String(s).startsWith(siteUrl) ? String(s).slice(siteUrl.length) : s);
+    const pathOf = ({ g, n }) => `/sitemap/${g.type}-${n}/`;
+    const image = heroFor('sitemap');
+    const count = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+    const cards = parts.map((pt) => {
+      const last = pt.items.reduce((a, x) => (x.lastmod > a ? x.lastmod : a), pt.items[0].lastmod);
+      return `<li><a class="sm-card" href="${u(pathOf(pt))}">
+  <span class="sm-kind">${e(pt.g.name)}${pt.total > 1 ? ` &middot; part ${pt.n}` : ''}</span>
+  <h2>${e(pt.g.title)}</h2>
+  <p>${e(pt.g.blurb)}</p>
+  <span class="sm-meta">${count(pt.items.length, 'address', 'addresses')} &middot; changed ${day(last)}</span>
+  <span class="sm-open">Open the list ${icon('arrowRight', 16)}</span>
+</a></li>`;
+    });
+    out.set('/sitemap/', layout(
+      { title: 'Sitemap', description: describe(`A complete index of every article and page on ${config.name}, grouped by type.`, 'Open a list, then choose any article.', 1), path: '/sitemap/', noindex: true, adKind: 'page', preload: image },
+      {},
+      `${hero({ image, title: 'Sitemap', sub: `Every article and page on ${config.name}, grouped by type. Open a list, then choose any address.`, crumbs: [['Home', u('/')], ['Sitemap', '']] })}
+<section class="section"><div class="wrap">
+  <ul class="sm-grid">${cards.join('')}</ul>
+  <p class="sm-note">Search engines read the XML version, <a href="${u('/sitemap.xml')}">sitemap.xml</a>. About, Contact, Work with us and the policy pages are not listed.</p>
+</div></section>`,
+    ));
+
+    for (const pt of parts) {
+      const { g, n, total, start, items } = pt;
+      const label = total > 1 ? `${g.name} sitemap, part ${n} of ${total}` : `${g.name} sitemap`;
+      const rows = items.map((x, k) => `<tr>
+  <td class="sm-n">${start + k}</td>
+  <td class="sm-t">${x.info.thumb ? `<img class="sm-thumb" src="${e(local(x.info.thumb))}" alt="" width="72" height="48" loading="lazy" decoding="async">` : ''}<span class="sm-tt"><a href="${local(x.loc)}">${e(x.info.title)}</a>${x.info.note ? `<small>${e(x.info.note)}</small>` : ''}</span></td>
+  <td class="sm-d">${day(x.lastmod)}</td>
+</tr>`).join('');
+      const prev = n > 1 ? `<a class="btn btn-outline" rel="prev" href="${u(pathOf({ g, n: n - 1 }))}">${icon('arrowLeft', 16)} Previous list</a>` : '<span></span>';
+      const next = n < total ? `<a class="btn btn-outline" rel="next" href="${u(pathOf({ g, n: n + 1 }))}">Next list ${icon('arrowRight', 16)}</a>` : '<span></span>';
+      out.set(pathOf(pt), layout(
+        { title: label, description: describe(`${g.blurb} Addresses ${start} to ${start + items.length - 1} on ${config.name}.`, 'Choose any address to open it.', 1), path: pathOf(pt), noindex: true, adKind: 'page', preload: image },
+        {},
+        `${hero({ image, title: e(label), sub: `${g.blurb} Addresses ${start} to ${start + items.length - 1}. Choose any address to open it.`, crumbs: [['Home', u('/')], ['Sitemap', u('/sitemap/')], [g.name, '']] })}
+<section class="section"><div class="wrap">
+  <div class="sm-table-wrap"><table class="sm-table">
+    <caption class="sr-only">${e(label)}</caption>
+    <thead><tr><th scope="col">#</th><th scope="col">${g.type === 'posts' ? 'Article' : 'Page'}</th><th scope="col">Last changed</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>
+  <nav class="sm-pager" aria-label="Sitemap lists">${prev}<a class="btn btn-outline" href="${u('/sitemap/')}">All lists</a>${next}</nav>
+</div></section>`,
+      ));
+    }
+    return out;
+  }
+
+  // /rss/ is the page people open. feed.xml itself is plain XML for feed readers (browsers show it as code), so no visible link points at it.
+  function rssPage() {
+    const feedUrl = abs('/feed.xml');
+    const latest = posts.slice(0, 5);
+    const image = heroFor('rss');
+    const faq = [
+      ['Does it cost anything, and do I need an account?', 'No. The feed is free and you do not need to sign up with us. Some reader apps ask you to make an account with them, which is their rule, not ours.'],
+      ['Do you know who follows the feed?', `No. Your reader asks our site for the feed file, in the same way a browser asks for a web page. We do not collect names or email addresses through the feed. Our hosting provider handles technical data as described in the <a href="${u('/privacy-policy/')}">Privacy Policy</a>.`],
+      ['How do I stop following?', 'Remove the feed from your reader app. Nothing else is needed.'],
+      ['Does the feed have the whole article?', `Yes. Each item carries the full article text, so you can read it in your reader. The articles on the website have the pictures, the videos and the "Listen to this article" button.`],
+    ];
+    return layout(
+      { title: 'Follow with RSS', description: describe(`Get new ${config.name} articles in your feed reader. Copy the feed address, paste it into a reader and read for free.`, 'No account or email needed.', 1), path: '/rss/', noindex: true, adKind: 'page', preload: image },
+      {},
+      `${hero({ image, title: 'Follow with RSS', sub: 'New articles in the app you choose. No account and no email needed.', crumbs: [['Home', u('/')], ['Follow with RSS', '']] })}
+<section class="section"><div class="wrap wrap-narrow">
+  <div class="rss-box">
+    <h2 class="rss-h">${icon('rss', 22)} Your feed address</h2>
+    <p>Copy this address and paste it into a feed reader.</p>
+    <div class="rss-copy">
+      <input id="rss-url" class="rss-url" type="text" readonly value="${e(feedUrl)}" aria-label="Feed address" spellcheck="false" autocomplete="off">
+      <button class="btn btn-primary" type="button" data-copy="#rss-url" hidden>Copy address</button>
+    </div>
+    <p class="rss-status" role="status" aria-live="polite"></p>
+    <p class="rss-raw">The feed file itself is plain XML made for apps, so it looks technical in a browser. <a href="${u('/feed.xml')}">Open the feed file</a> if you want to see it.</p>
+  </div>
+  <div class="prose-page">
+    <h2>What is RSS?</h2>
+    <p>RSS is a simple way to get the new articles of a website in one place. You choose an app, add the feed address once, and the app shows new articles when we publish them. You do not need to visit the site to check.</p>
+    <h2>How to follow in three steps</h2>
+    <ol>
+      <li><strong>Pick a feed reader.</strong> Examples are Feedly, Inoreader, NetNewsWire and Thunderbird. We have no link with these apps and do not endorse them.</li>
+      <li><strong>Copy the address above.</strong> Press the Copy address button.</li>
+      <li><strong>Add it in your reader.</strong> Look for "Add feed", "Add subscription" or a plus button, and paste the address.</li>
+    </ol>
+    <h2>The latest articles in the feed</h2>
+    <ul class="rss-latest">${latest.map((p) => `<li><a href="${u(p.path)}">${e(p.title)}</a> <span class="rss-date">${timeTag(p.date)}</span></li>`).join('')}</ul>
+    <h2>Common questions</h2>
+  </div>
+  <div class="faq">${faq.map(([q, a]) => `<details><summary>${e(q)}</summary><p>${a}</p></details>`).join('')}</div>
+</div></section>`,
+    );
   }
 
   function feed() {
     const items = posts.slice(0, 30);
     const absolutize = (h) => h.replace(/(href|src)="(\/(?!\/)[^"]*)"/g, (_m, a, p) => `${a}="${siteUrl}${p}"`);
     return `<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/css" href="${u('/feed.css')}"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:dc="http://purl.org/dc/elements/1.1/">
 <channel>
   <title>${xml(config.name)}</title>
@@ -1344,5 +1513,5 @@ ${items.map((p) => `  <item>
     );
   }
 
-  return { tagTopics, tagPage, home, category, categoriesIndex, labelsIndex, postsDirectory, popular, searchPage, staticPage, authorPage, notFound, post, aliasStub, sitemap, feed, robots, manifest, searchIndex, helpers: { u, abs } };
+  return { rssPage, sitemapHtml, tagTopics, tagPage, home, category, categoriesIndex, labelsIndex, postsDirectory, popular, searchPage, staticPage, authorPage, notFound, post, aliasStub, sitemaps, feed, robots, manifest, searchIndex, helpers: { u, abs } };
 }

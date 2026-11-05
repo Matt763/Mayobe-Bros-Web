@@ -221,6 +221,7 @@ for (const file of postFiles) {
     metaDescription: data.metaDescription ? String(data.metaDescription) : '',
     sample: data.sample === true,
     html: withIds.html, toc: withIds.toc, text, words,
+    videos: [...body.matchAll(/^\s{0,3}::(video|youtube)\[([^\]]*)\]\(([^)\s]+)\)(?:\{([^}]*)\})?\s*$/gm)].map((m) => ({ kind: m[1], caption: m[2].trim(), src: m[3], poster: /(?:^|\s)poster=(\S+)/.exec(m[4] || '')?.[1] || '' })),
     readingMinutes: Math.max(1, Math.round(words / 200)),
     path: `/post/${cat.slug}/${label ? `${label.slug}/` : ''}${slug}/`,
   };
@@ -359,8 +360,12 @@ for (const a of authors) {
   ap.forEach((list, i) => emit(pageFile(i === 0 ? `/author/${a.slug}/` : `/author/${a.slug}/page/${i + 1}/`), R.authorPage(a, list, i + 1, ap.length, mine.length)));
 }
 
-emit('sitemap.xml', R.sitemap());
+for (const [name, content] of R.sitemaps()) emit(name, content);
+for (const [urlPath, html] of R.sitemapHtml()) emit(pageFile(urlPath), html);
+emit('sitemap.xsl', fs.readFileSync(path.join(ROOT, 'scripts/tools/sitemap.xsl'), 'utf8'));
 emit('feed.xml', R.feed());
+emit('feed.css', fs.readFileSync(path.join(ROOT, 'scripts/tools/feed.css'), 'utf8').replace(/\{\{name\}\}/g, config.name).replace(/\{\{rss-page\}\}/g, R.helpers.abs('/rss/')));
+emit(pageFile('/rss/'), R.rssPage());
 emit('robots.txt', R.robots());
 emit('manifest.json', R.manifest());
 emit('data/search.json', R.searchIndex());

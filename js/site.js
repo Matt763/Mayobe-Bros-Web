@@ -89,7 +89,7 @@
   $$('[data-drawer-close]').forEach(function (b) { b.addEventListener('click', function () { setDrawer(false); }); });
   if (drawer) {
     drawer.addEventListener('keydown', function (e) { trapTab(drawer, e); });
-    window.matchMedia('(min-width: 1024px)').addEventListener('change', function (e) { if (e.matches) setDrawer(false); });
+    window.matchMedia('(min-width: 1280px)').addEventListener('change', function (e) { if (e.matches) setDrawer(false); });
   }
 
   /* --------------------------------------------------------------- search */
@@ -488,13 +488,141 @@
     for (var k in extra) if (Object.prototype.hasOwnProperty.call(extra, k)) o[k] = extra[k];
     return o;
   }
+  /* Mini player: once a video has been started and the reader scrolls past it, it keeps playing in a small window in the corner
+     (like picture-in-picture, and it works for YouTube too). It goes back into the article when the reader scrolls up to it,
+     the video ends, or the reader presses the close button (which also pauses it). The article keeps its space, so nothing jumps. */
+  var MINI_KEY = 'mayobebros-mini-player';
+  var MINI_ICONS = {
+    move: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 9-3 3 3 3"/><path d="m9 5 3-3 3 3"/><path d="m15 19-3 3-3-3"/><path d="m19 9 3 3-3 3"/><path d="M2 12h20"/><path d="M12 2v20"/></svg>',
+    smaller: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/></svg>',
+    larger: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>',
+    back: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg>',
+    close: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
+    corner: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M20 4 4 20"/><path d="M20 12 12 20"/></svg>'
+  };
+  function miniPlayer(box, player) {
+    var root = player && player.elements && player.elements.container;
+    if (!box || !root || !('IntersectionObserver' in window)) return;
+    var started = false, dismissed = false, mini = false, full = false;
+    var MARGIN = 8, MIN_W = 208;
+    var custom = null; // {l, t, w} in pixels once the reader has moved or resized the window; null = the default corner
+    try { var saved = JSON.parse(store(MINI_KEY) || 'null'); if (saved && isFinite(saved.l) && isFinite(saved.t) && isFinite(saved.w)) custom = { l: +saved.l, t: +saved.t, w: +saved.w }; } catch (err) { custom = null; }
+    function maxW() { return Math.max(MIN_W, Math.min(doc.documentElement.clientWidth - 2 * MARGIN, 960)); }
+    function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
+    function save() { if (custom) store(MINI_KEY, JSON.stringify({ l: Math.round(custom.l), t: Math.round(custom.t), w: Math.round(custom.w) })); else store(MINI_KEY, null); }
+    function clear() { ['left', 'top', 'right', 'bottom', 'width'].forEach(function (k) { root.style[k] = ''; }); }
+    // put the window where `custom` says, keeping all of it on the screen
+    function place() {
+      if (!custom) { clear(); return; }
+      var vw = doc.documentElement.clientWidth, vh = window.innerHeight;
+      custom.w = clamp(custom.w, MIN_W, maxW());
+      root.style.width = custom.w + 'px';
+      var h = root.getBoundingClientRect().height;
+      custom.l = clamp(custom.l, MARGIN, Math.max(MARGIN, vw - custom.w - MARGIN));
+      custom.t = clamp(custom.t, MARGIN, Math.max(MARGIN, vh - h - MARGIN));
+      root.style.left = custom.l + 'px'; root.style.top = custom.t + 'px';
+      root.style.right = 'auto'; root.style.bottom = 'auto';
+    }
+    function current() { var r = root.getBoundingClientRect(); return { l: r.left, t: r.top, w: r.width, r: r.right, b: r.bottom }; }
+    // change the width and keep the bottom-right corner where it is
+    function resizeTo(w) {
+      var c = current();
+      custom = { l: c.r - w, t: c.t, w: w };
+      place();
+      var r = root.getBoundingClientRect();
+      custom.l = c.r - r.width; custom.t = c.b - r.height; custom.w = r.width;
+      place(); save();
+    }
+
+    var tools = el('div', 'video-mini-tools');
+    function tool(label, icon, fn, cls) {
+      var b = el('button', 'video-mini-btn' + (cls ? ' ' + cls : ''));
+      b.type = 'button'; b.setAttribute('aria-label', label); b.title = label; b.innerHTML = icon;
+      if (fn) b.addEventListener('click', fn);
+      tools.appendChild(b);
+      return b;
+    }
+    var grip = tool('Move the video: drag it, or use the arrow keys. Double-click to put it back in the corner.', MINI_ICONS.move, null, 'video-mini-grip');
+    tool('Make the video smaller', MINI_ICONS.smaller, function () { resizeTo(current().w * 0.85); });
+    tool('Make the video larger', MINI_ICONS.larger, function () { resizeTo(current().w * 1.2); });
+    tool('Back to the video in the article', MINI_ICONS.back, function () { box.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' }); });
+    tool('Close the mini player and pause', MINI_ICONS.close, function () { player.pause(); dismissed = true; set(false); });
+    var handle = el('button', 'video-mini-resize');
+    handle.type = 'button'; handle.setAttribute('aria-label', 'Resize the video: drag this corner'); handle.title = 'Drag to resize'; handle.innerHTML = MINI_ICONS.corner;
+    root.appendChild(tools); root.appendChild(handle);
+    // the player's own shortcuts (double-click for fullscreen, arrow keys to seek) must not fire from these controls
+    [tools, handle].forEach(function (n) { ['dblclick', 'keydown', 'keyup'].forEach(function (t) { n.addEventListener(t, function (e) { e.stopPropagation(); }); }); });
+
+    // drag the window by the move button
+    grip.addEventListener('pointerdown', function (e) {
+      if (e.button !== undefined && e.button !== 0) return;
+      e.preventDefault();
+      var c = current(), sx = e.clientX, sy = e.clientY;
+      custom = { l: c.l, t: c.t, w: c.w };
+      root.classList.add('is-dragging');
+      try { grip.setPointerCapture(e.pointerId); } catch (err) { /* older browsers */ }
+      function move(ev) { custom.l = c.l + ev.clientX - sx; custom.t = c.t + ev.clientY - sy; place(); }
+      function up() { grip.removeEventListener('pointermove', move); grip.removeEventListener('pointerup', up); grip.removeEventListener('pointercancel', up); root.classList.remove('is-dragging'); save(); }
+      grip.addEventListener('pointermove', move); grip.addEventListener('pointerup', up); grip.addEventListener('pointercancel', up);
+    });
+    grip.addEventListener('keydown', function (e) {
+      var step = e.shiftKey ? 80 : 24, d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
+      if (!d) return;
+      e.preventDefault();
+      var c = current(); custom = { l: c.l + d[0], t: c.t + d[1], w: c.w }; place(); save();
+    });
+    grip.addEventListener('dblclick', function () { custom = null; place(); save(); });
+    // drag the top-left corner to change the size
+    handle.addEventListener('pointerdown', function (e) {
+      if (e.button !== undefined && e.button !== 0) return;
+      e.preventDefault();
+      var c = current();
+      root.classList.add('is-dragging');
+      try { handle.setPointerCapture(e.pointerId); } catch (err) { /* older browsers */ }
+      function move(ev) {
+        var w = clamp(c.r - ev.clientX, MIN_W, maxW());
+        custom = { l: c.r - w, t: c.t, w: w }; place();
+        var r = root.getBoundingClientRect();
+        custom.l = c.r - r.width; custom.t = c.b - r.height; place();
+      }
+      function up() { handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', up); handle.removeEventListener('pointercancel', up); root.classList.remove('is-dragging'); save(); }
+      handle.addEventListener('pointermove', move); handle.addEventListener('pointerup', up); handle.addEventListener('pointercancel', up);
+    });
+    window.addEventListener('resize', function () { if (mini && custom) place(); });
+
+    function set(on) {
+      if (on === mini) return;
+      if (on) {
+        box.style.minHeight = box.offsetHeight + 'px';
+        box.classList.add('is-mini');
+        root.setAttribute('role', 'region'); root.setAttribute('aria-label', 'Mini video player');
+        place();
+      } else {
+        box.classList.remove('is-mini'); box.style.minHeight = '';
+        root.removeAttribute('role'); root.removeAttribute('aria-label');
+        clear();
+      }
+      mini = on;
+    }
+    var io = new IntersectionObserver(function (entries) {
+      var r = entries[entries.length - 1].intersectionRatio;
+      if (r >= 0.5) { dismissed = false; set(false); }
+      else if (r < 0.15 && started && !dismissed && !full) set(true);
+    }, { threshold: [0, 0.15, 0.5] });
+    io.observe(box);
+    player.on('play', function () { started = true; });
+    player.on('ended', function () { started = false; set(false); });
+    player.on('enterfullscreen', function () { full = true; set(false); });
+    player.on('exitfullscreen', function () { full = false; io.unobserve(box); io.observe(box); }); // look at the position again
+  }
   var plain = $$('video').filter(function (v) { return !v.closest('.plyr') && !v.hasAttribute('data-no-plyr'); });
   var embeds = $$('[data-video-embed]');
   if (plain.length || embeds.length) {
     loadPlyr().then(function (Plyr) {
       plain.forEach(function (v) {
         v.removeAttribute('width'); v.removeAttribute('height');
-        new Plyr(v, plyrOptions({ ratio: '16:9' }));
+        var pl = new Plyr(v, plyrOptions({ ratio: '16:9' }));
+        miniPlayer(v.closest('.video-figure'), pl);
       });
       embeds.forEach(function (box) {
         var go = box.querySelector('.video-load');
@@ -505,11 +633,29 @@
           holder.setAttribute('data-plyr-embed-id', box.getAttribute('data-embed-id'));
           go.replaceWith(holder);
           var player = new Plyr(holder, plyrOptions({ title: box.getAttribute('data-title') || '' }));
+          miniPlayer(box, player);
           player.once('ready', function () { player.play(); });
         });
       });
     })['catch'](function () { /* the browser's own controls stay in place */ });
   }
+
+  /* ------------------------------------------------- copy the feed address (/rss/) */
+  $$('[data-copy]').forEach(function (btn) {
+    var src = $(btn.getAttribute('data-copy'));
+    if (!src) return;
+    btn.hidden = false; // without JavaScript the address can still be selected by hand
+    src.addEventListener('focus', function () { src.select(); });
+    btn.addEventListener('click', function () {
+      var status = $('.rss-status');
+      function done(ok) {
+        if (status) status.textContent = ok ? 'Copied. Now paste it into your feed reader.' : 'Could not copy by itself. Select the address and copy it.';
+        if (!ok) { src.focus(); src.select(); }
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(src.value).then(function () { done(true); }, function () { done(false); });
+      else { src.select(); var ok = false; try { ok = doc.execCommand('copy'); } catch (err) { ok = false; } done(ok); }
+    });
+  });
 
   /* ---------------------------------------------------------------- forms */
   function postForm(form, statusEl, okMessage) {

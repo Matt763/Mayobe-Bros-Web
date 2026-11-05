@@ -42,7 +42,9 @@
       "contact": "assets/img/heroes/contact.webp",
       "advertise": "assets/img/heroes/advertise.webp",
       "author/mclean-mbaga": "assets/img/heroes/author.webp",
-      "search": "assets/img/heroes/search.webp"
+      "search": "assets/img/heroes/search.webp",
+      "sitemap": "assets/img/heroes/search.webp",
+      "rss": "assets/img/heroes/search.webp"
   },
 
   "postsPerPage": 15,
@@ -64,6 +66,8 @@
 
   "commentsApi": "",
   "turnstileSiteKey": "",
+
+  "sitemapUrlsPerFile": 200,
 
   "analytics": {
     "gtmId": "GTM-N8Z3H9L6"

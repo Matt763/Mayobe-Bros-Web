@@ -58,7 +58,7 @@ Until you do this, comments and reactions are hidden (the site never shows a bro
 Full explanation and the reasons are in `docs/search-engines.md`. In short, after the site is live:
 
 1. **Google Search Console**: add the *Domain* property `mayobebros.com`, verify with the DNS TXT record (Spaceship), submit `sitemap.xml`,
-   then URL Inspection > Request indexing for the home page and two posts. Remove the old `posts-sitemap1.xml` style sitemaps if Google lists them.
+   then URL Inspection > Request indexing for the home page and two posts. `sitemap.xml` is an index of `pages-`, `posts-`, `category-`, `label-`, `image-` and `video-sitemap1.xml` (the number goes up after 200 addresses per file, `sitemapUrlsPerFile` in `site.config.json`). Submit only `sitemap.xml`; Google finds the rest. If Google still lists old sitemap names from the previous host, they now exist again, so leave them.
 2. **Bing Webmaster Tools** (Yahoo and DuckDuckGo get their results from Bing): import from Search Console, or verify with the meta tag by putting its
    value in `site.config.json` > `verification.bing`, then rebuild and push. Submit `sitemap.xml`.
 3. **Yandex Webmaster**: add `https://mayobebros.com` (the verification file and tag are already in place), submit `sitemap.xml`.

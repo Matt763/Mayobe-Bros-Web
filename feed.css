@@ -1,0 +1,25 @@
+/* Shown only when a person opens feed.xml in a browser. Feed readers ignore it.
+   Source: scripts/tools/feed.css (the build copies it to /feed.css and fills in Mayobe Bros and https://mayobebros.com/rss/).
+   Plain CSS on purpose: browsers are removing XSLT, but they keep supporting CSS on XML. */
+@namespace dc url(http://purl.org/dc/elements/1.1/);
+@namespace content url(http://purl.org/rss/1.0/modules/content/);
+rss, channel { display: block; }
+rss { min-height: 100vh; background: #f3f6fb; color: #0b1220; font: 16px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif; }
+channel { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+channel::before { content: "This is the RSS feed of Mayobe Bros. It is made for feed readers. Copy the address of this page into a feed reader to get new articles there. Help: https://mayobebros.com/rss/"; display: block; margin: 0 0 1.5rem; padding: 1rem 1.25rem; border: 1px solid #bcc6d8; border-left: 4px solid #1e3a9e; border-radius: 12px; background: #ffffff; color: #1b2434; }
+channel > title { display: block; margin: 0 0 0.25rem; font-size: 2rem; font-weight: 800; line-height: 1.2; }
+channel > description { display: block; margin: 0 0 1.5rem; color: #364154; }
+channel > link, channel > language, channel > lastBuildDate { display: none; }
+item { display: block; margin: 0 0 1rem; padding: 1rem 1.25rem; border: 1px solid #dde4ef; border-radius: 14px; background: #ffffff; }
+item > title { display: block; font-size: 1.2rem; font-weight: 700; line-height: 1.3; }
+item > pubDate { display: block; margin: 0.15rem 0 0.5rem; color: #364154; font-size: 0.9rem; }
+item > description { display: block; }
+item > link { display: block; margin-top: 0.5rem; color: #1e3a9e; font-size: 0.875rem; word-break: break-all; }
+item > guid, item > dc|creator, item > category, item > content|encoded { display: none; }
+@media (prefers-color-scheme: dark) {
+  rss { background: #070b14; color: #f8fafc; }
+  channel::before { border-color: #3a4d78; border-left-color: #8fb0ff; background: #0d1424; color: #e6ecf6; }
+  channel > description, item > pubDate { color: #c5cfe2; }
+  item { border-color: #1f2d4d; background: #0d1424; }
+  item > link { color: #8fb0ff; }
+}

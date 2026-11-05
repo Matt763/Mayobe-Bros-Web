@@ -58,7 +58,7 @@ own in the post body:
 Own videos: save them in `assets/video/` (MP4 H.264 or WebM, keep them small; the site is on free hosting) and give captions
 (`.vtt`) when people speak. YouTube: the page shows only the poster and a play button; nothing is requested from YouTube until the reader
 presses play, and then it uses `youtube-nocookie.com`. Never paste a raw YouTube `<iframe>` (it would load Google code on page load and
-break the Cookie Policy). Videos need a useful caption, must be ours or properly licensed, and must not carry the article on their own:
+break the Cookie Policy). Once a video has been started and the reader scrolls past it, it keeps playing in a small corner window (the mini player, `miniPlayer()` in `js/site.js`, `.video-figure.is-mini` in `css/style.css`) with buttons to move it (drag, or arrow keys; double-click resets), make it smaller or larger, jump back to it and close it (which pauses it), plus a drag corner for the size; the position and size are remembered in local storage under `mayobebros-mini-player` (listed in the Cookie Policy, keep both in step); this works for own files and YouTube alike and needs nothing per post. Videos need a useful caption, must be ours or properly licensed, and must not carry the article on their own:
 the text must still stand without them.
 
 ## Listen to this article
@@ -91,7 +91,7 @@ Facebook and LinkedIn may not show WebP, and the covers come in different shapes
 
 ## Search engines (Google, Bing, Yahoo, DuckDuckGo, Yandex)
 Setup and steps are in `DEPLOY.md` and `docs/search-engines.md`. What the code already does, so do not undo it: one self-referencing absolute
-canonical per page; `sitemap.xml` lists only indexable pages (no noindex, no redirect stubs); redirect stubs for renamed posts have canonical +
+canonical per page; `sitemap.xml` is an index of child sitemaps (`pages-`, `posts-`, `category-`, `label-`, `image-`, `video-sitemap1.xml`; a new number starts after `sitemapUrlsPerFile`, default 200, addresses) and lists only indexable pages (no noindex, no redirect stubs; About, Contact, Work with us and every policy page are noindex on purpose and not listed); `sitemap.xsl` (source `scripts/tools/sitemap.xsl`) only styles them for people, crawlers read the XML; redirect stubs for renamed posts have canonical +
 instant meta refresh + a visible link (no noindex); titles stay near 60 characters (brand is added only when it fits; use `metaTitle:` for a
 shorter search title) and every description is unique, 70 to 160 characters; Article, BreadcrumbList (posts), WebSite, Organization, ProfilePage
 JSON-LD only, never FAQ/HowTo/SearchAction (retired by Google); `robots.txt` blocks AI-training bots, not search bots; no `Crawl-delay`.
@@ -119,9 +119,16 @@ Comments are held until approved. `node scripts/comments.mjs list` shows them; `
 links or personal data, and apply `content/pages/comment-policy.html`. Needs the Worker deployed (`worker/README.md`)
 and `.admin-token` (git-ignored) or `ADMIN_TOKEN`.
 
+## RSS feed
+`feed.xml` is plain RSS 2.0 for feed readers (the W3C validator passes it). Browsers show it as code, and XSLT styling is being removed from Chrome on 2026-11-17,
+so people are never sent to it: every visible "RSS feed" or "Follow with RSS" link goes to the page `/rss/` (copy button, what RSS is, how to follow,
+latest articles, questions). Only `<link rel="alternate" type="application/rss+xml">` in `<head>` points at the feed, so readers still find it.
+`feed.xml` carries a `text/css` stylesheet (`scripts/tools/feed.css`, built to `/feed.css`) so a person who opens it sees a readable page; CSS on XML is still supported.
+Do not add XSLT or scripts to the feed. Do not link third-party reader services from the page unless the link format is verified.
+
 ## Do not hand-edit generated files
 Generated on every build: `index.html`, `404.html`, `post/`, `category/`, `label/`, `popular/`, `search/`, `author/`,
-every page folder from `content/pages/`, `sitemap.xml`, `feed.xml`, `robots.txt`, `manifest.json`, `data/search.json`,
+every page folder from `content/pages/`, `sitemap.xml`, `*-sitemap<N>.xml`, `sitemap.xsl`, `feed.xml`, `feed.css`, `rss/`, `sitemap/`, `robots.txt`, `manifest.json`, `data/search.json`,
 `assets/share/*.jpg` (link-preview pictures), `.share-cards.json`, `.build-manifest.json`. Change the sources and rebuild:
 
 | To change | Edit |
