@@ -256,7 +256,7 @@ export function createRenderer(ctx) {
 
   /* ------------------------------------------------------------- footer */
   function footer() {
-    const socials = [['facebook', 'Facebook'], ['twitter', 'X'], ['instagram', 'Instagram'], ['linkedin', 'LinkedIn']].filter(([k]) => config.social?.[k]);
+    const socials = [['facebook', 'Facebook'], ['twitter', 'X'], ['instagram', 'Instagram'], ['linkedin', 'LinkedIn'], ['whatsapp', 'WhatsApp Channel']].filter(([k]) => config.social?.[k]);
     const li = (href, label) => `<li><a class="foot-link" href="${href}">${e(label)}</a></li>`;
     const legal = pages.filter((p) => p.kind === 'legal');
     const company = [['About us', '/about/'], ['Contact', '/contact/'], ['Work with us', '/advertise/'], ...authors.map((a) => [`${a.name} (author)`, `/author/${a.slug}/`])];
@@ -1088,6 +1088,7 @@ ${withIds.html}
     mods.push(`<section class="rail-mod rail-follow" aria-labelledby="rf-h">
       <h2 class="rail-title" id="rf-h">Follow</h2>
       <a class="rf-rss" href="${u('/rss/')}">${icon('rss', 18)} <span>Follow with RSS<small>New articles in your feed reader</small></span></a>
+      ${config.social?.whatsapp ? `<a class="rf-rss" href="${e(config.social.whatsapp)}" target="_blank" rel="noopener noreferrer">${brandIcon('whatsapp', 18)} <span>WhatsApp Channel<small>Get a message when we publish</small></span></a>` : ''}
     </section>`);
     mods.push(`<section class="rail-mod rail-stick" aria-label="Your reading progress" data-rail-progress data-min="${p.readingMinutes}">
       <div class="rs-ring" style="--p:0" aria-hidden="true"><span data-rs-pct>0%</span></div>
