@@ -87,7 +87,7 @@ test('screening is fast and safe on large or hostile input', () => {
 test('names that look like the team are recognised, even when disguised', () => {
   const team = ['Mayobe Bros Team', 'MAYOBE', 'M a y o b e', 'M.a.y.o.b.e', 'M|a|y|o|b|e', 'Mayo-be', 'm4y0be', 'm@yobe', 'Mmayyobbe', 'Mayobе' /* Cyrillic е */,
     'ΜΑΥΟΒΕ' /* Greek */, 'ΤΕΑΜ', 'Mayօbe' /* Armenian */, 'May\u200bobe', 'May\u3164obe', 'May\u2800obe', 'Site Admin', 'Site+Admin', 'Admin|Team', "Site'Admin", 'A d m i n', '4dm1n', 'Adm!n',
-    '\uff2d\uff41\uff59\uff4f\uff42\uff45' /* full-width */, 'Moderator Joe', 'Mclean Mbaga', 'The Mayobe Bros', 'mayobebrosofficial', 'Support'];
+    '\uff2d\uff41\uff59\uff4f\uff42\uff45' /* full-width */, 'Mayøbe', 'Admın', 'Mbagɑ', 'ᴍᴀʏᴏʙᴇ', 'ᴀᴅᴍɪɴ', '\u{1F17C}\u{1F170}\u{1F188}\u{1F17E}\u{1F171}\u{1F174}' /* squared letters */, "Ad'min", "Ad\u2019min", 'Ad-min', 'Te am', 'Stafff', 'Offficial', 'Site Ad min', 'Admin Joe', 'Moderator Joe', 'Mclean Mbaga', 'The Mayobe Bros', 'mayobebrosofficial', 'Support'];
   for (const n of team) assert.equal(looksLikeTeam(n), true, n);
   for (const n of ['Asha', 'Youno yvonne', 'Badminton Fan', 'Teamwork Lover', 'Joseph M', 'Zoë Müller', 'Amina Salum', 'Juma Bakari']) assert.equal(looksLikeTeam(n), false, n);
 });
