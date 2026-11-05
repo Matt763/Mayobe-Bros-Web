@@ -89,17 +89,23 @@
 
   var buttons = box ? $$('.reaction', box) : [];
   var note = box ? $('.engage-note', box) : null;
-  var mine = null;
-  var busy = false;
+  var mine = null;      // what the screen shows (changes the instant the reader taps)
+  var confirmed = null; // what the server has; the two meet again after each round trip
+  var syncing = false, touched = false;
 
   function showStats(st) {
     buttons.forEach(function (b) { $('.n', b).textContent = st.r[b.getAttribute('data-r')]; });
-    var tot = $('[data-total]');
-    if (tot) { var sum = st.r.like + st.r.amazed + st.r.sad + st.r.angry; tot.textContent = sum ? plural(sum, 'reaction', 'reactions') : 'Be the first to react'; }
+    paintTotal();
     var link = $('[data-comment-count-link]');
     if (link) link.textContent = plural(st.c, 'comment', 'comments');
     var h = $('[data-comment-count]');
     if (h) h.textContent = '(' + st.c + ')';
+  }
+  function paintTotal() {
+    var tot = $('[data-total]');
+    if (!tot) return;
+    var sum = buttons.reduce(function (n, b) { return n + (Number($('.n', b).textContent) || 0); }, 0);
+    tot.textContent = sum ? plural(sum, 'reaction', 'reactions') : 'Be the first to react';
   }
   function showMine() {
     buttons.forEach(function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-r') === mine ? 'true' : 'false'); });
@@ -138,26 +144,40 @@
     angry: 'We hear you. Tell us what bothered you in the comments.'
   };
 
+  // Send the reader's latest choice. Taps are never ignored while a request is on its way: the screen changes at once, and
+  // only the newest choice is sent when the previous round trip ends (so ten quick taps cost two requests, not ten).
+  function sync() {
+    if (syncing || mine === confirmed) return;
+    syncing = true;
+    var target = mine;
+    post('/posts/' + slug + '/react', { cid: cid(), type: target }).then(function (j) {
+      confirmed = target;
+      try { sessionStorage.removeItem('mb_stats'); } catch (e) {}
+      if (mine === target) { showStats(j.stats); say(target ? THANKS[target] : 'Reaction removed.'); } // a newer tap is waiting: do not repaint older numbers
+    }).catch(function (err) {
+      mine = confirmed; showMine(); refresh(); say(err.message, true); // go back to what the server has
+    }).then(function () { syncing = false; sync(); });
+  }
   buttons.forEach(function (b) {
+    // pressed look on the first touch, not after the finger lifts (iOS Safari only paints :active with a touch listener)
+    var press = function (on) { b.classList.toggle('is-press', on); };
+    b.addEventListener('pointerdown', function () { press(true); });
+    ['pointerup', 'pointercancel', 'pointerleave', 'blur'].forEach(function (t) { b.addEventListener(t, function () { press(false); }); });
     b.addEventListener('click', function () {
-      if (busy) return;
       var type = b.getAttribute('data-r');
       var next = mine === type ? null : type;
       var before = mine;
-      busy = true;
+      touched = true;
       // update the screen at once, then confirm with the server
       var counter = $('.n', b);
       if (before) { var o = buttons.filter(function (x) { return x.getAttribute('data-r') === before; })[0]; if (o) $('.n', o).textContent = Math.max(0, Number($('.n', o).textContent) - 1); }
       if (next) counter.textContent = Number(counter.textContent) + 1;
-      mine = next; showMine();
+      mine = next; showMine(); paintTotal();
       b.classList.remove('is-pop'); void b.offsetWidth; if (next) { b.classList.add('is-pop'); burst(b, next); }
       counter.classList.remove('is-bump'); void counter.offsetWidth; counter.classList.add('is-bump');
-      post('/posts/' + slug + '/react', { cid: cid(), type: next }).then(function (j) {
-        try { sessionStorage.removeItem('mb_stats'); } catch (e) {}
-        showStats(j.stats); say(next ? THANKS[next] : 'Reaction removed.');
-      }).catch(function (err) {
-        mine = before; showMine(); refresh(); say(err.message, true);
-      }).then(function () { busy = false; });
+      if (next && navigator.vibrate) { try { navigator.vibrate(12); } catch (e) { /* not allowed here */ } } // a light tap on phones that support it
+      say(next ? THANKS[next] : 'Reaction removed.');
+      sync();
     });
   });
 
@@ -296,7 +316,7 @@
   }
 
   /* load on screen, and when the comments come into view */
-  if (box) call('/posts/' + slug + '/mine?cid=' + encodeURIComponent(cid())).then(function (j) { mine = j.reaction; showMine(); }).catch(function () {});
+  if (box) call('/posts/' + slug + '/mine?cid=' + encodeURIComponent(cid())).then(function (j) { confirmed = j.reaction; if (!touched) { mine = j.reaction; showMine(); } else sync(); }).catch(function () {});
   var started = false;
   var start = function () { if (!started) { started = true; refresh(); } };
   if ('IntersectionObserver' in window) {

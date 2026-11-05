@@ -44,7 +44,7 @@ source and licence as the cover they come from.
 | `edef401d44e4.webp` | 10-proven-techniques-to-study-effectively-for-students.md | Imported from the old Supabase storage. **Source and licence not recorded. Owner to confirm.** |
 | `eff12f9360c1.webp` | jobs-for-pcb-combination.md | Imported from the old Supabase storage. **Source and licence not recorded. Owner to confirm.** |
 
-Also used: `assets/img/hero.webp` (home page picture; from Pexels, which allows free use, keep the photographer's page link here when you have it),
+Also used: `assets/img/hero.webp` (home page picture; `hero-640.webp` and `hero-1080.webp` are smaller copies of it made with ffmpeg; from Pexels, which allows free use, keep the photographer's page link here when you have it),
 and the pictures in `assets/img/heroes/` and the two `cover-*.webp` files, which are original illustrations drawn in code.
 Pictures that were in the old project but are not used by any page are in `../my-site-archive/unused-post-images/` (outside the public site).
 

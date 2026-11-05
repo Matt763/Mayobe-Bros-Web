@@ -318,6 +318,7 @@ emit('index.html', R.home());
 emit('404.html', R.notFound());
 emit(pageFile('/category/'), R.categoriesIndex());
 emit(pageFile('/label/'), R.labelsIndex());
+emit(pageFile('/tag/'), R.tagsIndex());
 emit(pageFile('/search/'), R.searchPage());
 
 const dirPages = chunk(posts, per);
@@ -369,6 +370,7 @@ emit(pageFile('/rss/'), R.rssPage());
 emit('robots.txt', R.robots());
 emit('manifest.json', R.manifest());
 emit('data/search.json', R.searchIndex());
+emit('data/tags.json', JSON.stringify(R.tagsJson()));
 
 if (CHECK_ONLY) {
   report(0, 0);

@@ -3,6 +3,7 @@ import { escapeHtml as e, addHeadingIds } from './markdown.mjs';
 
 /* ------------------------------------------------------------------ icons */
 const ICONS = {
+  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
   rxLike: '<path d="M12 20.2S4.6 15.9 4.6 10.2A4.2 4.2 0 0 1 12 7.7a4.2 4.2 0 0 1 7.4 2.5c0 5.7-7.4 10-7.4 10Z"/>',
   rxAmazed: '<path d="M10.5 6.5c.5 4 2 5.5 6 6-4 .5-5.5 2-6 6-.5-4-2-5.5-6-6 4-.5 5.5-2 6-6Z"/><path d="M18.5 3.5v4M16.5 5.5h4"/>',
   rxSad: '<path d="M12 3.8c3.2 3.9 5.4 6.8 5.4 9.8a5.4 5.4 0 0 1-10.8 0c0-3 2.2-5.9 5.4-9.8Z"/><path d="M9.6 14.6a2.6 2.6 0 0 0 1.9 1.9"/>',
@@ -168,7 +169,7 @@ export function createRenderer(ctx) {
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#070b14" media="(prefers-color-scheme: dark)">${config.verification?.yandex ? `\n<meta name="yandex-verification" content="${e(config.verification.yandex)}">` : ''}${adsenseId ? `\n<meta name="google-adsense-account" content="${e(adsenseId)}">` : ''}${config.verification?.google ? `\n<meta name="google-site-verification" content="${e(config.verification.google)}">` : ''}${config.verification?.bing ? `\n<meta name="msvalidate.01" content="${e(config.verification.bing)}">` : ''}
-<link rel="icon" href="${u('/favicon.ico')}" sizes="48x48">
+<link rel="icon" href="${u('/favicon.ico')}" sizes="16x16 32x32 48x48">
 <link rel="icon" href="${u('/assets/img/favicon-48.png')}" type="image/png" sizes="48x48">
 <link rel="icon" href="${u('/assets/img/favicon-32.png')}" type="image/png" sizes="32x32">
 <link rel="icon" href="${u('/assets/img/icon-192.png')}" type="image/png" sizes="192x192">
@@ -330,7 +331,11 @@ ${SEARCH_MODAL()}
 
   /* --------------------------------------------------------------- hero */
   // Topic photographs come in several widths (see scripts/tools/make-topic-heroes.mjs); the browser picks the one that suits the screen.
+  // the home picture comes in three widths so a phone does not download the 1920 px file
+  const HOME_HERO = '/assets/img/hero.webp';
+  const homeSet = (src) => (src === HOME_HERO || src === u(HOME_HERO) ? [[640, '/assets/img/hero-640.webp'], [1080, '/assets/img/hero-1080.webp'], [1920, HOME_HERO]].map(([w, f]) => `${u(f)} ${w}w`).join(', ') : '');
   const topicSet = (src) => {
+    if (homeSet(src)) return homeSet(src);
     const m = /\/assets\/img\/topics\/([a-z0-9-]+)-(\d+)\.webp$/.exec(src || '');
     const widths = m && heroSets[m[1]];
     return widths ? widths.map((w) => `${u(`/assets/img/topics/${m[1]}-${w}.webp`)} ${w}w`).join(', ') : '';
@@ -455,7 +460,10 @@ ${SEARCH_MODAL()}
 </nav>`;
   };
 
-  const orgJson = () => ({ '@type': 'Organization', name: config.name, url: abs('/'), logo: { '@type': 'ImageObject', url: absImage(config.orgLogo || config.logo) } });
+  // names a search engine may use for the site, and the profiles that are really ours (only filled-in links are sent)
+  const altNames = [config.name.replace(/\s+/g, ''), new URL(config.siteUrl).host].filter((n) => n && n !== config.name);
+  const sameAs = Object.values(config.social || {}).filter((v) => /^https:\/\//.test(v || ''));
+  const orgJson = () => ({ '@type': 'Organization', '@id': abs('/') + '#organization', name: config.name, alternateName: altNames, url: abs('/'), logo: { '@type': 'ImageObject', url: absImage(config.orgLogo || config.logo), width: 512, height: 512 }, ...(sameAs.length ? { sameAs } : {}) });
 
   /* --------------------------------------------------------------- home */
   /* ------------------------------------------- "Discover more" section on the home page
@@ -567,7 +575,7 @@ ${SEARCH_MODAL()}
       <ul>${t.list.slice(0, 3).map((x) => `<li><a href="${u(x.path)}">${e(x.title)}</a></li>`).join('')}</ul>
       <a class="tt-more" href="${u(`/tag/${t.slug}/`)}">All ${t.list.length} articles ${icon('arrowRight', 15)}</a>
     </article>`).join('')}</div>
-    <p class="tt-all">${tagTopics.slice(6).map((t) => `<a class="chip" href="${u(`/tag/${t.slug}/`)}">${e(t.name)} <span class="chip-count">${t.list.length}</span></a>`).join('')}</p>
+    ${tagTopics.length > top.length ? `<p class="tt-all"><a class="btn btn-outline" href="${u('/tag/')}">Browse all ${tagTopics.length} topics ${icon('arrowRight', 16)}</a></p>` : ''}
   </div>
 </section>`;
   }
@@ -651,7 +659,7 @@ ${discover()}`;
         path: '/',
         preload: heroImg,
         adKind: 'home',
-        jsonLd: [{ '@context': 'https://schema.org', '@graph': [{ '@type': 'WebSite', name: config.name, url: abs('/'), description: config.description, potentialAction: { '@type': 'SearchAction', target: `${abs('/search/')}?q={search_term_string}`, 'query-input': 'required name=search_term_string' } }, orgJson()] }],
+        jsonLd: [{ '@context': 'https://schema.org', '@graph': [{ '@type': 'WebSite', '@id': abs('/') + '#website', name: config.name, alternateName: altNames, url: abs('/'), description: config.description, publisher: { '@id': abs('/') + '#organization' }, inLanguage: config.language }, orgJson()] }],
         bodyClass: 'page-home',
       },
       { type: 'home' },
@@ -695,6 +703,24 @@ ${discover()}`;
       `<div class="grid grid-tiles" data-reveal-stagger>${categories.map(catTile).join('')}</div>`,
     );
   }
+
+  // every tag topic on one page (noindex: it is a directory for readers, like the sitemap page); also the no-JavaScript fallback of the sidebar's "More topics"
+  function tagsIndex() {
+    const byLetter = new Map();
+    for (const t of [...tagTopics].sort((a, b) => a.name.localeCompare(b.name))) {
+      const k = (t.name[0] || '#').toUpperCase();
+      if (!byLetter.has(k)) byLetter.set(k, []);
+      byLetter.get(k).push(t);
+    }
+    return listingShell(
+      { title: 'All topics', description: describe(`Every topic on ${config.name}, from A to Z, with the number of articles in each.`, 'Choose a topic to see all the articles we have on it.', 1), path: '/tag/', noindex: true, adKind: 'category' },
+      {},
+      { image: heroFor('topics'), kind: 'listing', title: 'All topics', sub: `${tagTopics.length} topics from our tags, from A to Z, with the number of articles in each.` },
+      `<div class="label-groups">${[...byLetter].map(([k, list]) => `<div class="label-group"><h2>${e(k)}</h2><div class="chips">${list.map((t) => `<a class="chip" href="${u(`/tag/${t.slug}/`)}">${e(t.name)} <span class="chip-count">${t.list.length}</span></a>`).join('')}</div></div>`).join('') || '<p class="empty">No topics yet.</p>'}</div>`,
+    );
+  }
+  // [name, slug, number of articles] for the sidebar's "More topics" button, most covered first
+  const tagsJson = () => tagTopics.map((t) => [t.name, t.slug, t.list.length]);
 
   function labelsIndex() {
     return listingShell(
@@ -1093,7 +1119,9 @@ ${withIds.html}
       ...(p.label ? [[p.label.name, u(`/category/${p.category.slug}/${p.label.slug}/`)]] : []),
       ...p.tags.map((t) => [t, tagHref(t)]),
     ].slice(0, 6);
-    mods.push(`<section class="rail-mod rail-tags" aria-labelledby="rg-h"><h2 class="rail-title" id="rg-h">${icon('tag', 16)} Topics</h2><div class="chips">${chipList.map(([n, h]) => `<a class="chip" href="${h}">${e(n)}</a>`).join('')}</div></section>`);
+    // "More topics" reveals the rest of the tag topics 12 at a time (js/site.js, list from /data/tags.json); without JavaScript it is a link to /tag/
+    const more = tagTopics.length ? `<div class="rail-more" data-more-tags="${u('/data/tags.json')}" data-base="${u('/tag/')}" data-step="12"><button class="rail-more-btn" type="button" hidden>${icon('plus', 15)} <span>More topics</span></button><a class="rail-more-link" href="${u('/tag/')}">All topics ${icon('arrowRight', 14)}</a><span class="sr-only" role="status" aria-live="polite"></span></div>` : '';
+    mods.push(`<section class="rail-mod rail-tags" aria-labelledby="rg-h"><h2 class="rail-title" id="rg-h">${icon('tag', 16)} Topics</h2><div class="chips" data-tag-chips>${chipList.map(([n, h]) => `<a class="chip" href="${h}">${e(n)}</a>`).join('')}</div>${more}</section>`);
     mods.push(`<section class="rail-mod rail-follow" aria-labelledby="rf-h">
       <h2 class="rail-title" id="rf-h">Follow</h2>
       <a class="rf-rss" href="${u('/rss/')}">${icon('rss', 18)} <span>Follow with RSS<small>New articles in your feed reader</small></span></a>
@@ -1523,5 +1551,5 @@ ${items.map((p) => `  <item>
     );
   }
 
-  return { rssPage, sitemapHtml, tagTopics, tagPage, home, category, categoriesIndex, labelsIndex, postsDirectory, popular, searchPage, staticPage, authorPage, notFound, post, aliasStub, sitemaps, feed, robots, manifest, searchIndex, helpers: { u, abs } };
+  return { rssPage, sitemapHtml, tagTopics, tagsIndex, tagsJson, tagPage, home, category, categoriesIndex, labelsIndex, postsDirectory, popular, searchPage, staticPage, authorPage, notFound, post, aliasStub, sitemaps, feed, robots, manifest, searchIndex, helpers: { u, abs } };
 }

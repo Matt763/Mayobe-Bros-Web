@@ -58,7 +58,7 @@ own in the post body:
 Own videos: save them in `assets/video/` (MP4 H.264 or WebM, keep them small; the site is on free hosting) and give captions
 (`.vtt`) when people speak. YouTube: the page shows only the poster and a play button; nothing is requested from YouTube until the reader
 presses play, and then it uses `youtube-nocookie.com`. Never paste a raw YouTube `<iframe>` (it would load Google code on page load and
-break the Cookie Policy). Once a video has been started and the reader scrolls past it, it keeps playing in a small corner window (the mini player, `miniPlayer()` in `js/site.js`, `.video-figure.is-mini` in `css/style.css`) with buttons to move it (drag, or arrow keys; double-click resets), make it smaller or larger, jump back to it and close it (which pauses it), plus a drag corner for the size; the position and size are remembered in local storage under `mayobebros-mini-player` (listed in the Cookie Policy, keep both in step); this works for own files and YouTube alike and needs nothing per post. Videos need a useful caption, must be ours or properly licensed, and must not carry the article on their own:
+break the Cookie Policy). Once a video has been started and the reader scrolls past it, it keeps playing in a small corner window (the mini player, `miniPlayer()` in `js/site.js`, `.video-figure.is-mini` in `css/style.css`) with buttons to move it (drag, or arrow keys; double-click resets), make it smaller or larger, jump back to it and close it (which pauses it), plus a drag corner for the size. It also takes **touch and mouse gestures on the window itself** (one engine on the window, `js/site.js`, search "Gestures on the window itself"): drag from the picture, a quick flick glides to the nearest corner, two-finger pinch resizes (the picture stays under the fingers), double-tap switches small/large (no fullscreen), and a lone tap shows the controls without pausing (the play button does that). Every gesture has a one-tap button alternative (WCAG 2.5.1, 2.5.7): a size toggle (pinch, double-tap) and a "next corner" button (drag); on touch devices the buttons are 44 px, rest out of sight while playing, the +/- buttons, the move button and the resize corner are replaced by those two, and a tap on the picture brings them back. It works for YouTube too (Plyr's poster layer sits above the iframe, so touches reach the window). **Leaving the browser:** own video files get a "Pop out" button (native Picture-in-Picture, which keeps playing outside the browser); Media Session metadata is set on play and Chrome/Edge desktop pop out automatically when the tab is hidden (only for sites the reader allows); Safari and Firefox cannot be asked to, and iPhone does it from native fullscreen then Home. A YouTube embed cannot be popped out by a page, and YouTube's API policy forbids background-player tricks, so do not add any. Position and size are saved under `mayobebros-mini-player` the position and size are remembered in local storage under `mayobebros-mini-player` (listed in the Cookie Policy, keep both in step); this works for own files and YouTube alike and needs nothing per post. Videos need a useful caption, must be ours or properly licensed, and must not carry the article on their own:
 the text must still stand without them.
 
 ## Listen to this article
@@ -104,9 +104,16 @@ Never use a picture that shows a real company logo, crest or badge, a real perso
 AI pictures must not look like real news photos. Record where each used picture came from in `docs/image-sources.md`. Unused pictures do not
 belong in `assets/` (everything there is public); old ones are in `../my-site-archive/`.
 
+## Icons and the favicon
+`node scripts/tools/make-icons.mjs` (needs ffmpeg) rebuilds `favicon.ico` (16, 32 and 48 px in one file), `assets/img/favicon-32.png`, `favicon-48.png`, `icon-192.png`, `icon-512.png` (the Organization logo in the JSON-LD) and `icon-180.png` (Apple touch icon, opaque white) from `scripts/tools/logo-mark-source.png`, cropping the mark tight so it fills about 95% of the canvas (readable at 16 px). Keep those URLs stable: Google asks for it. Google shows a favicon only after it has recrawled the home page (days to weeks, no guarantee): check `https://www.google.com/s2/favicons?domain=mayobebros.com`, verify the site in Search Console and Bing Webmaster Tools, run URL Inspection on the home page and "Request indexing". The home page also has `WebSite` and `Organization` JSON-LD with `@id`, `alternateName` and `sameAs` (only filled-in social links); never add `SearchAction`.
+The home picture comes in three sizes (`hero-640.webp`, `hero-1080.webp`, `hero.webp`, served with `srcset`): re-make the two small ones with ffmpeg if `hero.webp` changes.
+
+## PageSpeed "no data"
+PageSpeed Insights shows two things: lab data (Lighthouse, works on this site) and field data from real Chrome visitors over 28 days (CrUX). "No data" is the field part: it needs enough Chrome traffic and cannot be forced from code. Test the exact origin `https://mayobebros.com/`. Cloudflare Web Analytics shows Core Web Vitals from the beacon already on every page.
+
 ## Tags are topics
 Every tag used by 2 or more posts becomes a topic page at `/tag/<tag>/` (built automatically; the home page shows the six biggest in "Topics from our tags"
-and every tag chip on a post links to its page). A tag page is `noindex` and left out of the sitemap until 3 posts use the tag (thin pages are
+and every tag chip on a post links to its page). The home page shows only those six cards and a "Browse all topics" button to `/tag/` (noindex, A to Z with counts); the post sidebar's Topics box starts with the article's own chips and a "More topics" button reveals the rest 12 at a time. A tag page is `noindex` and left out of the sitemap until 3 posts use the tag (thin pages are
 bad for AdSense). So keep tags consistent: reuse the same spelling (`small business`, not `small businesses`), 3 to 5 per post, and only real topics.
 
 ## Updating an existing post
@@ -127,7 +134,7 @@ latest articles, questions). Only `<link rel="alternate" type="application/rss+x
 Do not add XSLT or scripts to the feed. Do not link third-party reader services from the page unless the link format is verified.
 
 ## Do not hand-edit generated files
-Generated on every build: `index.html`, `404.html`, `post/`, `category/`, `label/`, `popular/`, `search/`, `author/`,
+Generated on every build: `index.html`, `404.html`, `post/`, `category/`, `label/`, `tag/` (every tag page and the `/tag/` index of all topics), `data/tags.json` (read by the sidebar's "More topics" button), `popular/`, `search/`, `author/`,
 every page folder from `content/pages/`, `sitemap.xml`, `*-sitemap<N>.xml`, `sitemap.xsl`, `feed.xml`, `feed.css`, `rss/`, `sitemap/`, `robots.txt`, `manifest.json`, `data/search.json`,
 `assets/share/*.jpg` (link-preview pictures), `.share-cards.json`, `.build-manifest.json`. Change the sources and rebuild:
 

@@ -512,6 +512,9 @@
     larger: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>',
     back: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg>',
     close: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
+    pop: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 9V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10c0 1.1.9 2 2 2h4"/><rect width="10" height="7" x="12" y="13" rx="2"/></svg>',
+    size: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/></svg>',
+    toCorner: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="12" y="12" width="6" height="6" rx="1"/></svg>',
     corner: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M20 4 4 20"/><path d="M20 12 12 20"/></svg>'
   };
   function miniPlayer(box, player) {
@@ -521,7 +524,12 @@
     var MARGIN = 8, MIN_W = 208;
     var custom = null; // {l, t, w} in pixels once the reader has moved or resized the window; null = the default corner
     try { var saved = JSON.parse(store(MINI_KEY) || 'null'); if (saved && isFinite(saved.l) && isFinite(saved.t) && isFinite(saved.w)) custom = { l: +saved.l, t: +saved.t, w: +saved.w }; } catch (err) { custom = null; }
-    function maxW() { return Math.max(MIN_W, Math.min(doc.documentElement.clientWidth - 2 * MARGIN, 960)); }
+    // room to keep clear on phones with a notch or a home bar (env(safe-area-inset-*) read through a hidden probe)
+    var probe = el('div'); probe.setAttribute('aria-hidden', 'true');
+    probe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)';
+    doc.body.appendChild(probe);
+    function insets() { var s = getComputedStyle(probe); return { t: parseFloat(s.paddingTop) || 0, r: parseFloat(s.paddingRight) || 0, b: parseFloat(s.paddingBottom) || 0, l: parseFloat(s.paddingLeft) || 0 }; }
+    function maxW() { var i = insets(); return Math.max(MIN_W, Math.min(doc.documentElement.clientWidth - 2 * MARGIN - i.l - i.r, 960)); }
     function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
     function save() { if (custom) store(MINI_KEY, JSON.stringify({ l: Math.round(custom.l), t: Math.round(custom.t), w: Math.round(custom.w) })); else store(MINI_KEY, null); }
     function clear() { ['left', 'top', 'right', 'bottom', 'width'].forEach(function (k) { root.style[k] = ''; }); }
@@ -532,8 +540,9 @@
       custom.w = clamp(custom.w, MIN_W, maxW());
       root.style.width = custom.w + 'px';
       var h = root.getBoundingClientRect().height;
-      custom.l = clamp(custom.l, MARGIN, Math.max(MARGIN, vw - custom.w - MARGIN));
-      custom.t = clamp(custom.t, MARGIN, Math.max(MARGIN, vh - h - MARGIN));
+      var i = insets();
+      custom.l = clamp(custom.l, MARGIN + i.l, Math.max(MARGIN + i.l, vw - custom.w - MARGIN - i.r));
+      custom.t = clamp(custom.t, MARGIN + i.t, Math.max(MARGIN + i.t, vh - h - MARGIN - i.b));
       root.style.left = custom.l + 'px'; root.style.top = custom.t + 'px';
       root.style.right = 'auto'; root.style.bottom = 'auto';
     }
@@ -557,10 +566,48 @@
       return b;
     }
     var grip = tool('Move the video: drag it, or use the arrow keys. Double-click to put it back in the corner.', MINI_ICONS.move, null, 'video-mini-grip');
-    tool('Make the video smaller', MINI_ICONS.smaller, function () { resizeTo(current().w * 0.85); });
-    tool('Make the video larger', MINI_ICONS.larger, function () { resizeTo(current().w * 1.2); });
+    tool('Make the video smaller', MINI_ICONS.smaller, function () { resizeTo(current().w * 0.85); }, 'video-mini-smaller');
+    tool('Make the video larger', MINI_ICONS.larger, function () { resizeTo(current().w * 1.2); }, 'video-mini-larger');
+    // the one-tap versions of the gestures (WCAG 2.5.1 and 2.5.7: pinch, double-tap and dragging each need a way that is not a gesture)
+    tool('Switch between a small and a large video', MINI_ICONS.size, function () { toggleSize(); }, 'video-mini-size');
+    tool('Move the video to the next corner', MINI_ICONS.toCorner, function () { nextCorner(); }, 'video-mini-corner');
     tool('Back to the video in the article', MINI_ICONS.back, function () { box.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' }); });
     tool('Close the mini player and pause', MINI_ICONS.close, function () { player.pause(); dismissed = true; set(false); });
+    /* Native Picture-in-Picture (own video files only): the browser or the system draws the video in its own always-on-top window, so it
+       keeps playing when the reader switches tab or app. A page cannot do that itself, and a YouTube embed cannot be popped out. */
+    var vid = player.isHTML5 && player.media && player.media.tagName === 'VIDEO' ? player.media : null;
+    var pipOn = false;
+    function pipOK(v) {
+      if (v.disablePictureInPicture) return false;
+      if (doc.pictureInPictureEnabled && v.requestPictureInPicture) return true;
+      return !!(v.webkitSupportsPresentationMode && v.webkitSupportsPresentationMode('picture-in-picture'));
+    }
+    function togglePip() {
+      try {
+        if (doc.pictureInPictureElement === vid) { doc.exitPictureInPicture(); return; }
+        if (doc.pictureInPictureEnabled && vid.requestPictureInPicture) { vid.requestPictureInPicture()['catch'](function () { /* refused: no gesture, or another window is open */ }); return; }
+        if (vid.webkitSetPresentationMode) vid.webkitSetPresentationMode(vid.webkitPresentationMode === 'picture-in-picture' ? 'inline' : 'picture-in-picture'); // iPhone, iPad, older Safari
+      } catch (err) { /* not available right now */ }
+    }
+    if (vid && pipOK(vid)) {
+      tool('Pop the video out. It keeps playing when you leave the browser.', MINI_ICONS.pop, togglePip, 'video-mini-pop');
+      var pipChange = function (on) { if (on === pipOn) return; pipOn = on; if (on) set(false); else { io.unobserve(box); io.observe(box); } }; // the picture is in the other window: dock ours
+      vid.addEventListener('enterpictureinpicture', function () { pipChange(true); });
+      vid.addEventListener('leavepictureinpicture', function () { pipChange(false); });
+      vid.addEventListener('webkitpresentationmodechanged', function () { pipChange(vid.webkitPresentationMode === 'picture-in-picture'); });
+      // lock-screen / notification card, and Chrome and Edge on desktop pop the video out by themselves when the tab is hidden
+      // (only for sites the reader allows; Safari and Firefox cannot be asked to, so the button is the dependable way there)
+      var ms = 'mediaSession' in navigator ? navigator.mediaSession : null;
+      var capEl = box.querySelector('figcaption');
+      var arm = function () {
+        if (!ms) return;
+        try { ms.metadata = new MediaMetadata({ title: ((capEl && capEl.textContent) || doc.title).trim().slice(0, 120), artist: 'Mayobe Bros', artwork: [{ src: location.origin + BASE + '/assets/img/icon-512.png', sizes: '512x512', type: 'image/png' }] }); } catch (err) { /* no metadata */ }
+        try { ms.setActionHandler('enterpictureinpicture', function () { if (vid.paused || doc.pictureInPictureElement) return undefined; return vid.requestPictureInPicture(); }); } catch (err) { /* action not supported here */ }
+        try { ms.setActionHandler('seekbackward', function () { player.rewind(10); }); ms.setActionHandler('seekforward', function () { player.forward(10); }); } catch (err) { /* not supported */ }
+      };
+      var disarm = function () { if (!ms) return; try { ms.setActionHandler('enterpictureinpicture', null); } catch (err) { /* not supported */ } };
+      vid.addEventListener('play', arm); vid.addEventListener('pause', disarm); vid.addEventListener('ended', disarm);
+    }
     var handle = el('button', 'video-mini-resize');
     handle.type = 'button'; handle.setAttribute('aria-label', 'Resize the video: drag this corner'); handle.title = 'Drag to resize'; handle.innerHTML = MINI_ICONS.corner;
     root.appendChild(tools); root.appendChild(handle);
@@ -602,11 +649,142 @@
       function up() { handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', up); handle.removeEventListener('pointercancel', up); root.classList.remove('is-dragging'); save(); }
       handle.addEventListener('pointermove', move); handle.addEventListener('pointerup', up); handle.addEventListener('pointercancel', up);
     });
+    /* Gestures on the window itself, with a finger or a mouse. One pointer: drag (after a few pixels, so a tap is still a tap) and a quick
+       flick glides to the nearest corner. Two fingers: pinch to resize, with the picture staying under the fingers. Double-tap: small
+       and large. A tap on the picture shows the controls; the play button starts and stops it, so a slip while dragging never pauses.
+       Every gesture has a one-finger alternative (the buttons). The controls, the tool buttons and the corner handle keep their own input. */
+    var TOOLS = '.plyr__controls, .video-mini-tools, .video-mini-resize';
+    var pts = {}, g = null, lastType = 'mouse', swallow = false, lastTap = null, raf = 0, uiTimer = 0, tapTimer = 0;
+    function schedule() { if (!raf) raf = requestAnimationFrame(function () { raf = 0; place(); }); }
+    function capture(id) { if (pts[id] && pts[id].type === 'touch') return; try { root.setPointerCapture(id); } catch (err) { /* the pointer is already gone */ } }
+    function swallowClick() { swallow = true; setTimeout(function () { swallow = false; }, 350); } // the click that follows a drag or a double-tap is not a tap
+    function showUi() {
+      root.classList.add('mini-ui');
+      clearTimeout(uiTimer);
+      uiTimer = setTimeout(function () { root.classList.remove('mini-ui'); }, 3200);
+    }
+    function wDefault() { var vw = doc.documentElement.clientWidth; return vw <= 640 ? Math.min(240, Math.round(vw * 0.62)) : Math.min(352, vw - 2 * MARGIN); }
+    function wLarge() { var vw = doc.documentElement.clientWidth; return Math.min(maxW(), vw <= 640 ? vw - 2 * MARGIN : 560); }
+    function glide(fn) { // run a change of place or size with a short, smooth transition
+      if (reduceMotion) { fn(); return; }
+      root.classList.add('is-gliding'); fn();
+      setTimeout(function () { root.classList.remove('is-gliding'); }, 460);
+    }
+    function toggleSize() {
+      var c = current(), target = c.w < (wDefault() + wLarge()) / 2 + 1 ? wLarge() : wDefault();
+      glide(function () { custom = { l: c.l + (c.w - target) / 2, t: c.t, w: target }; place(); save(); });
+    }
+    var TOP_ROOM = 56; // room below the site header
+    function nextCorner() { // clockwise: top left, top right, bottom right, bottom left
+      var c = current(), vw = doc.documentElement.clientWidth, vh = window.innerHeight, i = insets(), h = c.b - c.t;
+      var left = MARGIN + i.l, right = vw - c.w - MARGIN - i.r, top = MARGIN + i.t + TOP_ROOM, bottom = vh - h - MARGIN - i.b;
+      var corners = [], seen = {}; // a full-width window has the same spot on the left and the right: go through distinct places only
+      [[left, top], [right, top], [right, bottom], [left, bottom]].forEach(function (p) { var k = Math.round(p[0]) + ',' + Math.round(p[1]); if (!seen[k]) { seen[k] = 1; corners.push(p); } });
+      var best = 0, bd = Infinity;
+      corners.forEach(function (p, k) { var d = Math.hypot(p[0] - c.l, p[1] - c.t); if (d < bd) { bd = d; best = k; } });
+      var n = corners[(best + 1) % corners.length];
+      glide(function () { custom = { w: c.w, l: n[0], t: n[1] }; place(); save(); });
+    }
+    function startPinch() {
+      clearTimeout(tapTimer);
+      var ids = Object.keys(pts).slice(0, 2), a = pts[ids[0]], b = pts[ids[1]], r = current();
+      g = { mode: 'pinch', ids: ids, d0: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), m0: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, r0: r };
+      root.classList.add('is-dragging'); ids.forEach(function (id) { capture(+id); });
+    }
+    function pinchMove() {
+      var a = pts[g.ids[0]], b = pts[g.ids[1]];
+      if (!a || !b) return;
+      var d = Math.hypot(a.x - b.x, a.y - b.y), m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, h0 = g.r0.b - g.r0.t;
+      var w = clamp(g.r0.w * d / g.d0, MIN_W, maxW()), s = w / g.r0.w;
+      var fx = (g.m0.x - g.r0.l) / g.r0.w, fy = (g.m0.y - g.r0.t) / h0; // the spot under the fingers stays under the fingers
+      custom = { w: w, l: m.x - fx * w, t: m.y - fy * h0 * s };
+      schedule();
+    }
+    function finish(e, fling) {
+      var tr = g && g.trail, c = current(); // measured before anything else changes
+      root.classList.remove('is-dragging');
+      swallowClick();
+      g = null;
+      if (fling && tr && tr.length > 1) { // a quick flick glides to the corner it was thrown towards
+        var last = tr[tr.length - 1], first = tr[Math.max(0, tr.length - 4)], dt = Math.max(1, last.t - first.t);
+        var vx = (last.x - first.x) / dt, vy = (last.y - first.y) / dt;
+        if (Math.hypot(vx, vy) > 0.55 && e.timeStamp - last.t < 90) {
+          var vw = doc.documentElement.clientWidth, vh = window.innerHeight, i = insets();
+          var cx = c.l + c.w / 2 + vx * 200, cy = c.t + (c.b - c.t) / 2 + vy * 200;
+          glide(function () {
+            custom = { w: c.w, l: cx < vw / 2 ? MARGIN + i.l : vw - c.w - MARGIN - i.r, t: cy < vh / 2 ? MARGIN + i.t + TOP_ROOM : vh - (c.b - c.t) - MARGIN - i.b }; 
+            place();
+          });
+        }
+      }
+      save();
+    }
+    root.addEventListener('pointerdown', function (e) {
+      lastType = e.pointerType || 'mouse';
+      if (!mini || (lastType === 'mouse' && e.button !== 0) || e.target.closest(TOOLS)) return;
+      pts[e.pointerId] = { x: e.clientX, y: e.clientY, type: lastType };
+      var n = Object.keys(pts).length;
+      if (n === 1) g = { mode: 'pending', id: e.pointerId, sx: e.clientX, sy: e.clientY, c: current(), trail: [{ t: e.timeStamp, x: e.clientX, y: e.clientY }] };
+      else if (n === 2) startPinch();
+    });
+    root.addEventListener('pointermove', function (e) {
+      var p = pts[e.pointerId];
+      if (!p || !g) return;
+      p.x = e.clientX; p.y = e.clientY;
+      if (g.mode === 'pinch') { pinchMove(); return; }
+      if (g.id !== e.pointerId) return;
+      if (g.mode === 'pending') {
+        if (Math.hypot(e.clientX - g.sx, e.clientY - g.sy) < (lastType === 'mouse' ? 4 : 8)) return;
+        g.mode = 'drag'; custom = { l: g.c.l, t: g.c.t, w: g.c.w };
+        root.classList.add('is-dragging'); capture(e.pointerId);
+      }
+      custom.l = g.c.l + e.clientX - g.sx; custom.t = g.c.t + e.clientY - g.sy;
+      g.trail.push({ t: e.timeStamp, x: e.clientX, y: e.clientY }); if (g.trail.length > 8) g.trail.shift();
+      schedule();
+    });
+    function release(e) {
+      if (!pts[e.pointerId]) return;
+      delete pts[e.pointerId];
+      if (!g) return;
+      var left = Object.keys(pts), cancelled = e.type === 'pointercancel';
+      if (g.mode === 'pinch') {
+        if (left.length === 1) { var q = pts[left[0]]; g = { mode: 'drag', id: +left[0], sx: q.x, sy: q.y, c: current(), trail: [{ t: e.timeStamp, x: q.x, y: q.y }] }; custom = { l: g.c.l, t: g.c.t, w: g.c.w }; } // one finger stays: keep moving with it
+        else if (!left.length) finish(e, false);
+        return;
+      }
+      if (g.id !== e.pointerId) return;
+      if (g.mode === 'drag') { finish(e, !cancelled); return; }
+      g = null; // a tap
+      if (cancelled || lastType === 'mouse') return;
+      if (lastTap && e.timeStamp - lastTap.t < 320 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 40) { // second tap: change the size
+        lastTap = null; clearTimeout(tapTimer); swallowClick(); toggleSize();
+      } else {
+        lastTap = { t: e.timeStamp, x: e.clientX, y: e.clientY };
+        // a lone tap shows or hides the controls, but only after the double-tap window has passed: the buttons must not appear under a second tap
+        clearTimeout(tapTimer);
+        tapTimer = setTimeout(function () {
+          if (typeof player.toggleControls === 'function') player.toggleControls(root.classList.contains('plyr--hide-controls'));
+          showUi();
+        }, 330);
+      }
+    }
+    ['gesturestart', 'gesturechange'].forEach(function (t) { root.addEventListener(t, function (e) { if (mini) e.preventDefault(); }); }); // Safari's own pinch zoom
+    root.addEventListener('pointerup', release);
+    root.addEventListener('pointercancel', release);
+    // clicks that end a drag or a double-tap are dropped; with a finger, a tap on the picture shows or hides the controls instead of pausing
+    root.addEventListener('click', function (e) {
+      if (!mini || e.target.closest(TOOLS)) return;
+      if (swallow) { e.stopPropagation(); e.preventDefault(); return; }
+      if (lastType !== 'mouse') { e.stopPropagation(); e.preventDefault(); } // a tap with a finger never starts or stops the video
+    }, true);
+    root.addEventListener('dblclick', function (e) { if (mini && lastType !== 'mouse' && !e.target.closest(TOOLS)) e.stopPropagation(); }, true); // no fullscreen from a double-tap: it changes the size
     window.addEventListener('resize', function () { if (mini && custom) place(); });
 
+    root.addEventListener('animationend', function (e) { if (e.target === root && mini) root.classList.add('is-settled'); }); // the entrance plays once, never again after a drag
     function set(on) {
       if (on === mini) return;
       if (on) {
+        root.classList.remove('is-settled');
         box.style.minHeight = box.offsetHeight + 'px';
         box.classList.add('is-mini');
         root.setAttribute('role', 'region'); root.setAttribute('aria-label', 'Mini video player');
@@ -621,7 +799,7 @@
     var io = new IntersectionObserver(function (entries) {
       var r = entries[entries.length - 1].intersectionRatio;
       if (r >= 0.5) { dismissed = false; set(false); }
-      else if (r < 0.15 && started && !dismissed && !full) set(true);
+      else if (r < 0.15 && started && !dismissed && !full && !pipOn) set(true);
     }, { threshold: [0, 0.15, 0.5] });
     io.observe(box);
     player.on('play', function () { started = true; });
@@ -635,7 +813,7 @@
     loadPlyr().then(function (Plyr) {
       plain.forEach(function (v) {
         v.removeAttribute('width'); v.removeAttribute('height');
-        var pl = new Plyr(v, plyrOptions({ ratio: '16:9' }));
+        var pl = new Plyr(v, plyrOptions({ ratio: '16:9', fullscreen: { enabled: true, fallback: true, iosNative: true } })); // iosNative: on iPhone the system player can pop the video out when the reader leaves
         miniPlayer(v.closest('.video-figure'), pl);
       });
       embeds.forEach(function (box) {
@@ -653,6 +831,42 @@
       });
     })['catch'](function () { /* the browser's own controls stay in place */ });
   }
+
+  /* ------------------------------------------- sidebar: "More topics" reveals the other tag topics 12 at a time */
+  $$('[data-more-tags]').forEach(function (box) {
+    var btn = $('.rail-more-btn', box), link = $('.rail-more-link', box), say = $('[role="status"]', box), chips = $('[data-tag-chips]', box.parentNode);
+    if (!btn || !chips) return;
+    var base = box.getAttribute('data-base') || '/tag/', step = Number(box.getAttribute('data-step')) || 12;
+    var queue = null, busy = false;
+    btn.hidden = false; if (link) link.hidden = true; // the plain link stays for readers without JavaScript
+    function label(left) { $('span', btn).textContent = left ? 'More topics (' + left + ' left)' : 'More topics'; }
+    function finish() { btn.hidden = true; if (link) link.hidden = false; }
+    function reveal() {
+      var batch = queue.splice(0, step);
+      batch.forEach(function (t, i) {
+        var a = el('a', 'chip chip-new'); a.href = base + t[1] + '/';
+        a.style.setProperty('--i', i);
+        a.appendChild(doc.createTextNode(t[0] + ' '));
+        a.appendChild(el('span', 'chip-count', String(t[2])));
+        chips.appendChild(a);
+      });
+      if (say) say.textContent = batch.length + ' more topics added.';
+      $$('.chip-new', chips).forEach(function (c) { c.classList.add('is-seen'); });
+      if (queue.length) label(queue.length); else finish();
+      busy = false; btn.removeAttribute('aria-busy');
+    }
+    btn.addEventListener('click', function () {
+      if (busy) return;
+      if (queue) { busy = true; reveal(); return; }
+      busy = true; btn.setAttribute('aria-busy', 'true');
+      fetch(box.getAttribute('data-more-tags')).then(function (r) { if (!r.ok) throw new Error('topics'); return r.json(); }).then(function (all) {
+        var have = {}; $$('a.chip', chips).forEach(function (a) { have[a.getAttribute('href')] = 1; });
+        queue = all.filter(function (t) { return !have[base + t[1] + '/']; });
+        if (!queue.length) { finish(); busy = false; return; }
+        reveal();
+      })['catch'](function () { busy = false; btn.removeAttribute('aria-busy'); if (link) { link.hidden = false; } btn.hidden = true; }); // could not load the list: fall back to the page of all topics
+    });
+  });
 
   /* ------------------------------------------------- copy the feed address (/rss/) */
   $$('[data-copy]').forEach(function (btn) {
