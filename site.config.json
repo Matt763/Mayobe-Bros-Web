@@ -65,7 +65,7 @@
     "whatsapp": "https://whatsapp.com/channel/0029Vb7A9jFKrWQnpQZJdQ1J"
   },
 
-  "commentsApi": "",
+  "commentsApi": "https://mayobe-engage.mattmclean763.workers.dev",
   "turnstileSiteKey": "",
 
   "sitemapUrlsPerFile": 200,

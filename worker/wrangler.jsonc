@@ -4,6 +4,7 @@
   "main": "src/index.js",
   "compatibility_date": "2026-11-01",
   "workers_dev": true,
+  "preview_urls": false,
   "observability": { "enabled": true },
   "vars": {
     "ALLOWED_ORIGINS": "https://mayobebros.com,https://www.mayobebros.com",
@@ -13,7 +14,7 @@
     {
       "binding": "DB",
       "database_name": "mayobe-engage",
-      "database_id": "REPLACE_WITH_ID_PRINTED_BY_wrangler_d1_create",
+      "database_id": "cacaf5f7-0c3c-4904-9a32-f8b857956bb2",
       "migrations_dir": "migrations"
     }
   ]
