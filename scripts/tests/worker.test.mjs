@@ -158,6 +158,8 @@ test('team replies: admin only, badge shown, names that look like the team are h
   assert.equal(fake.json.status, 'pending');
   const held = await call('GET', '/v1/admin/comments', { auth: env.ADMIN_TOKEN, origin: null });
   assert.match(held.json.comments[0].flag, /impersonation/);
+  const sneaky = await call('POST', '/v1/posts/hello-post/comments', { body: comment({ name: 'M a y o b e  B r o s', body: 'Please trust me', cid: 'qqqqqqqqqqqqqqqqqq56', ip: '7.7.7.7' }), ip: '7.7.7.7' });
+  assert.equal(sneaky.json.status, 'pending');
 });
 
 test('spam and delete adjust the count and hide replies', async () => {

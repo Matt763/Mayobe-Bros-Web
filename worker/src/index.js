@@ -13,7 +13,7 @@
 // shouting). A clean comment is published at once ("approved"); a flagged one is held as "pending" until the owner approves it.
 // Set the variable AUTO_APPROVE to "false" to hold every comment again (for example during a spam wave).
 
-import { screen } from './moderation.js';
+import { screen, looksLikeTeam } from './moderation.js';
 
 export const REACTIONS = ['like', 'amazed', 'sad', 'angry'];
 const COL = { like: 'r_like', amazed: 'r_amazed', sad: 'r_sad', angry: 'r_angry' };
@@ -21,7 +21,6 @@ const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const CID_RE = /^[A-Za-z0-9-]{16,64}$/;
 const LINK_RE = /(https?:\/\/|www\.|\b[a-z0-9-]+\.(?:com|net|org|info|biz|xyz|top|click|link|ru|cn|co\.tz|go\.tz|tk|ml|ga|cf|gq)\b|t\.me\/|bit\.ly)/i;
 const MAX_BODY = 4000;
-const TEAM_NAME_RE = /\b(mayobe|moderators?|admins?|administrators?|staff|official|support|team)\b/i;
 
 const enc = new TextEncoder();
 const now = () => Date.now();
@@ -189,7 +188,7 @@ async function handle(request, env, ctx) {
       const j = await r.json().catch(() => ({}));
       if (!j.success) return fail('Please complete the security check and try again.', 400, cors);
     }
-    const name = String(b.name || '').replace(/\s+/g, ' ').trim();
+    const name = String(b.name || '').normalize('NFKC').replace(/\p{Cf}+/gu, '').replace(/\s+/g, ' ').trim(); // stored exactly as it was checked: no invisible characters
     const email = String(b.email || '').trim().slice(0, 120);
     const body = String(b.body || '').replace(/\r\n?/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
     if (name.length < 2 || name.length > 50) return fail('Please enter your name (2 to 50 characters).', 400, cors);
@@ -215,7 +214,7 @@ async function handle(request, env, ctx) {
       let reasons;
       try { reasons = [...screen(`${name}\n${body}`).reasons]; } catch (err) { console.error('screen failed', err && err.stack ? err.stack : err); reasons = ['screen-error']; } // fail closed: if the check breaks, hold the comment
       if (String(env.AUTO_APPROVE).toLowerCase() === 'false') reasons.push('auto-approve-off');
-      if (TEAM_NAME_RE.test(name)) reasons.push('impersonation'); // only the admin reply route may use a name that looks like the team
+      if (looksLikeTeam(name)) reasons.push('impersonation'); // only the admin reply route may use a name that looks like the team
       if ((await env.DB.prepare("SELECT COUNT(*) AS n FROM comments WHERE (cid = ? OR ip_hash = ?) AND status = 'spam'").bind(b.cid, ih).first())?.n) reasons.push('earlier-spam');
       const pending = await env.DB.prepare("SELECT COUNT(*) AS n FROM comments WHERE cid = ? AND status = 'pending'").bind(b.cid).first();
       if (reasons.length && (pending?.n || 0) >= 5) return fail('You already have several comments waiting for review.', 429, cors);

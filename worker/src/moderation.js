@@ -216,3 +216,19 @@ export function screen(text) {
 
 // phrases are stored with normal spelling; collapse only runs of 3+ so "see" and "all" survive
 function squeezeKeep(s) { return s.replace(/(.)\1{2,}/g, '$1'); }
+
+// Names that look like the site team. Only the admin reply route may use them (it adds the Team badge).
+// The name is normalised first (accents, zero-width characters, look-alike letters, digits and symbols used as letters),
+// so "M a y o b e", "Mayobe" with a Cyrillic letter or "m4y0be" are caught too.
+const TEAM_WORDS = new Set(['moderator', 'moderators', 'admin', 'admins', 'administrator', 'administrators', 'staff', 'official', 'support', 'team', 'editor', 'editors', 'mayobe', 'mbaga']);
+const TEAM_RUNS = ['mayobe', 'moderator', 'administrator', 'mcleanmbaga', 'mbaga']; // distinctive: also matched with the spaces and dots removed
+export function looksLikeTeam(name) {
+  const base = clean(name);
+  const variants = new Set([base, base.replace(/[013457]/g, (d) => DIGIT_LEET[d]), base.replace(/1/g, 'l').replace(/[03457]/g, (d) => DIGIT_LEET[d])]);
+  for (const v of variants) {
+    for (const w of v.split(/[^a-z0-9]+/)) if (TEAM_WORDS.has(w)) return true;
+    const squashed = v.replace(/[^a-z0-9]+/g, '');
+    for (const r of TEAM_RUNS) if (squashed.includes(r)) return true;
+  }
+  return false;
+}

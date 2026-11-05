@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { screen } from '../../worker/src/moderation.js';
+import { screen, looksLikeTeam } from '../../worker/src/moderation.js';
 import { WORDS, STEMS, PHRASES, SCAM } from '../../worker/src/wordlist.js';
 
 const flagged = (t) => screen(t).flagged;
@@ -82,4 +82,13 @@ test('screening is fast and safe on large or hostile input', () => {
   screen('(a+)+$'.repeat(100) + '!'); // nothing here backtracks
   screen('​'.repeat(2000));
   screen('😀'.repeat(500));
+});
+
+test('names that look like the team are recognised, even when disguised', () => {
+  for (const n of ['Mayobe Bros Team', 'MAYOBE', 'M a y o b e', 'M.a.y.o.b.e', 'Mayo-be', 'm4y0be', 'Mayobе' /* Cyrillic е */, 'May\u200bobe', 'Site Admin', '4dm1n', 'Moderator Joe', 'Mclean Mbaga', 'The Mayobe Bros']) {
+    assert.equal(looksLikeTeam(n), true, n);
+  }
+  for (const n of ['Asha', 'Youno yvonne', 'Badminton Fan', 'Teamwork Lover', 'Joseph M', 'Support']) {
+    assert.equal(looksLikeTeam(n), n === 'Support', n);
+  }
 });
