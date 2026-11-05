@@ -65,6 +65,10 @@
   "commentsApi": "",
   "turnstileSiteKey": "",
 
+  "analytics": {
+    "gtmId": "GTM-N8Z3H9L6"
+  },
+
   "adsense": {
     "client": "ca-pub-4671753262151081",
     "autoAds": false,

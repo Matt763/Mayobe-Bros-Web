@@ -324,6 +324,17 @@
     doc.head.appendChild(s);
     adSlots(true);
   }
+  /* Google Tag Manager (analytics): loaded only after the reader pressed Accept, on every page. */
+  function loadTags() {
+    var id = root.getAttribute('data-gtm');
+    if (!id || store(CONSENT) !== 'accepted' || window.__mbGtm) return;
+    window.__mbGtm = true;
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' });
+    var s = el('script'); s.async = true;
+    s.src = 'https://www.googletagmanager.com/gtm.js?id=' + encodeURIComponent(id);
+    doc.head.appendChild(s);
+  }
   /* The labelled ad slot in the article sidebar (only in the page when ads are switched on in site.config.json).
      It is shown only after the reader pressed Accept. Google does not run an ad request for a unit that is hidden when it
      asks, so the box is shown first and taken away again when no ad comes back (data-ad-status="unfilled", a blocker, or a timeout). */
@@ -375,11 +386,13 @@
       wrap.remove();
       if (b.getAttribute('data-consent') === 'rejected') adSlots(false);
       loadAds();
+      loadTags();
     });
   }
   if (!store(CONSENT)) setTimeout(function () { if (!store(CONSENT)) showCookieNotice(); }, 1500);
   $$('[data-cookie-settings]').forEach(function (b) { b.addEventListener('click', function () { store(CONSENT, null); showCookieNotice(); }); });
   loadAds();
+  loadTags();
 
   /* ---------------------------------------------------------------- share */
   $$('[data-share]').forEach(function (box) {

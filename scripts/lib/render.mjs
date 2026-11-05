@@ -85,6 +85,7 @@ export function createRenderer(ctx) {
   const siteUrl = config.siteUrl.replace(/\/$/, '');
   const api = (config.commentsApi || '').replace(/\/$/, '');
   const adsenseId = (config.adsense?.client || '').trim();
+  const gtmId = /^GTM-[A-Z0-9]{4,12}$/.test(config.analytics?.gtmId || '') ? config.analytics.gtmId : '';
 
   const u = (p) => `${base}${p}`;
   const abs = (p) => `${siteUrl}${base}${p}`;
@@ -305,7 +306,7 @@ export function createRenderer(ctx) {
   function layout(meta, cur, body) {
     const ads = adsenseId && config.adsense?.autoAds && !NO_AD_PAGES.has(meta.adKind || '') && meta.adKind === 'post';
     return `<!doctype html>
-<html lang="${config.language}" data-base="${base}"${api ? ` data-api="${e(api)}"` : ''}${config.turnstileSiteKey ? ` data-turnstile="${e(config.turnstileSiteKey)}"` : ''}${adsenseId ? ` data-adsense="${e(adsenseId)}"` : ''}>
+<html lang="${config.language}" data-base="${base}"${api ? ` data-api="${e(api)}"` : ''}${config.turnstileSiteKey ? ` data-turnstile="${e(config.turnstileSiteKey)}"` : ''}${adsenseId ? ` data-adsense="${e(adsenseId)}"` : ''}${gtmId ? ` data-gtm="${e(gtmId)}"` : ''}>
 <head>
 ${head(meta)}
 </head>
@@ -877,6 +878,8 @@ ${discover()}`;
       h
         .replace(/\{\{#comments\}\}([\s\S]*?)\{\{\/comments\}\}/g, (_m, t) => (api ? t : ''))
         .replace(/\{\{\^comments\}\}([\s\S]*?)\{\{\/comments\}\}/g, (_m, t) => (api ? '' : t))
+        .replace(/\{\{#analytics\}\}([\s\S]*?)\{\{\/analytics\}\}/g, (_m, t) => (gtmId ? t : ''))
+        .replace(/\{\{\^analytics\}\}([\s\S]*?)\{\{\/analytics\}\}/g, (_m, t) => (gtmId ? '' : t))
         .replace(/\{\{base\}\}/g, base)
         .replace(/\{\{contact-form\}\}/g, contactForm())
         .replace(/\{\{email:(general|support|executive)\}\}/g, (_m, k) => `<a href="mailto:${config.contact[k]}">${config.contact[k]}</a>`)
