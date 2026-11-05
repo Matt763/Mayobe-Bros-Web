@@ -218,17 +218,41 @@ export function screen(text) {
 function squeezeKeep(s) { return s.replace(/(.)\1{2,}/g, '$1'); }
 
 // Names that look like the site team. Only the admin reply route may use them (it adds the Team badge).
-// The name is normalised first (accents, zero-width characters, look-alike letters, digits and symbols used as letters),
-// so "M a y o b e", "Mayobe" with a Cyrillic letter or "m4y0be" are caught too.
+// A list of look-alike letters can never be complete, so this check fails closed:
+//  * a letter from any script other than Latin (Greek, Cyrillic, Armenian, Hangul fillers ...) holds the name for review;
+//  * a Latin name is folded (accents, zero-width characters, full-width letters), every symbol or space becomes a separator,
+//    digits and symbols are also tried as letters (4dm1n, m@yobe, $taff, 8), and the result is compared as words, as one
+//    run with the separators removed, with repeated letters squeezed, and with single spaced-out letters joined (A d m i n).
+// A false alarm only holds a comment for a person to read, so the check is deliberately broad.
 const TEAM_WORDS = new Set(['moderator', 'moderators', 'admin', 'admins', 'administrator', 'administrators', 'staff', 'official', 'support', 'team', 'editor', 'editors', 'mayobe', 'mbaga']);
-const TEAM_RUNS = ['mayobe', 'moderator', 'administrator', 'mcleanmbaga', 'mbaga']; // distinctive: also matched with the spaces and dots removed
+const TEAM_RUNS = ['mayobe', 'moderator', 'administrator', 'mcleanmbaga', 'mbaga'].map((r) => [r, squeeze(r)]); // distinctive: matched even inside a longer run
+const NAME_LEET = { 0: 'o', 1: 'i', 3: 'e', 4: 'a', 5: 's', 7: 't', 8: 'b' };
+const NAME_SYM = { '@': 'a', $: 's', '!': 'i', '+': 't', '|': 'i', '€': 'e', '£': 'l' };
+
+function teamForm(v) {
+  const tokens = v.split(' ').filter(Boolean);
+  for (const w of tokens) if (TEAM_WORDS.has(w) || TEAM_WORDS.has(squeeze(w))) return true;
+  let run = [];
+  const flush = () => { if (run.length >= 3 && TEAM_WORDS.has(run.join(''))) return true; run = []; return false; };
+  for (const w of tokens) { if (w.length === 1) run.push(w); else if (flush()) return true; }
+  if (flush()) return true;
+  const squashed = tokens.join('');
+  const squeezed = squeeze(squashed);
+  for (const [r, q] of TEAM_RUNS) if (squashed.includes(r) || squeezed.includes(q)) return true;
+  return false;
+}
+
 export function looksLikeTeam(name) {
-  const base = clean(name);
-  const variants = new Set([base, base.replace(/[013457]/g, (d) => DIGIT_LEET[d]), base.replace(/1/g, 'l').replace(/[03457]/g, (d) => DIGIT_LEET[d])]);
-  for (const v of variants) {
-    for (const w of v.split(/[^a-z0-9]+/)) if (TEAM_WORDS.has(w)) return true;
-    const squashed = v.replace(/[^a-z0-9]+/g, '');
-    for (const r of TEAM_RUNS) if (squashed.includes(r)) return true;
+  const raw = String(name || '').normalize('NFKD').replace(/\p{M}+/gu, '').replace(/\p{Cf}+/gu, '');
+  if (/(?!\p{Script=Latin})\p{L}/u.test(raw)) return true; // fail closed on any non-Latin letter
+  const lower = raw.toLowerCase();
+  const withSymbols = lower.replace(/[@$!+|€£]/g, (c) => NAME_SYM[c]);
+  const sep = (t) => t.replace(/[^a-z0-9]+/g, ' ').trim();
+  const bases = [sep(lower), sep(withSymbols)];
+  for (const b of bases) {
+    const digits = b.replace(/[0134578]/g, (d) => NAME_LEET[d]);
+    const digitsL = b.replace(/1/g, 'l').replace(/[034578]/g, (d) => NAME_LEET[d]);
+    if (teamForm(b) || teamForm(digits) || teamForm(digitsL)) return true;
   }
   return false;
 }
