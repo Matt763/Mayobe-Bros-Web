@@ -76,7 +76,7 @@
     "google": "",
     "bing": ""
   },
-  "showEmptyTopics": true,
+  "showEmptyTopics": false,
   "indexNowKey": "f2e092d4489603c02141ac4e4ae1fe91",
   "homePaths": [
       {
