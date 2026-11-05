@@ -141,6 +141,25 @@ test('a reply to a held comment is refused until the parent is approved', async 
   assert.equal((await call('POST', '/v1/posts/hello-post/comments', { body: comment({ body: 'A reply here', parent: 1 }) })).status, 400);
 });
 
+test('team replies: admin only, badge shown, names that look like the team are held', async () => {
+  const p = await call('POST', '/v1/posts/hello-post/comments', { body: comment() });
+  const noAuth = await call('POST', '/v1/admin/reply', { body: { parent: p.json.comment.id, body: 'Thanks' }, origin: null });
+  assert.equal(noAuth.status, 401);
+  const r = await call('POST', '/v1/admin/reply', { auth: env.ADMIN_TOKEN, origin: null, body: { parent: p.json.comment.id, body: 'Thanks for the love' } });
+  assert.equal(r.status, 201);
+  assert.equal(r.json.comment.team, true);
+  assert.equal(r.json.stats.c, 2);
+  const pub = (await call('GET', '/v1/posts/hello-post')).json;
+  assert.equal(pub.comments[0].replies[0].team, true);
+  assert.equal(pub.comments[0].replies[0].name, 'Mayobe Bros Team');
+  assert.equal('team' in pub.comments[0], false, 'ordinary comments carry no badge');
+  assert.equal((await call('POST', '/v1/admin/reply', { auth: env.ADMIN_TOKEN, origin: null, body: { parent: 999, body: 'Thanks' } })).status, 400);
+  const fake = await call('POST', '/v1/posts/hello-post/comments', { body: comment({ name: 'Mayobe Bros Moderator', body: 'Send your bank details', cid: CID2, ip: '8.8.8.8' }), ip: '8.8.8.8' });
+  assert.equal(fake.json.status, 'pending');
+  const held = await call('GET', '/v1/admin/comments', { auth: env.ADMIN_TOKEN, origin: null });
+  assert.match(held.json.comments[0].flag, /impersonation/);
+});
+
 test('spam and delete adjust the count and hide replies', async () => {
   const p = await call('POST', '/v1/posts/hello-post/comments', { body: comment() });
   await call('POST', '/v1/posts/hello-post/comments', { body: comment({ body: 'Reply text', parent: p.json.comment.id }) });

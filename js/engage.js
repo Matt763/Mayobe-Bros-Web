@@ -183,6 +183,14 @@
     var main = el('div');
     var head = el('div', 'comment-head');
     head.appendChild(el('span', 'comment-name', c.name));
+    if (c.team) {
+      var badge = el('span', 'team-badge');
+      badge.title = 'Written by the Mayobe Bros team';
+      badge.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20 6 9 17l-5-5"/></svg>';
+      badge.appendChild(doc.createTextNode('Team'));
+      head.appendChild(badge);
+      wrap.classList.add('is-team');
+    }
     var t = el('time', 'comment-time', ago(c.at));
     t.setAttribute('datetime', new Date(c.at).toISOString());
     head.appendChild(t);

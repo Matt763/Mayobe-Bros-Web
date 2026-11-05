@@ -58,6 +58,7 @@ node scripts/comments.mjs list              # comments waiting for review
 node scripts/comments.mjs approve 3 4       # publish
 node scripts/comments.mjs spam 5            # hide
 node scripts/comments.mjs delete 6          # remove
+node scripts/comments.mjs reply 1 "Thanks for the love"   # publish a reply from the team under comment 1 (shows a Team badge)
 ```
 
 ## What protects the site from spam

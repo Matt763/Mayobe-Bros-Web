@@ -523,13 +523,13 @@ body.no-scroll { overflow: hidden; }
 .comment-form .hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
 .comment-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 .opt { font-weight: 500; color: var(--text-3); font-size: 0.9375rem; }
-.comment-note { margin: 0.5rem 0 1.5rem; font-size: 1rem; color: var(--text-2); }
-.comment-note a { color: var(--link); }
 .comment-list { display: grid; gap: 1.1rem; }
 .comment { display: grid; grid-template-columns: auto 1fr; gap: 0.9rem; padding: 1.1rem; border: 1px solid var(--line-soft); border-radius: var(--radius); background: var(--bg-alt); animation: rise 0.6s var(--ease) both; }
 .comment .avatar { width: 2.8rem; height: 2.8rem; font-size: 1.15rem; }
 .comment-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2rem 0.75rem; }
 .comment-name { font-weight: 800; }
+.team-badge { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.12rem 0.6rem 0.12rem 0.45rem; border-radius: 999px; background: var(--btn-bg); color: var(--btn-text); font-size: 0.8125rem; font-weight: 700; line-height: 1.4; letter-spacing: 0.02em; align-self: center; }
+.comment.is-team .avatar { background: var(--btn-bg) !important; color: var(--btn-text) !important; box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--gold); }
 .comment-time { font-size: 0.9375rem; color: var(--text-3); }
 .comment-body { margin-top: 0.3rem; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); font-size: 1.0625rem; line-height: 1.65; }
 .comment-reply { margin-top: 0.5rem; padding: 0.2rem 0; border: 0; background: none; color: var(--link); font-weight: 700; font-size: 0.9688rem; text-decoration: underline; text-underline-offset: 3px; }

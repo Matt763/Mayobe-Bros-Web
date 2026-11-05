@@ -7,6 +7,7 @@
 //   POST /v1/posts/:slug/comments           { name, email?, body, parent?, cid, website (honeypot), ts }
 //   GET  /v1/admin/comments?status=pending  (Authorization: Bearer ADMIN_TOKEN)
 //   POST /v1/admin/comments/:id             { action: "approve" | "spam" | "delete" }
+//   POST /v1/admin/reply                    { parent, body, name? }  a published reply from the team (shows a Team badge)
 //
 // A comment is screened automatically (worker/src/moderation.js: English + Swahili abusive words, scam lines, contact details,
 // shouting). A clean comment is published at once ("approved"); a flagged one is held as "pending" until the owner approves it.
@@ -20,6 +21,7 @@ const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const CID_RE = /^[A-Za-z0-9-]{16,64}$/;
 const LINK_RE = /(https?:\/\/|www\.|\b[a-z0-9-]+\.(?:com|net|org|info|biz|xyz|top|click|link|ru|cn|co\.tz|go\.tz|tk|ml|ga|cf|gq)\b|t\.me\/|bit\.ly)/i;
 const MAX_BODY = 4000;
+const TEAM_NAME_RE = /\b(mayobe|moderators?|admins?|administrators?|staff|official|support|team)\b/i;
 
 const enc = new TextEncoder();
 const now = () => Date.now();
@@ -137,11 +139,12 @@ async function handle(request, env, ctx) {
   if ((m = path.match(/^\/v1\/posts\/([^/]+)$/)) && method === 'GET') {
     const slug = m[1];
     if (!(await slugKnown(env, slug))) return fail('Unknown post.', 404, cors);
-    const rows = await env.DB.prepare("SELECT id, parent_id, name, body, created FROM comments WHERE slug = ? AND status = 'approved' ORDER BY created ASC LIMIT 500").bind(slug).all();
+    const rows = await env.DB.prepare("SELECT id, parent_id, name, body, created, team FROM comments WHERE slug = ? AND status = 'approved' ORDER BY created ASC LIMIT 500").bind(slug).all();
     const all = rows.results || [];
-    const tops = all.filter((c) => !c.parent_id).map((c) => ({ id: c.id, name: c.name, body: c.body, at: c.created, replies: [] }));
+    const pub = (c) => ({ id: c.id, name: c.name, body: c.body, at: c.created, ...(c.team ? { team: true } : {}) });
+    const tops = all.filter((c) => !c.parent_id).map((c) => ({ ...pub(c), replies: [] }));
     const byId = Object.fromEntries(tops.map((c) => [c.id, c]));
-    for (const c of all) if (c.parent_id && byId[c.parent_id]) byId[c.parent_id].replies.push({ id: c.id, name: c.name, body: c.body, at: c.created });
+    for (const c of all) if (c.parent_id && byId[c.parent_id]) byId[c.parent_id].replies.push(pub(c));
     tops.reverse(); // newest conversation first, replies oldest first
     // always revalidate: a visitor who just reacted or whose comment was just approved must see it on reload
     return reply({ stats: await getStats(env, slug), comments: tops }, 200, cors, 'no-cache');
@@ -212,6 +215,7 @@ async function handle(request, env, ctx) {
       let reasons;
       try { reasons = [...screen(`${name}\n${body}`).reasons]; } catch (err) { console.error('screen failed', err && err.stack ? err.stack : err); reasons = ['screen-error']; } // fail closed: if the check breaks, hold the comment
       if (String(env.AUTO_APPROVE).toLowerCase() === 'false') reasons.push('auto-approve-off');
+      if (TEAM_NAME_RE.test(name)) reasons.push('impersonation'); // only the admin reply route may use a name that looks like the team
       if ((await env.DB.prepare("SELECT COUNT(*) AS n FROM comments WHERE (cid = ? OR ip_hash = ?) AND status = 'spam'").bind(b.cid, ih).first())?.n) reasons.push('earlier-spam');
       const pending = await env.DB.prepare("SELECT COUNT(*) AS n FROM comments WHERE cid = ? AND status = 'pending'").bind(b.cid).first();
       if (reasons.length && (pending?.n || 0) >= 5) return fail('You already have several comments waiting for review.', 429, cors);
@@ -235,6 +239,18 @@ async function handle(request, env, ctx) {
       const limit = Math.min(200, Math.max(1, Number(url.searchParams.get('limit')) || 50));
       const rows = await env.DB.prepare('SELECT id, slug, parent_id, name, email, body, status, created, flag FROM comments WHERE status = ? ORDER BY created DESC LIMIT ?').bind(status, limit).all();
       return reply({ comments: rows.results || [] }, 200, cors);
+    }
+    if (method === 'POST' && path === '/v1/admin/reply') {
+      const b = await readJson(request);
+      const body = String(b.body || '').replace(/\r\n?/g, '\n').trim();
+      const name = String(b.name || 'Mayobe Bros Team').replace(/\s+/g, ' ').trim().slice(0, 50);
+      if (body.length < 2 || body.length > 1500) return fail('The reply must be 2 to 1,500 characters.', 400, cors);
+      const parent = await env.DB.prepare("SELECT id, slug FROM comments WHERE id = ? AND status = 'approved' AND parent_id IS NULL").bind(Number(b.parent)).first();
+      if (!parent) return fail('You can only reply to a published comment.', 400, cors);
+      const t = now();
+      const row = await env.DB.prepare("INSERT INTO comments(slug, parent_id, name, email, body, status, created, ip_hash, cid, team, flag) VALUES(?, ?, ?, NULL, ?, 'approved', ?, NULL, 'team', 1, NULL) RETURNING id").bind(parent.slug, parent.id, name, body, t).first();
+      await env.DB.prepare('UPDATE post_stats SET comments = comments + 1 WHERE slug = ?').bind(parent.slug).run();
+      return reply({ ok: true, comment: { id: row.id, name, body, at: t, parent: parent.id, team: true }, stats: await getStats(env, parent.slug) }, 201, cors);
     }
     if ((m = path.match(/^\/v1\/admin\/comments\/(\d+)$/)) && method === 'POST') {
       const id = Number(m[1]);

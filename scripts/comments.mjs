@@ -5,6 +5,7 @@
 //   node scripts/comments.mjs approve <id> [<id> ...]           publish comments
 //   node scripts/comments.mjs spam <id> [<id> ...]              hide as spam (replies too)
 //   node scripts/comments.mjs delete <id> [<id> ...]            remove for good (replies too)
+//   node scripts/comments.mjs reply <id> "text" ["Name"]         publish a reply from the team under comment <id> (shows a Team badge)
 //
 // The admin token is read from the ADMIN_TOKEN environment variable, or from the file
 // ".admin-token" in the project root (that file is git-ignored; never commit it).
@@ -46,7 +47,12 @@ try {
       const j = await call('POST', `/admin/comments/${Number(id)}`, { action: cmd });
       console.log(`#${id}: ${cmd} ok (post now has ${j.stats.c} approved comment${j.stats.c === 1 ? '' : 's'})`);
     }
-  } else throw new Error(`Unknown command "${cmd}". Use: list, approve, spam, delete.`);
+  } else if (cmd === 'reply') {
+    const [id, text, name] = rest;
+    if (!id || !text) throw new Error('Usage: reply <comment id> "your reply" ["Display name"]');
+    const j = await call('POST', '/admin/reply', { parent: Number(id), body: text, ...(name ? { name } : {}) });
+    console.log(`#${j.comment.id}: team reply published under #${id} (post now has ${j.stats.c} comment${j.stats.c === 1 ? '' : 's'})`);
+  } else throw new Error(`Unknown command "${cmd}". Use: list, approve, spam, delete, reply.`);
 } catch (err) {
   console.error(`✖ ${err.message}`);
   process.exit(1);

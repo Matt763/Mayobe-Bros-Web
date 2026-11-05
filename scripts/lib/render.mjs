@@ -1043,7 +1043,6 @@ ${withIds.html}
     <div class="comment-actions"><button class="btn btn-primary" type="submit">Post comment ${icon('arrowRight', 16)}</button><button class="btn btn-outline" type="button" data-cancel-reply hidden>Cancel reply</button></div>
     <p class="form-status" role="status" aria-live="polite"></p>
   </form>
-  <p class="comment-note">Comments are read before they appear. Please be kind and stay on topic. Links are not allowed. See our <a href="${u('/comment-policy/')}">Comment Policy</a>.</p>
   <div class="comment-list" data-comment-list aria-live="polite"></div>
 </section>`;
 
