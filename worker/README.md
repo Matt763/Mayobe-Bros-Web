@@ -75,7 +75,7 @@ GET  /v1/posts/<slug>?cid=<visitor id>      also returns "liked": the ids of com
 
 - **Edit rule:** a reader can change their own comment for 30 minutes after posting, and only while it is published and has no reply (a published or waiting reply both count).
   The window is `EDIT_WINDOW_MINUTES` (a variable under `vars` in `wrangler.jsonc`; leave it out for 30). The new text goes through the same automatic screen as a new comment,
-  so a flagged edit is held until you approve it. Saving the same text, or the same text with different spaces, changes nothing and does not restart the window.
+  so a flagged edit is held until you approve it. Leading and trailing spaces, tabs and runs of three or more newlines are tidied before the new text is compared with the old, so text that differs only by that changes nothing and does not restart the window.
 - **Delete:** a comment with no replies is removed. A comment with replies stays as a blank "tombstone" so the replies keep their place: the public sees "This comment was deleted.",
   and the name, email, text, token hash and visitor hashes are erased. The tombstone disappears when its last reply is removed. A comment you marked as spam cannot be deleted by its author.
 - **Wrong token, unknown id, team comment, spam or deleted comment:** all give the same `404` ("That comment could not be found."), so nothing can be probed.

@@ -34,7 +34,7 @@ for (let i = 0; i < slugs.length; i += 50) {
 }
 
 // a question mark anywhere, or a question word at the start of the comment or of a sentence (English and Swahili)
-const safe = (s) => String(s ?? '').replace(/[\u0000-\u001f\u007f-\u009f]/g, ' '); // server text is untrusted: no terminal escape sequences reach the screen
+const safe = (s) => String(s ?? '').replace(/[\u0000-\u001f\u007f-\u009f\p{Cf}]/gu, ' '); // server text is untrusted: no terminal escape sequences reach the screen
 const QUESTION = /\?|(^|[.!,\n]\s*)(how|what|why|when|where|which|who|whom|whose|can|could|do|does|did|is|are|am|was|were|will|would|should|may|nini|vipi|je|wapi|lini|nani|kwa nini|naweza|ninawezaje|unaweza|ni\s+(nini|nani|wapi|lini)|inawezekana)\b/i;
 const posts = {};
 let questions = 0, skipped = 0;

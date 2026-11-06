@@ -297,7 +297,7 @@ async function handle(request, env, ctx) {
     if (!row) return fail(NOT_FOUND, 404, cors);
     // counted per comment only once the owner is proven, so strangers guessing ids cannot lock the owner out
     if (!(await hit(env, ctx, `edc:${id}:${hour}`, 10, 3700))) return fail('You have edited this comment several times already. Please try again later.', 429, cors);
-    if (row.status !== 'approved') return fail('This comment is waiting for review, so it cannot be edited. You can still delete it.', 409, cors);
+    if (row.status !== 'approved') return fail('This comment is waiting for review, so it cannot be edited.', 409, cors);
     if (await hasReplies(env, id)) return fail('This comment has a reply, so it can no longer be edited.', 409, cors);
     const windowMin = Number(env.EDIT_WINDOW_MINUTES) > 0 ? Number(env.EDIT_WINDOW_MINUTES) : 30;
     if (now() - row.created > windowMin * 60000) return fail(`The ${windowMin} minutes for editing have passed.`, 409, cors);

@@ -35,6 +35,11 @@
     }
     return v;
   }
+  // the id if this browser already has one; never creates it (page load must not store anything)
+  function cidIfAny() {
+    var v = store('mb_cid');
+    return v && /^[A-Za-z0-9-]{16,64}$/.test(v) ? v : '';
+  }
   function call(path, opts) {
     return fetch(API + path, opts).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (j) {
@@ -288,12 +293,14 @@
           var msg = 'Your edit needs a quick check by our team. The comment is hidden until it is approved.';
           close();
           body.hidden = true; tools.hidden = true;
+          try { sessionStorage.removeItem('mb_stats'); } catch (e) {}
           var note = el('p', 'form-status is-ok', msg);
           main.insertBefore(note, tools);
           node.tabIndex = -1; node.focus();
           liveSay(msg);
           return;
         }
+        try { sessionStorage.removeItem('mb_stats'); } catch (e) {}
         liveSay('Comment updated.');
         return refresh().then(function () { focusAfter(c.id, '.comment-edit-btn'); });
       }).catch(function (err) {
@@ -427,7 +434,7 @@
     form.elements.body.focus({ preventScroll: true });
   }
   function refresh() {
-    return call('/posts/' + slug + '?cid=' + encodeURIComponent(cid())).then(function (j) {
+    return call('/posts/' + slug + (cidIfAny() ? '?cid=' + encodeURIComponent(cidIfAny()) : '')).then(function (j) {
       likedIds = {};
       (j.liked || []).forEach(function (id) { likedIds[id] = true; });
       showStats(j.stats);
@@ -489,7 +496,7 @@
   }
 
   /* load on screen, and when the comments come into view */
-  if (box) call('/posts/' + slug + '/mine?cid=' + encodeURIComponent(cid())).then(function (j) { confirmed = j.reaction; if (!touched) { mine = j.reaction; showMine(); } else sync(); }).catch(function () {});
+  if (box && cidIfAny()) call('/posts/' + slug + '/mine?cid=' + encodeURIComponent(cidIfAny())).then(function (j) { confirmed = j.reaction; if (!touched) { mine = j.reaction; showMine(); } else sync(); }).catch(function () {});
   var started = false;
   var start = function () { if (!started) { started = true; refresh(); } };
   if ('IntersectionObserver' in window) {

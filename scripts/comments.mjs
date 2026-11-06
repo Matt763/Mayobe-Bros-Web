@@ -24,7 +24,7 @@ let STATIC_COPY_NOTE = false;
 if (!api) { console.error('No API address. Set "commentsApi" in site.config.json (or MAYOBE_API) after deploying the Worker.'); process.exit(1); }
 if (!token) { console.error('No admin token. Set ADMIN_TOKEN, or save it in a file named .admin-token in the project root.'); process.exit(1); }
 
-const safe = (s) => String(s ?? '').replace(/[\u0000-\u001f\u007f-\u009f]/g, ' '); // server text is untrusted: no terminal escape sequences reach the screen
+const safe = (s) => String(s ?? '').replace(/[\u0000-\u001f\u007f-\u009f\p{Cf}]/gu, ' '); // server text is untrusted: no terminal escape sequences reach the screen
 
 async function call(method, p, body) {
   const r = await fetch(`${api}/v1${p}`, { method, headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });

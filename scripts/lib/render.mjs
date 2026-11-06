@@ -1091,7 +1091,7 @@ ${withIds.html}
     <div class="comment-actions"><button class="btn btn-primary" type="submit">Post comment ${icon('arrowRight', 16)}</button><button class="btn btn-outline" type="button" data-cancel-reply hidden>Cancel reply</button></div>
     <p class="form-status" role="status" aria-live="polite"></p>
   </form>
-  <div class="comment-list" data-comment-list aria-live="polite">${staticComments(p.slug)}</div>
+  <div class="comment-list" data-comment-list>${staticComments(p.slug)}</div>
 </section>`;
 
   // The one ad slot in the article sidebar. Nothing is written to the page until ads are really switched on

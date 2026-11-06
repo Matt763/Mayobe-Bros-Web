@@ -346,7 +346,7 @@ test('edit: refused after 30 minutes, with a reply, with a pending reply, and on
   const held = await mk({ body: RUDE, cid: 'rrrrrrrrrrrrrrrrrr12' }, '6.6.6.6');
   const h = await edit(held.id, held.token, 'Now I am polite and calm');
   assert.equal(h.status, 409);
-  assert.equal(h.json.error, 'This comment is waiting for review, so it cannot be edited. You can still delete it.');
+  assert.equal(h.json.error, 'This comment is waiting for review, so it cannot be edited.');
 });
 
 test('edit: the screen runs again and a flagged edit is held', async () => {
