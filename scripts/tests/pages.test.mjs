@@ -40,3 +40,18 @@ test('every "Keep reading" section is short enough to fade in', () => {
   }
   assert.ok(checked > 0, 'no page had a "Keep reading" section');
 });
+
+// Search engines can only offer a "jump to" link for a heading that has an address and a plain link to it in the page.
+// The contents list is written into the HTML at build time and must link every ## and ### heading of the article.
+test('every ## and ### heading of a post is linked from its table of contents', () => {
+  for (const file of postPages()) {
+    const html = fs.readFileSync(file, 'utf8');
+    const toc = html.match(/<nav class="toc"[\s\S]*?<\/nav>/);
+    if (!toc) continue; // posts with fewer than 3 sections have no contents list
+    const article = html.split('data-engage')[0];
+    const links = new Set([...toc[0].matchAll(/href="#([^"]+)"/g)].map((m) => m[1]));
+    for (const [, id] of article.matchAll(/<h[23] id="([^"]+)"/g)) {
+      assert.ok(links.has(id), `${path.relative(ROOT, file)}: heading #${id} is not in the table of contents`);
+    }
+  }
+});

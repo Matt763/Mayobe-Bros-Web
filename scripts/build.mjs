@@ -302,7 +302,10 @@ for (const p of posts) shareSpecs.push({ id: `post-${p.slug}`, source: localCove
 const share = makeShareCards(shareSpecs.filter((s) => s.source), { root: ROOT, host: new URL(config.siteUrl).host, dryRun: CHECK_ONLY });
 for (const m of share.warnings) warn('share pictures', m);
 
-const R = createRenderer({ config, categories, posts, pages, authors, versions, heroSets, shareCards: share.cards });
+// Questions readers asked that the team answered, saved by `node scripts/qa-sync.mjs` so search engines can read them in the page
+let qa = {};
+try { qa = JSON.parse(fs.readFileSync(path.join(ROOT, 'content/qa.json'), 'utf8')).posts || {}; } catch { /* none saved yet */ }
+const R = createRenderer({ config, categories, posts, pages, authors, versions, heroSets, shareCards: share.cards, qa });
 
 const out = new Map();
 const emit = (relPath, content) => out.set(relPath, content);

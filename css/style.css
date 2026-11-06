@@ -396,7 +396,8 @@ body.no-scroll { overflow: hidden; }
 .toc a { display: block; padding: 0.35rem 0.6rem; margin-left: -0.6rem; border-radius: 8px; text-decoration: none; color: var(--text-2); font-size: 1rem; line-height: 1.4; transition: background-color 0.2s, color 0.2s; }
 .toc a:hover { background: var(--surface-2); color: var(--text); }
 .toc a.is-current { background: var(--soft); color: var(--soft-text); font-weight: 700; }
-.toc-l3 { padding-left: 1rem; }
+.toc ol ol { margin: 0.1rem 0 0.35rem 0.9rem; padding-left: 0.7rem; border-left: 2px solid var(--line); }
+.toc ol ol a { font-size: 0.9375rem; }
 .post-main { min-width: 0; }
 .share { display: flex; flex-wrap: wrap; align-items: center; gap: 0.55rem; margin: 1.25rem 0; }
 .share-label { display: inline-flex; align-items: center; gap: 0.45rem; margin-right: 0.35rem; font-size: 1rem; font-weight: 700; color: var(--text-2); }

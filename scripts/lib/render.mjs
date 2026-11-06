@@ -85,7 +85,7 @@ const BOT_RULES = ['GPTBot', 'CCBot', 'anthropic-ai', 'ClaudeBot', 'Google-Exten
 const NO_AD_PAGES = new Set(['legal', 'search', 'notfound']);
 
 export function createRenderer(ctx) {
-  const { config, categories, posts, pages, authors, versions, heroSets = {}, shareCards = new Map() } = ctx;
+  const { config, categories, posts, pages, authors, versions, heroSets = {}, shareCards = new Map(), qa = {} } = ctx;
   const base = (config.basePath || '').replace(/\/$/, '');
   const siteUrl = config.siteUrl.replace(/\/$/, '');
   const api = (config.commentsApi || '').replace(/\/$/, '');
@@ -921,11 +921,11 @@ ${discover()}`;
         .replace(/\{\{updated\}\}/g, fmtDate(pg.updated || new Date(), true));
     const withIds = addHeadingIds(fill(pg.html));
     const isDoc = pg.kind === 'legal';
-    const toc = withIds.toc.filter((t) => t.level === 2);
+    const toc = withIds.toc.filter((t) => t.level === 2 || t.level === 3);
     const rail = pages.filter((p) => p.kind === 'legal' && p.slug !== pg.slug);
     const inner = isDoc
       ? `<div class="doc wrap">
-  <aside class="doc-toc" aria-label="On this page">${toc.length > 2 ? `<p class="aside-title">On this page</p><ol>${toc.map((t) => `<li><a href="#${t.id}">${e(t.text)}</a></li>`).join('')}</ol>` : ''}</aside>
+  <aside class="doc-toc" aria-label="On this page">${toc.filter((t) => t.level === 2).length > 2 ? `<p class="aside-title">On this page</p>${tocList(toc)}` : ''}</aside>
   <div class="prose-page">
     ${pg.updatedLabel ? '' : `<p class="doc-updated">Last updated: ${fmtDate(pg.updated || new Date(), true)}</p>`}
 ${withIds.html}
@@ -1041,6 +1041,28 @@ ${withIds.html}
 </div>`;
   }
 
+  // The table of contents: every ## and ### heading as a plain link to its id, with the ### questions nested under their ## section.
+  // It is real HTML in the page (not drawn by JavaScript), so search engines see each heading's address and can offer it as a "jump to" link.
+  const tocList = (items) => {
+    const top = [];
+    for (const t of items) {
+      if (t.level === 3 && top.length) top[top.length - 1].kids.push(t);
+      else top.push({ ...t, kids: [] });
+    }
+    const link = (t) => `<a href="#${t.id}">${e(t.text)}</a>`;
+    return `<ol>${top.map((t) => `<li>${link(t)}${t.kids.length ? `<ol>${t.kids.map((k) => `<li>${link(k)}</li>`).join('')}</ol>` : ''}</li>`).join('')}</ol>`;
+  };
+
+  // Questions readers asked in the comments that the team answered (content/qa.json, refreshed with `node scripts/qa-sync.mjs`).
+  // Written into the page as plain HTML so search engines can read them; js/engage.js replaces this list with the live one.
+  const staticComments = (slug) => {
+    const items = qa[slug] || [];
+    if (!items.length) return '';
+    const day = (ms) => fmtDate(new Date(ms));
+    const node = (c, team) => `<article class="comment${team ? ' is-team' : ''}" id="comment-${c.id}"><span class="avatar" aria-hidden="true">${team ? `<img class="avatar-logo" src="${u('/assets/img/icon-192.png')}" alt="" width="96" height="96">` : e((c.name[0] || '?').toUpperCase())}</span><div><div class="comment-head"><span class="comment-name">${e(c.name)}</span>${team ? `<span class="team-badge">Team</span>` : ''}<time class="comment-time" datetime="${new Date(c.at).toISOString()}">${day(c.at)}</time></div><p class="comment-body">${e(c.body)}</p></div></article>`;
+    return items.map((c) => `<article class="comment" id="comment-${c.id}"><span class="avatar" aria-hidden="true">${e((c.name[0] || '?').toUpperCase())}</span><div><div class="comment-head"><span class="comment-name">${e(c.name)}</span><time class="comment-time" datetime="${new Date(c.at).toISOString()}">${day(c.at)}</time></div><p class="comment-body">${e(c.body)}</p></div><div class="comment-replies">${c.replies.map((r) => node(r, true)).join('')}</div></article>`).join('');
+  };
+
   const engageBlock = (p) =>
     !api
       ? ''
@@ -1068,7 +1090,7 @@ ${withIds.html}
     <div class="comment-actions"><button class="btn btn-primary" type="submit">Post comment ${icon('arrowRight', 16)}</button><button class="btn btn-outline" type="button" data-cancel-reply hidden>Cancel reply</button></div>
     <p class="form-status" role="status" aria-live="polite"></p>
   </form>
-  <div class="comment-list" data-comment-list aria-live="polite"></div>
+  <div class="comment-list" data-comment-list aria-live="polite">${staticComments(p.slug)}</div>
 </section>`;
 
   // The one ad slot in the article sidebar. Nothing is written to the page until ads are really switched on
@@ -1146,8 +1168,8 @@ ${withIds.html}
     const crumbs = [['Home', u('/')], [p.category.name, u(`/category/${p.category.slug}/`)]];
     if (p.label) crumbs.push([p.label.name, u(`/category/${p.category.slug}/${p.label.slug}/`)]);
     crumbs.push([p.title, '']);
-    const tocItems = p.toc.filter((t) => t.level === 2);
-    const toc = tocItems.length >= 3 ? `<nav class="toc" aria-label="Table of contents"><details open data-toc-details><summary class="aside-title">${icon('list', 16)} In this article</summary><ol>${tocItems.map((t) => `<li><a href="#${t.id}">${e(t.text)}</a></li>`).join('')}</ol></details></nav>` : '';
+    const tocItems = p.toc.filter((t) => t.level === 2 || t.level === 3);
+    const toc = p.toc.filter((t) => t.level === 2).length >= 3 ? `<nav class="toc" aria-label="Table of contents"><details open data-toc-details><summary class="aside-title">${icon('list', 16)} In this article</summary>${tocList(tocItems)}</details></nav>` : '';
     const author = authorOf(p.author);
     const authorName = author ? `<a href="${u(`/author/${author.slug}/`)}" rel="author">${e(p.author)}</a>` : `<span>${e(p.author)}</span>`;
     const latest = posts.filter((x) => x.slug !== p.slug).slice(0, 4);
