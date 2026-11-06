@@ -1,10 +1,14 @@
 // Mayobe Bros comments + reactions API.  Cloudflare Worker + D1 (SQLite).  No dependencies.
 //
 //   GET  /v1/stats?slugs=a,b,c              counts for many posts at once (browser-cached 10 s)
-//   GET  /v1/posts/:slug                    approved comments + counts (always fresh)
+//   GET  /v1/posts/:slug                    approved comments (+ a blank "deleted" placeholder for a deleted comment that has replies) + counts (always fresh)
 //   GET  /v1/posts/:slug/mine?cid=<id>      this visitor's own reaction (never cached)
 //   POST /v1/posts/:slug/react              { cid, type: "like"|"amazed"|"sad"|"angry"|null }
-//   POST /v1/posts/:slug/comments           { name, email?, body, parent?, cid, website (honeypot), ts }
+//   POST /v1/posts/:slug/comments           { name, email?, body, parent?, cid, website (honeypot), ts }  -> { ok, status, comment, id, token }
+//                                           `token` is the commenter's secret to edit or delete this comment; it is shown once (only its SHA-256 is stored)
+//   POST /v1/comments/:id/edit              { token, body }       change your own comment: within 30 minutes, until it has a reply; the screen runs again
+//   POST /v1/comments/:id/delete            { token }             delete your own comment (a comment with replies stays as "This comment was deleted.")
+//   POST /v1/comments/:id/like              { cid, on: true|false }  like or unlike any published comment, once per visitor
 //   GET  /v1/admin/comments?status=pending  (Authorization: Bearer ADMIN_TOKEN)
 //   POST /v1/admin/comments/:id             { action: "approve" | "spam" | "delete" }
 //   POST /v1/admin/reply                    { parent, body, name? }  a published reply from the team (shows a Team badge)
@@ -21,6 +25,8 @@ const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const CID_RE = /^[A-Za-z0-9-]{16,64}$/;
 const LINK_RE = /(https?:\/\/|www\.|\b[a-z0-9-]+\.(?:com|net|org|info|biz|xyz|top|click|link|ru|cn|co\.tz|go\.tz|tk|ml|ga|cf|gq)\b|t\.me\/|bit\.ly)/i;
 const MAX_BODY = 4000;
+const TOKEN_RE = /^[A-Za-z0-9_-]{32,64}$/;
+const NOT_FOUND = 'That comment could not be found.'; // the one answer for a wrong token, a missing comment, a team comment and so on, so nothing can be probed
 
 const enc = new TextEncoder();
 const now = () => Date.now();
@@ -55,6 +61,30 @@ function same(a, b) {
   let d = 0;
   for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return d === 0;
+}
+// A random secret for one comment: 24 random bytes as base64url (32 characters, no padding).
+async function newToken() {
+  const bytes = crypto.getRandomValues(new Uint8Array(24));
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+// The comment with this id, only if `token` is its owner's token and it is still approved or pending; otherwise null.
+// The supplied token is hashed even when the id does not exist, so the time taken does not reveal whether a comment exists.
+async function ownerRow(env, id, token) {
+  const given = typeof token === 'string' ? token : '';
+  const givenHash = await sha(given);
+  const row = Number.isInteger(id) && id > 0
+    ? await env.DB.prepare('SELECT id, slug, parent_id, status, created, body, cid, ip_hash, name, manage_hash FROM comments WHERE id = ?').bind(id).first()
+    : null;
+  const match = same(givenHash, row?.manage_hash || '0'.repeat(64)); // a comment with no hash (older, or from the team) is compared with zeros and never matches
+  if (!row || !row.manage_hash || !match || !TOKEN_RE.test(given) || !['approved', 'pending'].includes(row.status)) return null;
+  const { manage_hash, ...own } = row; // the hash never leaves this function
+  return own;
+}
+// A reply counts when it is approved or still waiting for review.
+async function hasReplies(env, id) {
+  return !!(await env.DB.prepare("SELECT 1 AS ok FROM comments WHERE parent_id = ? AND status IN ('approved', 'pending') LIMIT 1").bind(id).first());
 }
 function isAdmin(request, env) {
   const t = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
@@ -138,9 +168,12 @@ async function handle(request, env, ctx) {
   if ((m = path.match(/^\/v1\/posts\/([^/]+)$/)) && method === 'GET') {
     const slug = m[1];
     if (!(await slugKnown(env, slug))) return fail('Unknown post.', 404, cors);
-    const rows = await env.DB.prepare("SELECT id, parent_id, name, body, created, team FROM comments WHERE slug = ? AND status = 'approved' ORDER BY created ASC LIMIT 500").bind(slug).all();
+    const rows = await env.DB.prepare("SELECT id, parent_id, name, body, created, team, likes, edited_at, status FROM comments WHERE slug = ? AND status IN ('approved', 'deleted') ORDER BY created ASC LIMIT 500").bind(slug).all();
     const all = rows.results || [];
-    const pub = (c) => ({ id: c.id, name: c.name, body: c.body, at: c.created, ...(c.team ? { team: true } : {}) });
+    // a deleted comment that still has replies stays as a blank tombstone (its text and name were erased when it was deleted)
+    const pub = (c) => c.status === 'deleted'
+      ? { id: c.id, name: '', body: 'This comment was deleted.', at: c.created, deleted: true, likes: 0 }
+      : { id: c.id, name: c.name, body: c.body, at: c.created, likes: c.likes || 0, ...(c.edited_at ? { edited: c.edited_at } : {}), ...(c.team ? { team: true } : {}) };
     const tops = all.filter((c) => !c.parent_id).map((c) => ({ ...pub(c), replies: [] }));
     const byId = Object.fromEntries(tops.map((c) => [c.id, c]));
     for (const c of all) if (c.parent_id && byId[c.parent_id]) byId[c.parent_id].replies.push(pub(c));
@@ -209,6 +242,8 @@ async function handle(request, env, ctx) {
     const dup = await env.DB.prepare('SELECT 1 AS ok FROM comments WHERE slug = ? AND cid = ? AND body = ? AND created > ?').bind(slug, b.cid, body, now() - 600000).first();
     let status = dup ? 'duplicate' : 'pending';
     let shown = null;
+    let newId = null;
+    let token = null;
     if (!dup) {
       // automatic screen: flagged text, a visitor who was marked as spam before, or AUTO_APPROVE=false -> hold for review
       let reasons;
@@ -220,14 +255,17 @@ async function handle(request, env, ctx) {
       if (reasons.length && (pending?.n || 0) >= 5) return fail('You already have several comments waiting for review.', 429, cors);
       status = reasons.length ? 'pending' : 'approved';
       const t = now();
-      const row = await env.DB.prepare('INSERT INTO comments(slug, parent_id, name, email, body, status, created, ip_hash, cid, flag) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id')
-        .bind(slug, parent, name, email || null, body, status, t, ih, b.cid, reasons.length ? reasons.join(', ').slice(0, 300) : null).first();
+      token = await newToken(); // shown to the commenter once, in this response; only its hash is stored
+      const row = await env.DB.prepare('INSERT INTO comments(slug, parent_id, name, email, body, status, created, ip_hash, cid, flag, manage_hash) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id')
+        .bind(slug, parent, name, email || null, body, status, t, ih, b.cid, reasons.length ? reasons.join(', ').slice(0, 300) : null, await sha(token)).first();
+      newId = row.id;
       if (status === 'approved') {
         await env.DB.prepare('UPDATE post_stats SET comments = comments + 1 WHERE slug = ?').bind(slug).run();
         shown = { id: row.id, name, body, at: t, parent };
       }
     }
-    return reply({ ok: true, status, comment: shown }, status === 'approved' ? 201 : 202, cors);
+    // id and token only for a row that was really inserted (approved or held), so the browser can keep the token even when no comment is shown yet
+    return reply({ ok: true, status, comment: shown, ...(newId ? { id: newId, token } : {}) }, status === 'approved' ? 201 : 202, cors);
   }
 
   /* ------------------------------------------------------------- moderation */

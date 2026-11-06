@@ -40,6 +40,7 @@ let questions = 0, skipped = 0;
 for (const slug of withComments.sort()) {
   const { comments = [] } = await get(`/posts/${slug}`);
   const kept = comments
+    .filter((c) => !c.deleted) // a deleted question (blank name, placeholder text) is never published as a Q&A, even if it has a Team reply
     .map((c) => ({ id: c.id, name: c.name, body: c.body, at: c.at, replies: (c.replies || []).filter((r) => r.team).map((r) => ({ id: r.id, name: r.name, body: r.body, at: r.at })) }))
     .filter((c) => !c.team && c.replies.length);
   for (const c of kept.filter((c) => !QUESTION.test(c.body))) { skipped++; console.log(`  skipped (not a question): #${c.id} on ${slug}: ${c.body.slice(0, 60)}`); }

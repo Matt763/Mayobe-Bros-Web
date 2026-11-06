@@ -1,6 +1,7 @@
 // Tests the Worker against a real SQLite engine (Node's built-in node:sqlite) wrapped to look like Cloudflare D1.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import worker from '../../worker/src/index.js';
 import { makeD1 } from '../lib/d1-shim.mjs';
 
@@ -79,6 +80,68 @@ test('a clean comment is published at once and counted', async () => {
   assert.equal('email' in pub.comments[0], false, 'email is never public');
   assert.equal((await call('GET', '/v1/stats?slugs=hello-post')).json['hello-post'].c, 1);
   assert.equal((await call('GET', '/v1/admin/comments?status=pending', { auth: env.ADMIN_TOKEN, origin: null })).json.comments.length, 0);
+});
+
+test('a new comment returns its manage token once, and only a hash is stored', async () => {
+  const r = await call('POST', '/v1/posts/hello-post/comments', { body: comment({ email: 'asha@example.com' }) });
+  assert.equal(r.status, 201);
+  assert.match(r.json.token, /^[A-Za-z0-9_-]{32,}$/);
+  assert.equal(r.json.id, r.json.comment.id, 'the response carries the new row id');
+  const pubText = JSON.stringify((await call('GET', '/v1/posts/hello-post')).json);
+  assert.equal(pubText.includes(r.json.token), false, 'the token is never in the public list');
+  for (const word of ['manage_hash', 'prev_body', 'email']) assert.equal(pubText.includes(word), false, `${word} is never public`);
+  const stored = env.DB.raw.prepare('SELECT manage_hash FROM comments WHERE id = ?').get(r.json.id).manage_hash;
+  assert.equal(stored.length, 64);
+  assert.notEqual(stored, r.json.token);
+  assert.equal(stored, createHash('sha256').update(r.json.token).digest('hex'), 'only the SHA-256 of the token is stored');
+
+  // a held comment gets an id and a token too, so the browser can keep the token even though no comment is shown yet
+  const held = await call('POST', '/v1/posts/hello-post/comments', { body: comment({ body: RUDE, cid: CID2 }) });
+  assert.equal(held.json.status, 'pending');
+  assert.equal(held.json.comment, null);
+  assert.equal(typeof held.json.id, 'number');
+  assert.match(held.json.token, /^[A-Za-z0-9_-]{32,}$/);
+  assert.notEqual(held.json.token, r.json.token, 'every comment gets its own token');
+  assert.equal(env.DB.raw.prepare('SELECT manage_hash FROM comments WHERE id = ?').get(held.json.id).manage_hash.length, 64);
+
+  // a duplicate inserts nothing, so it must not hand out an id or a token
+  const dup = await call('POST', '/v1/posts/hello-post/comments', { body: comment({ email: 'asha@example.com' }) });
+  assert.equal(dup.json.status, 'duplicate');
+  assert.equal('id' in dup.json, false);
+  assert.equal('token' in dup.json, false);
+  // a bot post pretends to work and also gets nothing
+  const bot = await call('POST', '/v1/posts/hello-post/comments', { body: comment({ website: 'http://bot' }) });
+  assert.equal('id' in bot.json, false);
+  assert.equal('token' in bot.json, false);
+});
+
+test('public comments carry likes, and edited and deleted markers only when true', async () => {
+  const p = await call('POST', '/v1/posts/hello-post/comments', { body: comment() });
+  await call('POST', '/v1/posts/hello-post/comments', { body: comment({ body: 'A reply here', parent: p.json.id }) });
+  const top = (await call('GET', '/v1/posts/hello-post')).json.comments[0];
+  for (const c of [top, top.replies[0]]) {
+    assert.equal(c.likes, 0);
+    assert.equal('edited' in c, false);
+    assert.equal('deleted' in c, false);
+  }
+  // edited shows the time of the edit; the reason and the old text never appear
+  env.DB.raw.prepare('UPDATE comments SET edited_at = 1234567890123, likes = 3, prev_body = ? WHERE id = ?').run('old text', p.json.id);
+  const edited = (await call('GET', '/v1/posts/hello-post')).json.comments[0];
+  assert.equal(edited.edited, 1234567890123);
+  assert.equal(edited.likes, 3);
+  assert.equal(JSON.stringify(edited).includes('old text'), false);
+});
+
+test('a deleted comment that still has replies is public as a blank tombstone', async () => {
+  const p = await call('POST', '/v1/posts/hello-post/comments', { body: comment() });
+  await call('POST', '/v1/posts/hello-post/comments', { body: comment({ body: 'A reply here', parent: p.json.id }) });
+  const t = Date.now();
+  env.DB.raw.prepare("UPDATE comments SET status = 'deleted', name = '', body = '', email = NULL, manage_hash = NULL, prev_body = NULL, ip_hash = NULL, cid = NULL, flag = NULL, edited_at = NULL, likes = 0, created = ? WHERE id = ?").run(t, p.json.id);
+  const pub = (await call('GET', '/v1/posts/hello-post')).json;
+  assert.equal(pub.comments.length, 1);
+  assert.deepEqual({ ...pub.comments[0], replies: undefined }, { id: p.json.id, name: '', body: 'This comment was deleted.', at: t, deleted: true, likes: 0, replies: undefined });
+  assert.equal(pub.comments[0].replies.length, 1, 'the replies stay visible under the tombstone');
+  assert.equal(pub.comments[0].replies[0].body, 'A reply here');
 });
 
 test('a flagged comment is held, shows the reason to the moderator only, then can be approved', async () => {
