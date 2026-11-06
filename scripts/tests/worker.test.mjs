@@ -420,3 +420,93 @@ test('edit: a visitor with an earlier spam comment is held', async () => {
   assert.equal(r.json.status, 'pending');
   assert.match((await call('GET', '/v1/admin/comments', { auth: env.ADMIN_TOKEN, origin: null })).json.comments[0].flag, /earlier-spam/);
 });
+
+/* ------------------------------------------------ edit: races, window setting, boundaries */
+// Runs `hook` right after the "does it have a reply" check, i.e. between the checks and the write.
+function afterReplyCheck(fn) {
+  let ran = false;
+  const hook = () => { if (!ran) { ran = true; fn(); } };
+  const real = env.DB;
+  const wrap = (st, sql) => ({
+    bind: (...a) => wrap(st.bind(...a), sql),
+    first: async () => { const r = await st.first(); if (sql.includes('FROM comments WHERE parent_id = ? AND status IN')) hook(); return r; },
+    all: () => st.all(),
+    run: () => st.run(),
+    _exec: () => st._exec(),
+  });
+  env.DB = { ...real, prepare: (sql) => wrap(real.prepare(sql), sql), batch: (l) => real.batch(l) };
+}
+const approvedCount = () => env.DB.raw.prepare("SELECT COUNT(*) AS n FROM comments WHERE slug = 'hello-post' AND status = 'approved'").get().n;
+const statCount = () => env.DB.raw.prepare("SELECT comments FROM post_stats WHERE slug = 'hello-post'").get().comments;
+
+test('edit: concurrent edits (one flagged, one clean) leave the count equal to the approved rows', async () => {
+  for (const order of [0, 1]) {
+    env = { DB: makeD1(), ADMIN_TOKEN: 'a-very-long-admin-token-123', SITE_ORIGIN: ORIGIN };
+    const a = await mk();
+    await mk({ body: 'Another approved one', cid: CID2 }, '2.2.2.2');
+    const jobs = [edit(a.id, a.token, RUDE), edit(a.id, a.token, 'A clean and kind edit')];
+    if (order) jobs.reverse();
+    const out = await Promise.all(jobs);
+    for (const r of out) assert.ok([200, 404, 409].includes(r.status), String(r.status));
+    assert.equal(statCount(), approvedCount(), `count matches approved rows (order ${order})`);
+  }
+});
+
+test('edit: a comment that became spam between the checks cannot be revived or counted', async () => {
+  const a = await mk();
+  afterReplyCheck(() => env.DB.raw.exec(`UPDATE comments SET status = 'spam' WHERE id = ${a.id}; UPDATE post_stats SET comments = 0 WHERE slug = 'hello-post'`));
+  const r = await edit(a.id, a.token, RUDE);
+  assert.equal(r.status, 404);
+  assert.equal(r.json.error, 'That comment could not be found.');
+  assert.equal(rawRow(a.id).status, 'spam');
+  assert.equal(rawRow(a.id).body, 'Thanks, this helped me a lot.');
+  assert.equal(statCount(), 0, 'the count is not lowered for a row that did not change');
+});
+
+test('edit: a reply that arrives before the write blocks the edit', async () => {
+  const a = await mk();
+  afterReplyCheck(() => env.DB.raw.exec(`INSERT INTO comments(slug, parent_id, name, body, status, created, cid) VALUES('hello-post', ${a.id}, 'Sam', 'A quick reply', 'approved', ${Date.now()}, 'zzzzzzzzzzzzzzzzzz99'); UPDATE post_stats SET comments = comments + 1`));
+  const r = await edit(a.id, a.token, RUDE);
+  assert.equal(r.status, 409);
+  assert.equal(r.json.error, 'This comment has a reply, so it can no longer be edited.');
+  assert.equal(rawRow(a.id).body, 'Thanks, this helped me a lot.');
+  assert.equal(statCount(), 2);
+});
+
+test('edit: EDIT_WINDOW_MINUTES sets the window and the message', async () => {
+  env.EDIT_WINDOW_MINUTES = '5';
+  const a = await mk();
+  env.DB.raw.exec(`UPDATE comments SET created = created - ${4 * 60000} WHERE id = ${a.id}`);
+  assert.equal((await edit(a.id, a.token, 'Edited at four minutes')).status, 200);
+  env.DB.raw.exec(`UPDATE comments SET created = created - ${2 * 60000} WHERE id = ${a.id}`);
+  const late = await edit(a.id, a.token, 'Edited at six minutes');
+  assert.equal(late.status, 409);
+  assert.equal(late.json.error, 'The 5 minutes for editing have passed.');
+  env.EDIT_WINDOW_MINUTES = 'junk';
+  const b = await mk({ body: 'Another comment here', cid: CID2 }, '2.2.2.2');
+  env.DB.raw.exec(`UPDATE comments SET created = created - ${29 * 60000} WHERE id = ${b.id}`);
+  assert.equal((await edit(b.id, b.token, 'Edited at 29 minutes')).status, 200, 'a bad setting falls back to 30');
+});
+
+test('edit: window boundary at 29 and 31 minutes', async () => {
+  const a = await mk();
+  const b = await mk({ body: 'Another comment here', cid: CID2 }, '2.2.2.2');
+  env.DB.raw.exec(`UPDATE comments SET created = created - ${29 * 60000} WHERE id = ${a.id}`);
+  env.DB.raw.exec(`UPDATE comments SET created = created - ${31 * 60000} WHERE id = ${b.id}`);
+  assert.equal((await edit(a.id, a.token, 'Edited at 29 minutes')).status, 200);
+  assert.equal((await edit(b.id, b.token, 'Edited at 31 minutes')).status, 409);
+});
+
+test('edit: a team reply and a spam-marked comment give the same generic 404', async () => {
+  const a = await mk();
+  const s = await mk({ body: 'A comment marked spam', cid: CID2 }, '2.2.2.2');
+  await call('POST', `/v1/admin/comments/${s.id}`, { auth: env.ADMIN_TOKEN, origin: null, body: { action: 'spam' } });
+  const t = await call('POST', '/v1/admin/reply', { auth: env.ADMIN_TOKEN, origin: null, body: { parent: a.id, body: 'Thanks from the team' } });
+  const probe = await edit(a.id, 'x'.repeat(32), 'Whatever text here');
+  const team = await edit(t.json.comment.id, a.token, 'Whatever text here');
+  const spam = await edit(s.id, s.token, 'Whatever text here');
+  assert.equal(team.status, 404);
+  assert.equal(spam.status, 404);
+  assert.equal(JSON.stringify(team.json), JSON.stringify(probe.json));
+  assert.equal(JSON.stringify(spam.json), JSON.stringify(probe.json));
+});

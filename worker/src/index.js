@@ -289,7 +289,8 @@ async function handle(request, env, ctx) {
     if (!(await hit(env, ctx, `edc:${id}:${hour}`, 10, 3700))) return fail('You have edited this comment several times already. Please try again later.', 429, cors);
     if (row.status !== 'approved') return fail('This comment is waiting for review, so it cannot be edited. You can still delete it.', 409, cors);
     if (await hasReplies(env, id)) return fail('This comment has a reply, so it can no longer be edited.', 409, cors);
-    if (now() - row.created > 30 * 60000) return fail('The 30 minutes for editing have passed.', 409, cors);
+    const windowMin = Number(env.EDIT_WINDOW_MINUTES) > 0 ? Number(env.EDIT_WINDOW_MINUTES) : 30;
+    if (now() - row.created > windowMin * 60000) return fail(`The ${windowMin} minutes for editing have passed.`, 409, cors);
     const clean = cleanComment(row.name, b.body);
     if (clean.error) return fail(clean.error, 400, cors);
     const shown = (edited) => ({ id, body: clean.body, ...(edited ? { edited } : {}) });
@@ -300,10 +301,16 @@ async function handle(request, env, ctx) {
     if ((await env.DB.prepare("SELECT COUNT(*) AS n FROM comments WHERE (cid = ? OR ip_hash = ?) AND status = 'spam'").bind(row.cid, row.ip_hash).first())?.n) reasons.push('earlier-spam');
     const status = reasons.length ? 'pending' : 'approved';
     const t = now();
-    const st = [env.DB.prepare('UPDATE comments SET body = ?, prev_body = ?, edited_at = ?, status = ?, flag = ? WHERE id = ?')
-      .bind(clean.body, row.body, t, status, reasons.length ? reasons.join(', ').slice(0, 300) : null, id)];
-    if (status === 'pending') st.push(env.DB.prepare('UPDATE post_stats SET comments = MAX(0, comments - 1) WHERE slug = ?').bind(row.slug));
-    await env.DB.batch(st);
+    // The write is conditional, so a request that raced with a spam/delete, a new reply or another edit changes nothing:
+    // it only applies while the row is still approved and has no reply, and the count is lowered only if that row changed.
+    const st = [env.DB.prepare("UPDATE comments SET body = ?, prev_body = ?, edited_at = ?, status = ?, flag = ? WHERE id = ? AND status = 'approved' AND NOT EXISTS (SELECT 1 FROM comments WHERE parent_id = ? AND status IN ('approved', 'pending')) RETURNING id")
+      .bind(clean.body, row.body, t, status, reasons.length ? reasons.join(', ').slice(0, 300) : null, id, id)];
+    if (status === 'pending') st.push(env.DB.prepare('UPDATE post_stats SET comments = MAX(0, comments - 1) WHERE slug = ? AND changes() > 0').bind(row.slug));
+    const done = await env.DB.batch(st);
+    if (!(done[0]?.results || []).length) {
+      if (await hasReplies(env, id)) return fail('This comment has a reply, so it can no longer be edited.', 409, cors);
+      return fail(NOT_FOUND, 404, cors);
+    }
     return reply({ ok: true, status, comment: shown(t), stats: await getStats(env, row.slug) }, 200, cors);
   }
 
