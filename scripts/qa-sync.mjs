@@ -13,6 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { looksLikeQuestion } from '../worker/src/question.js'; // a question mark, or a question word (English and Swahili)
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DRY = process.argv.includes('--dry-run');
@@ -33,9 +34,7 @@ for (let i = 0; i < slugs.length; i += 50) {
   for (const [slug, s] of Object.entries(stats)) if (s && s.c > 0) withComments.push(slug);
 }
 
-// a question mark anywhere, or a question word at the start of the comment or of a sentence (English and Swahili)
 const safe = (s) => String(s ?? '').replace(/[\u0000-\u001f\u007f-\u009f\p{Cf}]/gu, ' '); // server text is untrusted: no terminal escape sequences reach the screen
-const QUESTION = /\?|(^|[.!,\n]\s*)(how|what|why|when|where|which|who|whom|whose|can|could|do|does|did|is|are|am|was|were|will|would|should|may|nini|vipi|je|wapi|lini|nani|kwa nini|naweza|ninawezaje|unaweza|ni\s+(nini|nani|wapi|lini)|inawezekana)\b/i;
 const posts = {};
 let questions = 0, skipped = 0;
 for (const slug of withComments.sort()) {
@@ -44,8 +43,8 @@ for (const slug of withComments.sort()) {
     .filter((c) => !c.deleted) // a deleted question (blank name, placeholder text) is never published as a Q&A, even if it has a Team reply
     .map((c) => ({ id: c.id, name: c.name, body: c.body, at: c.at, replies: (c.replies || []).filter((r) => r.team).map((r) => ({ id: r.id, name: r.name, body: r.body, at: r.at })) }))
     .filter((c) => !c.team && c.replies.length);
-  for (const c of kept.filter((c) => !QUESTION.test(c.body))) { skipped++; console.log(`  skipped (not a question): #${safe(c.id)} on ${safe(slug)}: ${safe(c.body).slice(0, 60)}`); }
-  const asked = kept.filter((c) => QUESTION.test(c.body));
+  for (const c of kept.filter((c) => !looksLikeQuestion(c.body))) { skipped++; console.log(`  skipped (not a question): #${safe(c.id)} on ${safe(slug)}: ${safe(c.body).slice(0, 60)}`); }
+  const asked = kept.filter((c) => looksLikeQuestion(c.body));
   if (asked.length) { posts[slug] = asked; questions += asked.length; }
 }
 

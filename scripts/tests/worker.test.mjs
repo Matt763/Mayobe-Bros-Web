@@ -10,21 +10,32 @@ const CID = 'abcdefabcdefabcdef12';
 const CID2 = 'zzzzzzzzzzzzzzzzzz34';
 let env;
 const realFetch = globalThis.fetch;
+// Mail: every request to Resend is recorded in `sent`; `resendMode` can make it fail. Promises given to waitUntil are kept so a test can await them.
+let sent = [];
+let resendMode = 'ok';
+let pendingMail = [];
 test.before(() => {
-  globalThis.fetch = async (u) => {
-    if (String(u).endsWith('/data/search.json')) return new Response(JSON.stringify([{ s: 'hello-post' }, { s: 'second-post' }]), { status: 200 });
+  globalThis.fetch = async (u, init) => {
+    if (String(u).endsWith('/data/search.json')) return new Response(JSON.stringify([{ s: 'hello-post', t: 'Hello Post Title', u: '/post/guides/hello-post/' }, { s: 'second-post', t: 'Second Post', u: '/post/second-post/' }]), { status: 200 });
+    if (String(u) === 'https://api.resend.com/emails') {
+      sent.push({ body: JSON.parse(init.body), raw: init.body, headers: init.headers });
+      if (resendMode === 'throw') throw new Error('network down');
+      if (resendMode === '500') return new Response('{"message":"boom"}', { status: 500 });
+      return new Response(JSON.stringify({ id: `msg_${sent.length}` }), { status: 200 });
+    }
     return new Response('{}', { status: 404 });
   };
 });
+const flushMail = async () => { while (pendingMail.length) await Promise.all(pendingMail.splice(0)); };
 test.after(() => { globalThis.fetch = realFetch; });
-test.beforeEach(() => { env = { DB: makeD1(), ADMIN_TOKEN: 'a-very-long-admin-token-123', SITE_ORIGIN: ORIGIN }; });
+test.beforeEach(() => { sent = []; resendMode = 'ok'; pendingMail = []; env = { DB: makeD1(), ADMIN_TOKEN: 'a-very-long-admin-token-123', SITE_ORIGIN: ORIGIN, RESEND_API_KEY: 're_test_key' }; });
 
 async function call(method, path, { body, origin = ORIGIN, auth, ip = '1.1.1.1' } = {}) {
   const headers = { 'CF-Connecting-IP': ip };
   if (origin) headers.Origin = origin;
   if (auth) headers.Authorization = `Bearer ${auth}`;
   if (body) headers['Content-Type'] = 'application/json';
-  const res = await worker.fetch(new Request(`https://api.test${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined }), env, { waitUntil() {} });
+  const res = await worker.fetch(new Request(`https://api.test${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined }), env, { waitUntil: (p) => { pendingMail.push(p); } });
   const text = await res.text();
   return { status: res.status, headers: res.headers, json: text ? JSON.parse(text) : null };
 }
@@ -982,4 +993,390 @@ test('an edit is cleaned the same way', async () => {
   const only = await edit(a.id, a.token, '\u001b\u0007\u0085');
   assert.equal(only.status, 400);
   assert.equal(rawRow(a.id).body, row.body);
+});
+
+/* ------------------------------------------------------------------ Task 4: comment emails */
+import { looksLikeQuestion } from '../../worker/src/question.js';
+import fs from 'node:fs';
+
+const sha256 = (t) => createHash('sha256').update(t).digest('hex');
+const MAILBOX = 'asha@example.com';
+const post = (body, ip = '1.1.1.1') => call('POST', '/v1/posts/hello-post/comments', { body, ip });
+const mail = (to) => sent.filter((m) => m.body.to[0] === to);
+const linkOf = (m) => (m.body.text.match(/https:\/\/mayobebros\.com\/manage\/#l=([A-Za-z0-9_-]+)/) || [])[1];
+const unsubOf = (m) => (m.body.text.match(/https:\/\/mayobebros\.com\/manage\/#u=([A-Za-z0-9_-]+)/) || [])[1];
+const exchange = (link, ip = '1.1.1.1') => call('POST', '/v1/manage/exchange', { body: { link }, ip });
+// a confirmed commenter: comments with notify, opens the emailed link
+async function confirmed(over = {}) {
+  const r = await post(comment({ email: MAILBOX, notify: true, ...over }));
+  await flushMail();
+  const link = linkOf(sent.at(-1));
+  const x = await exchange(link);
+  sent = [];
+  return { ...r.json, link, device: x.json.token };
+}
+
+test('question.js: English and Swahili questions are recognised, plain statements are not', () => {
+  for (const q of ['Can I apply with a diploma', 'how long does it take', 'Thanks. When is the deadline', 'Is this free', 'Does it work', 'Nini kinahitajika', 'Vipi kuhusu ada', 'Je, naweza kujiunga', 'Ni wapi ofisi', 'Naweza kuomba mara ngapi', 'Inawezekana kujiunga leo', 'it works??', 'really?', 'Great post, where do I sign\nand when'])
+    assert.equal(looksLikeQuestion(q), true, q);
+  for (const s of ['Thanks, this helped me a lot.', 'Great article', 'Asante sana kwa makala hii', 'However it was useful', 'I did it yesterday'])
+    assert.equal(looksLikeQuestion(s), false, s);
+  assert.equal(looksLikeQuestion(null), false);
+  assert.equal(looksLikeQuestion(undefined), false);
+  assert.equal(looksLikeQuestion(42), false);
+});
+
+test('qa-sync imports looksLikeQuestion and no longer carries its own regex', () => {
+  const src = fs.readFileSync(new URL('../qa-sync.mjs', import.meta.url), 'utf8');
+  assert.match(src, /import \{ looksLikeQuestion \} from '\.\.\/worker\/src\/question\.js'/);
+  assert.doesNotMatch(src, /const QUESTION\s*=/);
+});
+
+test('ticking notify with an email sends one manage-link mail with no visitor text and no clear token stored', async () => {
+  const r = await post(comment({ name: 'Secret Name Zed', body: 'Secret body words qwerty here.', email: MAILBOX, notify: true }));
+  assert.equal(r.status, 201);
+  await flushMail();
+  assert.equal(sent.length, 1);
+  const m = sent[0];
+  assert.deepEqual(m.body.to, [MAILBOX]);
+  const everything = `${m.body.subject}\n${m.body.html}\n${m.body.text}`;
+  assert.equal(everything.includes('Secret Name Zed'), false);
+  assert.equal(everything.includes('Secret body words'), false);
+  assert.ok(everything.includes('Hello Post Title'), 'our own article title is used');
+  assert.ok(m.body.text.includes('https://mayobebros.com/post/guides/hello-post/'), 'the real post URL from the site data');
+  const tok = linkOf(m);
+  assert.ok(tok && tok.length >= 32);
+  assert.equal(m.headers['Idempotency-Key'], `link-${r.json.id}`);
+  assert.ok(m.body.html.includes(`#l=${tok}`));
+  const rows = env.DB.raw.prepare('SELECT * FROM manage_links').all();
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].hash, sha256(tok));
+  assert.equal(rows[0].kind, 'link');
+  assert.equal(rows[0].comment_id, r.json.id);
+  assert.ok(Math.abs(rows[0].expires - (rows[0].created + 7 * 86400000)) < 1000);
+  assert.equal(JSON.stringify(env.DB.raw.prepare('SELECT * FROM manage_links').all()).includes(tok), false);
+  assert.equal(env.DB.raw.prepare('SELECT notify_wanted, notify_confirmed FROM comments WHERE id = ?').get(r.json.id).notify_wanted, 1);
+  assert.equal(env.DB.raw.prepare('SELECT COUNT(*) AS n FROM hits WHERE k LIKE ?').get(`%${MAILBOX}%`).n, 0, 'no raw email in hits');
+});
+
+test('manage-link mail for an unknown post title falls back to fixed text', async () => {
+  env.DB.raw.prepare('INSERT INTO posts(slug, created) VALUES(?, ?)').run('second-post', 1);
+  const r = await call('POST', '/v1/posts/second-post/comments', { body: comment({ email: MAILBOX, notify: true }) });
+  await flushMail();
+  assert.equal(r.status, 201);
+  assert.equal(sent.length, 1);
+  assert.ok(sent[0].body.text.includes('Second Post'));
+});
+
+test('no manage-link mail without notify, without an email, or for duplicate and bot posts', async () => {
+  await post(comment({ email: MAILBOX }));
+  await post(comment({ body: 'Another one here', notify: true }));
+  await post(comment({ body: 'Third one here', email: '', notify: true }));
+  await flushMail();
+  assert.equal(sent.length, 0);
+  await post(comment({ body: 'Real one', email: MAILBOX, notify: true }));
+  await flushMail();
+  assert.equal(sent.length, 1);
+  await post(comment({ body: 'Real one', email: MAILBOX, notify: true })); // duplicate
+  await post(comment({ body: 'Bot one', email: 'bot@example.com', notify: true, website: 'http://x' })); // bot
+  await post(comment({ body: 'Fast one', email: 'fast@example.com', notify: true, ts: Date.now() })); // too fast
+  await flushMail();
+  assert.equal(sent.length, 1);
+  assert.equal(env.DB.raw.prepare('SELECT COUNT(*) AS n FROM manage_links').get().n, 1);
+  assert.equal(env.DB.raw.prepare("SELECT COUNT(*) AS n FROM comments WHERE notify_wanted = 1").get().n, 1);
+});
+
+test('notify must be exactly true, and a bad address is refused with no mail', async () => {
+  await post(comment({ email: MAILBOX, notify: 'yes' }));
+  await post(comment({ body: 'Second text', email: MAILBOX, notify: 1 }));
+  await flushMail();
+  assert.equal(sent.length, 0);
+  const bad = await post(comment({ body: 'Third text', email: 'nope', notify: true }));
+  assert.equal(bad.status, 400);
+  await flushMail();
+  assert.equal(sent.length, 0);
+});
+
+test('at most one manage-link mail per address per day, and five per IP per day; the comment is saved anyway', async () => {
+  await post(comment({ email: MAILBOX, notify: true }), '2.2.2.2');
+  const second = await post(comment({ body: 'Second note here', email: 'ASHA@example.com', notify: true }), '3.3.3.3');
+  assert.equal(second.status, 201);
+  await flushMail();
+  assert.equal(sent.length, 1, 'the same address (any case) gets one a day');
+  assert.equal(env.DB.raw.prepare('SELECT COUNT(*) AS n FROM comments').get().n, 2);
+  // per IP: six different addresses from one IP, only five mails
+  env.DB.raw.exec('DELETE FROM hits');
+  sent = [];
+  for (let i = 0; i < 6; i++) {
+    const r = await post(comment({ body: `Note number ${i}`, email: `u${i}@example.com`, notify: true, cid: `visitorid-${i}-abcdefghij` }), '4.4.4.4');
+    if (r.status === 429) break;
+  }
+  await flushMail();
+  assert.ok(sent.length <= 5, `sent ${sent.length}`);
+  assert.equal(sent.length, 5);
+});
+
+test('exchange: a device token works for edit and delete, confirms notices, and the link is reusable until it expires', async () => {
+  const r = await post(comment({ email: MAILBOX, notify: true }));
+  await flushMail();
+  const link = linkOf(sent[0]);
+  const x = await exchange(link);
+  assert.equal(x.status, 200);
+  assert.equal(x.json.ok, true);
+  assert.equal(x.json.id, r.json.id);
+  assert.equal(x.json.slug, 'hello-post');
+  assert.match(x.json.token, /^[A-Za-z0-9_-]{32,}$/);
+  assert.notEqual(x.json.token, link);
+  assert.equal(env.DB.raw.prepare('SELECT notify_confirmed FROM comments WHERE id = ?').get(r.json.id).notify_confirmed, 1);
+  const dev = env.DB.raw.prepare("SELECT * FROM manage_links WHERE kind = 'device'").get();
+  assert.equal(dev.hash, sha256(x.json.token));
+  assert.equal(dev.expires, null);
+  // the second exchange gives a different device token, and both work
+  const y = await exchange(link, '9.9.9.9');
+  assert.equal(y.status, 200);
+  assert.notEqual(y.json.token, x.json.token);
+  const e = await call('POST', `/v1/comments/${r.json.id}/edit`, { body: { token: x.json.token, body: 'Edited from my phone' } });
+  assert.equal(e.status, 200);
+  assert.equal(e.json.comment.body, 'Edited from my phone');
+  // a device token is for its own comment only
+  const other = await post(comment({ body: 'Someone else here', cid: CID2 }), '5.5.5.5');
+  assert.equal((await call('POST', `/v1/comments/${other.json.id}/delete`, { body: { token: x.json.token } })).status, 404);
+  const d = await call('POST', `/v1/comments/${r.json.id}/delete`, { body: { token: y.json.token } });
+  assert.equal(d.status, 200);
+});
+
+test('exchange: expired, unknown, deleted, malformed and wrong-kind links all give the one generic 404', async () => {
+  const r = await post(comment({ email: MAILBOX, notify: true }));
+  await flushMail();
+  const link = linkOf(sent[0]);
+  const generic = await exchange('x'.repeat(32));
+  assert.equal(generic.status, 404);
+  assert.equal(generic.json.error, 'That comment could not be found.');
+  assert.deepEqual((await exchange('short')).json, generic.json);
+  assert.deepEqual((await call('POST', '/v1/manage/exchange', { body: {} })).json, generic.json);
+  assert.deepEqual((await call('POST', '/v1/manage/exchange', { body: { link: { a: 1 } } })).json, generic.json);
+  // a device token is not a link
+  const ok = await exchange(link);
+  assert.deepEqual((await exchange(ok.json.token)).json, generic.json);
+  // expired by raw DB
+  env.DB.raw.prepare("UPDATE manage_links SET expires = ? WHERE kind = 'link'").run(Date.now() - 1);
+  const ex = await exchange(link);
+  assert.equal(ex.status, 404);
+  assert.deepEqual(ex.json, generic.json);
+  env.DB.raw.prepare("UPDATE manage_links SET expires = ? WHERE kind = 'link'").run(Date.now() + 100000);
+  assert.equal((await exchange(link)).status, 200);
+  // a deleted (here: spam) comment
+  env.DB.raw.prepare("UPDATE comments SET status = 'spam' WHERE id = ?").run(r.json.id);
+  assert.deepEqual((await exchange(link)).json, generic.json);
+  env.DB.raw.prepare("UPDATE comments SET status = 'deleted' WHERE id = ?").run(r.json.id);
+  assert.deepEqual((await exchange(link)).json, generic.json);
+  // origin rule
+  assert.equal((await call('POST', '/v1/manage/exchange', { body: { link }, origin: 'https://evil.example' })).status, 403);
+});
+
+test('exchange does not confirm notices when the commenter did not ask for them', async () => {
+  const r = await post(comment({ email: MAILBOX }));
+  const link = 'L'.repeat(32);
+  env.DB.raw.prepare("INSERT INTO manage_links(hash, comment_id, kind, expires, created) VALUES(?, ?, 'link', ?, ?)").run(sha256(link), r.json.id, Date.now() + 100000, Date.now());
+  assert.equal((await exchange(link)).status, 200);
+  assert.equal(env.DB.raw.prepare('SELECT notify_confirmed FROM comments WHERE id = ?').get(r.json.id).notify_confirmed, 0);
+});
+
+test('exchange is rate limited per IP', async () => {
+  let last;
+  for (let i = 0; i < 40; i++) last = await exchange(`${'a'.repeat(31)}${i % 10}`, '8.8.8.8');
+  assert.equal(last.status, 429);
+});
+
+test('reply notice: a reply to a confirmed commenter sends one escaped mail with an unsubscribe link', async () => {
+  const a = await confirmed({ name: 'Asha Mwangi' });
+  const rep = await post(comment({ name: 'Bob <b>Bold</b>', body: 'My <script>alert(1)</script> "answer" & more', cid: CID2, parent: a.id }), '6.6.6.6');
+  assert.equal(rep.status, 201);
+  await flushMail();
+  const got = mail(MAILBOX);
+  assert.equal(got.length, 1);
+  const m = got[0];
+  assert.equal(m.headers['Idempotency-Key'], `reply-${rep.json.id}`);
+  assert.equal(m.body.html.includes('<script>'), false);
+  assert.ok(m.body.html.includes('&lt;script&gt;'));
+  assert.equal(m.body.html.includes('<b>Bold</b>'), false);
+  assert.ok(m.body.text.includes('alert(1)'));
+  assert.match(m.body.text, /Hi Asha,/);
+  const u = unsubOf(m);
+  assert.ok(u && u.length >= 32);
+  assert.equal(env.DB.raw.prepare("SELECT kind FROM manage_links WHERE hash = ?").get(sha256(u)).kind, 'unsub');
+  assert.equal(m.body.html.includes('Hello Post Title'), true);
+});
+
+test('reply notice: none for the same visitor, an unconfirmed parent, an unsubscribed one, or a suppressed address', async () => {
+  // not confirmed (opted in, never opened the link)
+  const p = await post(comment({ email: MAILBOX, notify: true, body: 'Parent A text' }));
+  await flushMail(); sent = [];
+  env.DB.raw.exec('DELETE FROM hits');
+  await post(comment({ body: 'Reply to unconfirmed', cid: CID2, parent: p.json.id }), '6.6.6.6');
+  await flushMail();
+  assert.equal(sent.length, 0);
+  // same cid as the parent
+  const a = await confirmed({ body: 'Parent B text', cid: 'cidforparentbb-123456' });
+  await post(comment({ body: 'My own followup', cid: 'cidforparentbb-123456', parent: a.id }), '7.7.7.7');
+  await flushMail();
+  assert.equal(mail(MAILBOX).length, 0);
+  // suppressed
+  env.DB.raw.prepare('INSERT INTO suppressed(email, reason, created) VALUES(?, ?, ?)').run(MAILBOX, 'bounce', 1);
+  await post(comment({ body: 'Reply while suppressed', cid: CID2, parent: a.id }), '6.6.6.6');
+  await flushMail();
+  assert.equal(sent.length, 0);
+  env.DB.raw.exec('DELETE FROM suppressed');
+  env.DB.raw.exec('DELETE FROM hits'); // the suppressed try used up today's one notice for this comment
+  // unsubscribe
+  await post(comment({ body: 'Reply that sends', cid: CID2, parent: a.id }), '6.6.6.6');
+  await flushMail();
+  assert.equal(sent.length, 1);
+  const u = unsubOf(sent[0]);
+  const un = await call('POST', '/v1/notify/unsubscribe', { body: { token: u } });
+  assert.equal(un.status, 200);
+  const again = await call('POST', '/v1/notify/unsubscribe', { body: { token: u } });
+  assert.equal(again.status, 200, 'idempotent');
+  const flags = env.DB.raw.prepare('SELECT notify_wanted, notify_confirmed FROM comments WHERE id = ?').get(a.id);
+  assert.deepEqual({ ...flags }, { notify_wanted: 0, notify_confirmed: 0 });
+  env.DB.raw.exec('DELETE FROM hits');
+  sent = [];
+  await post(comment({ body: 'Reply after stop', cid: 'thirdvisitorid-123456', parent: a.id }), '6.6.6.6');
+  await flushMail();
+  assert.equal(sent.length, 0);
+  // an unknown unsubscribe token is the generic 404
+  const bad = await call('POST', '/v1/notify/unsubscribe', { body: { token: 'z'.repeat(32) } });
+  assert.equal(bad.status, 404);
+  assert.equal(bad.json.error, 'That comment could not be found.');
+  assert.equal((await call('POST', '/v1/notify/unsubscribe', { body: {} })).status, 404);
+});
+
+test('reply notice: at most one a day per parent, each with its own working unsubscribe link', async () => {
+  const a = await confirmed();
+  await post(comment({ body: 'First reply here', cid: CID2, parent: a.id }), '6.6.6.6');
+  await post(comment({ body: 'Second reply here', cid: 'thirdvisitorid-123456', parent: a.id }), '6.6.6.6');
+  await flushMail();
+  assert.equal(mail(MAILBOX).length, 1);
+  // tomorrow a new one may go out, with a different unsubscribe token that also works
+  env.DB.raw.exec('DELETE FROM hits');
+  await post(comment({ body: 'Third reply here', cid: 'fourthvisitorid-12345', parent: a.id }), '6.6.6.6');
+  await flushMail();
+  const two = mail(MAILBOX);
+  assert.equal(two.length, 2);
+  assert.notEqual(unsubOf(two[0]), unsubOf(two[1]));
+  assert.equal((await call('POST', '/v1/notify/unsubscribe', { body: { token: unsubOf(two[0]) } })).status, 200);
+  assert.equal((await call('POST', '/v1/notify/unsubscribe', { body: { token: unsubOf(two[1]) } })).status, 200);
+});
+
+test('reply notice: team replies and admin approval of a pending reply also notify', async () => {
+  const a = await confirmed();
+  const t = await call('POST', '/v1/admin/reply', { body: { parent: a.id, body: 'Team answer <i>here</i>' }, auth: env.ADMIN_TOKEN, origin: null });
+  assert.equal(t.status, 201);
+  await flushMail();
+  assert.equal(mail(MAILBOX).length, 1);
+  assert.match(mail(MAILBOX)[0].body.subject, /team replied/i);
+  assert.equal(mail(MAILBOX)[0].body.html.includes('<i>here</i>'), false);
+  // a held reply, approved by the owner
+  env.DB.raw.exec('DELETE FROM hits');
+  sent = [];
+  const held = await post(comment({ body: RUDE, cid: CID2, parent: a.id }), '6.6.6.6');
+  assert.equal(held.json.status, 'pending');
+  await flushMail();
+  assert.equal(mail(MAILBOX).length, 0, 'a held reply is not announced');
+  sent = [];
+  const ap = await call('POST', `/v1/admin/comments/${held.json.id}`, { body: { action: 'approve' }, auth: env.ADMIN_TOKEN, origin: null });
+  assert.equal(ap.status, 200);
+  await flushMail();
+  assert.equal(mail(MAILBOX).length, 1);
+  // approving something already approved does not send again
+  sent = [];
+  env.DB.raw.exec('DELETE FROM hits');
+  await call('POST', `/v1/admin/comments/${held.json.id}`, { body: { action: 'approve' }, auth: env.ADMIN_TOKEN, origin: null });
+  await flushMail();
+  assert.equal(sent.length, 0);
+});
+
+test('owner alerts: held comment with reasons, question, and nothing for an ordinary comment', async () => {
+  env.OWNER_EMAIL = 'owner@example.org';
+  await post(comment({ body: 'Thanks, this helped me a lot.' }));
+  await flushMail();
+  assert.equal(sent.length, 0);
+  const q = await post(comment({ body: 'How long does it take to apply?', cid: CID2 }), '2.2.2.2');
+  await flushMail();
+  assert.equal(sent.length, 1);
+  assert.deepEqual(sent[0].body.to, ['owner@example.org']);
+  assert.match(sent[0].body.subject, /question/i);
+  assert.equal(sent[0].headers['Idempotency-Key'], `alert-${q.json.id}-question`);
+  assert.ok(sent[0].body.text.includes('How long does it take'));
+  sent = [];
+  const h = await post(comment({ body: RUDE, cid: 'thirdvisitorid-123456' }), '3.3.3.3');
+  await flushMail();
+  assert.equal(h.json.status, 'pending');
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].body.subject, /held/i);
+  assert.equal(sent[0].headers['Idempotency-Key'], `alert-${h.json.id}-held`);
+  assert.ok(/Reason/.test(sent[0].body.text));
+  assert.ok(sent[0].body.text.includes(env.DB.raw.prepare('SELECT flag FROM comments WHERE id = ?').get(h.json.id).flag.split(', ')[0]));
+  // duplicates and bots send nothing
+  sent = [];
+  await post(comment({ body: RUDE, cid: 'thirdvisitorid-123456' }), '3.3.3.3');
+  await post(comment({ body: 'Why? bot', website: 'x' }), '3.3.3.3');
+  await flushMail();
+  assert.equal(sent.length, 0);
+});
+
+test('owner alerts go to info@mayobebros.com when OWNER_EMAIL is not set', async () => {
+  await post(comment({ body: 'Is this free?' }));
+  await flushMail();
+  assert.deepEqual(sent[0].body.to, ['info@mayobebros.com']);
+});
+
+test('hostile names and bodies never reach an email unescaped and never break the API', async () => {
+  env.OWNER_EMAIL = 'owner@example.org';
+  const a = await confirmed();
+  const names = ['<script>alert(1)</script>', '"><img src=x onerror=alert(1)>', "O'Brien\r\nBcc: evil@example", 'Lone \ud800 surrogate', 'N'.repeat(50)];
+  let i = 0;
+  for (const name of names) {
+    env.DB.raw.exec('DELETE FROM hits');
+    const bodyText = `<script>alert(1)</script> \ud83d lone "quote" 'q' & ${'long '.repeat(250)}?`;
+    const r = await post(comment({ name, body: bodyText, cid: `hostile-visitor-${i++}-abcdef`, parent: a.id }), `10.0.0.${i}`);
+    assert.ok([201, 202].includes(r.status), `${name}: ${r.status}`);
+  }
+  // a held, hostile top-level comment (owner alert) and a hostile email address
+  env.DB.raw.exec('DELETE FROM hits');
+  await post(comment({ name: '<b>x</b>y', body: `${RUDE} <script>1</script> ${'z'.repeat(1300)}`, cid: 'hostile-visitor-9-abcdefg' }), '10.1.1.1');
+  await flushMail();
+  assert.ok(sent.length >= 3);
+  for (const m of sent) {
+    assert.equal(m.body.html.includes('<script>'), false);
+    assert.equal(/<img[^>]*onerror/i.test(m.body.html), false);
+    assert.equal(m.body.html.includes('<b>x</b>'), false);
+    assert.equal(/[\r\n]/.test(m.body.subject), false);
+    assert.doesNotThrow(() => JSON.parse(m.raw));
+    assert.equal(m.raw.includes('\\ud800') || m.raw.includes('\\ud83d\\"'), false, 'no lone surrogate in the JSON');
+  }
+});
+
+test('a failing mail service changes nothing in the API answer', async () => {
+  const run = async (mode) => {
+    resendMode = mode;
+    sent = [];
+    env = { ...env, DB: makeD1() };
+    const r = await post(comment({ email: MAILBOX, notify: true, body: 'Is this free?' }));
+    await flushMail();
+    const { id, token, comment: c, ...rest } = r.json;
+    return { status: r.status, rest, hasId: typeof id, hasToken: typeof token, name: c.name };
+  };
+  const good = await run('ok');
+  assert.deepEqual(await run('throw'), good);
+  assert.deepEqual(await run('500'), good);
+  assert.equal(good.status, 201);
+});
+
+test('without RESEND_API_KEY nothing is sent and comments still work', async () => {
+  delete env.RESEND_API_KEY;
+  const r = await post(comment({ email: MAILBOX, notify: true }));
+  await flushMail();
+  assert.equal(r.status, 201);
+  assert.equal(sent.length, 0);
 });

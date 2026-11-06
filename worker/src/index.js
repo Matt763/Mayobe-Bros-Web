@@ -12,12 +12,22 @@
 //   GET  /v1/admin/comments?status=pending  (Authorization: Bearer ADMIN_TOKEN)
 //   POST /v1/admin/comments/:id             { action: "approve" | "spam" | "delete" }
 //   POST /v1/admin/reply                    { parent, body, name? }  a published reply from the team (shows a Team badge)
+//   POST /v1/manage/exchange                { link }              swap the token from an emailed manage link (kept in the page's #l= fragment) for a device token -> { ok, id, slug, token }
+//   POST /v1/notify/unsubscribe             { token }             stop reply emails for the comment that owns this (#u=) token
+//
+// Email (worker/src/mail.js, mail-templates.js): the create route also takes `notify: true` with an email address. That sends one
+// "manage link" mail (fixed text and our own article title only: the address is unverified). Opening its link confirms the address, and
+// only then do reply notices go out. A held comment, or a new question, also alerts OWNER_EMAIL. Mail is sent inside ctx.waitUntil after
+// the data is saved and can never change an API answer.
 //
 // A comment is screened automatically (worker/src/moderation.js: English + Swahili abusive words, scam lines, contact details,
 // shouting). A clean comment is published at once ("approved"); a flagged one is held as "pending" until the owner approves it.
 // Set the variable AUTO_APPROVE to "false" to hold every comment again (for example during a spam wave).
 
 import { screen, looksLikeTeam } from './moderation.js';
+import { looksLikeQuestion } from './question.js';
+import { sendMail } from './mail.js';
+import { manageLinkEmail, replyNoticeEmail, ownerAlertEmail } from './mail-templates.js';
 
 export const REACTIONS = ['like', 'amazed', 'sad', 'angry'];
 const COL = { like: 'r_like', amazed: 'r_amazed', sad: 'r_sad', angry: 'r_angry' };
@@ -26,6 +36,7 @@ const CID_RE = /^[A-Za-z0-9-]{16,64}$/;
 const LINK_RE = /(https?:\/\/|www\.|\b[a-z0-9-]+\.(?:com|net|org|info|biz|xyz|top|click|link|ru|cn|co\.tz|go\.tz|tk|ml|ga|cf|gq)\b|t\.me\/|bit\.ly)/i;
 const MAX_BODY = 4000;
 const TOKEN_RE = /^[A-Za-z0-9_-]{32,64}$/;
+const LINK_DAYS = 7; // an emailed manage link works for this long
 const NOT_FOUND = 'That comment could not be found.'; // the one answer for a wrong token, a missing comment, a team comment and so on, so nothing can be probed
 
 const enc = new TextEncoder();
@@ -78,7 +89,11 @@ async function ownerRow(env, id, token) {
     ? await env.DB.prepare('SELECT id, slug, parent_id, status, created, body, cid, ip_hash, name, edited_at, manage_hash FROM comments WHERE id = ?').bind(id).first()
     : null;
   const match = same(givenHash, row?.manage_hash || '0'.repeat(64)); // a comment with no hash (older, or from the team) is compared with zeros and never matches
-  if (!row || !row.manage_hash || !match || !TOKEN_RE.test(given) || !['approved', 'pending'].includes(row.status)) return null;
+  // a device token (from the emailed manage link) is the same kind of secret, kept hashed in manage_links; it is looked up by its hash
+  const device = row && TOKEN_RE.test(given)
+    ? await env.DB.prepare("SELECT 1 AS ok FROM manage_links WHERE hash = ? AND comment_id = ? AND kind = 'device'").bind(givenHash, id).first()
+    : null;
+  if (!row || !TOKEN_RE.test(given) || !((row.manage_hash && match) || device) || !['approved', 'pending'].includes(row.status)) return null;
   const { manage_hash, ...own } = row; // the hash never leaves this function
   return own;
 }
@@ -144,6 +159,73 @@ async function slugKnown(env, slug) {
     env.DB.prepare('INSERT OR IGNORE INTO post_stats(slug) VALUES(?)').bind(slug),
   ]);
   return true;
+}
+
+// Title and address of one of OUR articles, from the site's own list; '' and a plain /post/<slug>/ address if it is not listed.
+// Never taken from visitor input: this is what goes into emails to addresses nobody has verified.
+async function postMeta(env, slug) {
+  const fallback = { title: '', path: `/post/${slug}/` };
+  try {
+    const r = await fetch(`${siteOrigin(env)}/data/search.json`, { cf: { cacheTtl: 300, cacheEverything: true } });
+    if (!r.ok) return fallback;
+    const list = await r.json();
+    const p = Array.isArray(list) ? list.find((x) => x && x.s === slug) : null;
+    if (!p) return fallback;
+    return { title: typeof p.t === 'string' ? p.t.slice(0, 200) : '', path: typeof p.u === 'string' && /^\/post\/[a-z0-9/-]*$/.test(p.u) && p.u.length <= 300 ? p.u : fallback.path };
+  } catch {
+    return fallback;
+  }
+}
+
+/* ------------------------------------------------------------------ email */
+const siteOrigin = (env) => String(env.SITE_ORIGIN || 'https://mayobebros.com').replace(/\/$/, '');
+const siteOf = (env) => ({ origin: siteOrigin(env), logoUrl: `${siteOrigin(env)}/assets/img/icon-192.png` });
+const utcDay = () => new Date().toISOString().slice(0, 10);
+const DAY_TTL = 90000; // a little over a day, in seconds
+
+// Runs a mail job after the response is decided. Whatever happens inside, it never throws and never changes the answer.
+// Nothing is created or counted when no mail key is set.
+function later(env, ctx, job) {
+  if (!env.RESEND_API_KEY) return;
+  const p = (async () => { try { await job(); } catch (err) { console.error('mail job failed', err && err.message ? err.message : err); } })();
+  try { ctx?.waitUntil?.(p); } catch { /* nothing more to do */ }
+}
+async function addLink(env, kind, commentId, expires) {
+  const token = await newToken();
+  await env.DB.prepare('INSERT INTO manage_links(hash, comment_id, kind, expires, created) VALUES(?, ?, ?, ?, ?)').bind(await sha(token), commentId, kind, expires, now()).run();
+  return token; // the clear token exists only here, long enough to be put in the email
+}
+
+// The "manage your comment" mail. The address is unverified, so it carries our article title and fixed text only.
+async function mailManageLink(env, ctx, c) {
+  const day = utcDay();
+  if (!(await hit(env, ctx, `mlip:${c.ih}:${day}`, 5, DAY_TTL))) return; // at most 5 a day per IP
+  if (!(await hit(env, ctx, `mlem:${(await sha(`${c.email.toLowerCase()}|${env.HASH_SALT || 'mayobe'}`)).slice(0, 32)}:${day}`, 1, DAY_TTL))) return; // 1 a day per address, never the raw address
+  const meta = await postMeta(env, c.slug);
+  const origin = siteOrigin(env);
+  const token = await addLink(env, 'link', c.id, now() + LINK_DAYS * 86400000);
+  const m = manageLinkEmail({ postTitle: meta.title, postUrl: `${origin}${meta.path}`, manageUrl: `${origin}/manage/#l=${token}`, notifyWanted: true }, siteOf(env));
+  await sendMail(env, ctx, { kind: 'commenter', to: c.email, ...m, key: `link-${c.id}` });
+}
+
+// A new approved reply: tell the parent's author, only if they confirmed the address by opening the manage link.
+async function mailReplyNotice(env, ctx, r) {
+  const parent = r.parent_id ? await env.DB.prepare('SELECT id, slug, name, email, cid, status, notify_confirmed FROM comments WHERE id = ?').bind(r.parent_id).first() : null;
+  if (!parent || parent.status !== 'approved' || !parent.notify_confirmed || !parent.email) return;
+  if (!r.team && r.cid && r.cid === parent.cid) return; // never tell people about their own follow-up
+  if (!(await hit(env, ctx, `rn:${parent.id}:${utcDay()}`, 1, DAY_TTL))) return; // 1 a day per comment
+  const meta = await postMeta(env, parent.slug);
+  const origin = siteOrigin(env);
+  const unsub = await addLink(env, 'unsub', parent.id, null); // a new one for every notice; all of them work
+  const m = replyNoticeEmail({ postTitle: meta.title, postUrl: `${origin}${meta.path}#comments`, unsubscribeUrl: `${origin}/manage/#u=${unsub}`, name: parent.name, isTeam: !!r.team, replyAuthor: r.name, replyBody: r.body }, siteOf(env));
+  await sendMail(env, ctx, { kind: 'commenter', to: parent.email, ...m, key: `reply-${r.id}` });
+}
+
+// Alerts to the owner (full content; the template escapes it).
+async function mailOwner(env, ctx, kind, c, reason) {
+  const meta = await postMeta(env, c.slug);
+  const m = ownerAlertEmail({ kind, postUrl: `${siteOrigin(env)}${meta.path}`, postSlug: c.slug, commentId: c.id, name: c.name, body: c.body, reason }, siteOf(env));
+  await sendMail(env, ctx, { kind: 'owner', to: env.OWNER_EMAIL || 'info@mayobebros.com', ...m, key: `alert-${c.id}-${kind}` });
 }
 
 const statsOf = (r) => ({ c: r?.comments || 0, r: { like: r?.r_like || 0, amazed: r?.r_amazed || 0, sad: r?.r_sad || 0, angry: r?.r_angry || 0 } });
@@ -273,17 +355,49 @@ async function handle(request, env, ctx) {
       if (reasons.length && (pending?.n || 0) >= 5) return fail('You already have several comments waiting for review.', 429, cors);
       status = reasons.length ? 'pending' : 'approved';
       const t = now();
+      const wantsMail = b.notify === true && !!email; // "email me about replies" counts only with an address
       token = await newToken(); // shown to the commenter once, in this response; only its hash is stored
-      const row = await env.DB.prepare('INSERT INTO comments(slug, parent_id, name, email, body, status, created, ip_hash, cid, flag, manage_hash) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id')
-        .bind(slug, parent, name, email || null, body, status, t, ih, b.cid, reasons.length ? reasons.join(', ').slice(0, 300) : null, await sha(token)).first();
+      const row = await env.DB.prepare('INSERT INTO comments(slug, parent_id, name, email, body, status, created, ip_hash, cid, flag, manage_hash, notify_wanted) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id')
+        .bind(slug, parent, name, email || null, body, status, t, ih, b.cid, reasons.length ? reasons.join(', ').slice(0, 300) : null, await sha(token), wantsMail ? 1 : 0).first();
       newId = row.id;
       if (status === 'approved') {
         await env.DB.prepare('UPDATE post_stats SET comments = comments + 1 WHERE slug = ?').bind(slug).run();
         shown = { id: row.id, name, body, at: t, parent };
       }
+      // Mail, after the data is saved. Only for a row that was really inserted (not a duplicate or a bot post).
+      const saved = { id: row.id, slug, name, body, cid: b.cid, parent_id: parent, team: 0 };
+      if (wantsMail) later(env, ctx, () => mailManageLink(env, ctx, { id: row.id, slug, email, ih }));
+      if (status === 'approved' && parent) later(env, ctx, () => mailReplyNotice(env, ctx, saved));
+      if (status === 'pending') later(env, ctx, () => mailOwner(env, ctx, 'held', saved, reasons.join(', ')));
+      else if (looksLikeQuestion(body)) later(env, ctx, () => mailOwner(env, ctx, 'question', saved, ''));
     }
     // id and token only for a row that was really inserted (approved or held), so the browser can keep the token even when no comment is shown yet
     return reply({ ok: true, status, comment: shown, ...(newId ? { id: newId, token } : {}) }, status === 'approved' ? 201 : 202, cors);
+  }
+
+  if (method === 'POST' && path === '/v1/manage/exchange') {
+    const b = await readJson(request);
+    const ih = await ipHash(request, env);
+    if (!(await hit(env, ctx, `mx:${ih}:${Math.floor(now() / 3600000)}`, 30, 3700))) return fail('Too many tries. Please try again later.', 429, cors);
+    if (typeof b.link !== 'string' || !TOKEN_RE.test(b.link)) return fail(NOT_FOUND, 404, cors);
+    const link = await env.DB.prepare("SELECT comment_id FROM manage_links WHERE hash = ? AND kind = 'link' AND expires > ?").bind(await sha(b.link), now()).first();
+    const row = link ? await env.DB.prepare("SELECT id, slug, status, notify_wanted FROM comments WHERE id = ?").bind(link.comment_id).first() : null;
+    if (!row || !['approved', 'pending'].includes(row.status)) return fail(NOT_FOUND, 404, cors);
+    const device = await addLink(env, 'device', row.id, null);
+    if (row.notify_wanted) await env.DB.prepare('UPDATE comments SET notify_confirmed = 1 WHERE id = ? AND notify_wanted = 1').bind(row.id).run(); // opening the link proves the address is read by the commenter
+    return reply({ ok: true, id: row.id, slug: row.slug, token: device }, 200, cors);
+  }
+
+  if (method === 'POST' && path === '/v1/notify/unsubscribe') {
+    const b = await readJson(request);
+    const ih = await ipHash(request, env);
+    if (!(await hit(env, ctx, `un:${ih}:${Math.floor(now() / 3600000)}`, 30, 3700))) return fail('Too many tries. Please try again later.', 429, cors);
+    if (typeof b.token !== 'string' || !TOKEN_RE.test(b.token)) return fail(NOT_FOUND, 404, cors);
+    const link = await env.DB.prepare("SELECT comment_id FROM manage_links WHERE hash = ? AND kind = 'unsub'").bind(await sha(b.token)).first();
+    const row = link ? await env.DB.prepare('SELECT id FROM comments WHERE id = ?').bind(link.comment_id).first() : null;
+    if (!row) return fail(NOT_FOUND, 404, cors);
+    await env.DB.prepare('UPDATE comments SET notify_wanted = 0, notify_confirmed = 0 WHERE id = ?').bind(row.id).run();
+    return reply({ ok: true }, 200, cors);
   }
 
   if ((m = path.match(/^\/v1\/comments\/(\d+)\/edit$/)) && method === 'POST') {
@@ -347,6 +461,7 @@ async function handle(request, env, ctx) {
       const done = await env.DB.batch(st);
       if (!(done[0]?.results || []).length) continue;
       await purgeIfOrphan(env, row.parent_id);
+      await env.DB.prepare('DELETE FROM manage_links WHERE comment_id = ?').bind(id).run(); // its emailed links and device tokens are of no use now
       return reply({ ok: true, removed: replies ? 'tombstone' : 'deleted', stats: await getStats(env, row.slug) }, 200, cors);
     }
     return fail(NOT_FOUND, 404, cors);
@@ -394,6 +509,7 @@ async function handle(request, env, ctx) {
       const t = now();
       const row = await env.DB.prepare("INSERT INTO comments(slug, parent_id, name, email, body, status, created, ip_hash, cid, team, flag) VALUES(?, ?, ?, NULL, ?, 'approved', ?, NULL, 'team', 1, NULL) RETURNING id").bind(parent.slug, parent.id, name, body, t).first();
       await env.DB.prepare('UPDATE post_stats SET comments = comments + 1 WHERE slug = ?').bind(parent.slug).run();
+      later(env, ctx, () => mailReplyNotice(env, ctx, { id: row.id, parent_id: parent.id, name, body, team: 1, cid: 'team' }));
       return reply({ ok: true, comment: { id: row.id, name, body, at: t, parent: parent.id, team: true }, stats: await getStats(env, parent.slug) }, 201, cors);
     }
     if ((m = path.match(/^\/v1\/admin\/comments\/(\d+)$/)) && method === 'POST') {
@@ -412,6 +528,10 @@ async function handle(request, env, ctx) {
             env.DB.prepare('UPDATE post_stats SET comments = comments + 1 WHERE slug = ? AND changes() > 0').bind(row.slug), // must stay right after the row statement
           ]);
           if (!(done[0]?.results || []).length) return fail('No such comment.', 404, cors); // it changed or was deleted while we looked
+          if (row.parent_id) { // a held reply is now public: tell the person it answers
+            const rep = await env.DB.prepare('SELECT id, parent_id, name, body, team, cid FROM comments WHERE id = ?').bind(id).first();
+            if (rep) later(env, ctx, () => mailReplyNotice(env, ctx, rep));
+          }
         }
       } else if (b.action === 'spam') {
         await env.DB.batch([
