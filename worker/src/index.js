@@ -94,8 +94,8 @@ async function purgeIfOrphan(env, parentId) {
 // Cleans a comment's name and text the way they are stored, and checks length and links. Shared by the create and edit routes.
 // Returns { name, body } or { error } (a message for a 400).
 function cleanComment(rawName, rawBody) {
-  const name = String(rawName || '').normalize('NFKC').replace(/\p{Cf}+/gu, '').replace(/\s+/g, ' ').trim(); // stored exactly as it was checked: no invisible characters
-  const body = String(rawBody || '').replace(/\r\n?/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  const name = String(rawName || '').normalize('NFKC').replace(/[\p{Cc}\p{Cf}]+/gu, '').replace(/\s+/g, ' ').trim(); // stored exactly as it was checked: no invisible characters
+  const body = String(rawBody || '').replace(/\r\n?/g, '\n').replace(/\t/g, ' ').replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g, '').replace(/\n{3,}/g, '\n\n').trim(); // no control characters (terminal escapes) are stored; newlines stay
   if (name.length < 2 || name.length > 50) return { error: 'Please enter your name (2 to 50 characters).' };
   if (body.length < 3) return { error: 'Your comment is too short.' };
   if (body.length > 1500) return { error: 'Your comment is too long (1,500 characters at most).' };
@@ -246,7 +246,7 @@ async function handle(request, env, ctx) {
     const clean = cleanComment(b.name, b.body);
     if (clean.error) return fail(clean.error, 400, cors);
     const { name, body } = clean;
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail('That email address does not look right.', 400, cors);
+    if (email && (/\p{Cc}|\p{Cf}/u.test(email) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) return fail('That email address does not look right.', 400, cors);
     if (!CID_RE.test(String(b.cid || ''))) return fail('Missing visitor id.', 400, cors);
     const ih = await ipHash(request, env);
     if (!(await hit(env, ctx, `c:${ih}:${Math.floor(now() / 3600000)}`, 5, 3700))) return fail('You have posted several comments already. Please try again later.', 429, cors);

@@ -936,3 +936,50 @@ test('like: rate limited', async () => {
   assert.equal(last.status, 429);
   assert.equal((await like(a.id, CID, true, { ip: '8.8.8.8' })).status, 200, 'another visitor address is not limited');
 });
+
+/* ---------------------------------------------------------------- control characters */
+const CTRL = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/;
+const hasCtrl = (row) => ['name', 'email', 'body', 'prev_body', 'flag'].some((k) => CTRL.test(String(row[k] ?? '')));
+
+test('control characters are stripped from a new comment body and name; newlines stay', async () => {
+  const a = await mk({ name: 'As\u001b[2Jha\u0007', body: 'Hello \u001b[31mred\u001b[0m \u001b]52;c;aGk=\u0007 next\u0085line\u009b end\ttab\u0000' });
+  assert.equal(a.status, 'approved');
+  const row = rawRow(a.id);
+  assert.equal(hasCtrl(row), false);
+  assert.equal(row.name, 'As[2Jha');
+  assert.equal(row.body.includes('\n'), false);
+  const ml = await mk({ body: 'First line here.\n\nSecond line\r\nthird line' }, '2.2.2.2');
+  assert.equal(rawRow(ml.id).body, 'First line here.\n\nSecond line\nthird line');
+});
+
+test('a body made only of control characters is too short, not stored empty', async () => {
+  const r = await call('POST', '/v1/posts/hello-post/comments', { body: comment({ body: '\u001b\u0007\u0085\u009b\u0000\u001b' }) });
+  assert.equal(r.status, 400);
+  assert.equal(env.DB.raw.prepare('SELECT COUNT(*) AS n FROM comments').get().n, 0);
+  const n = await call('POST', '/v1/posts/hello-post/comments', { body: comment({ name: '\u001b\u001b\u001b' }) });
+  assert.equal(n.status, 400);
+});
+
+test('control characters cannot hide an abusive word from the screen', async () => {
+  const r = await call('POST', '/v1/posts/hello-post/comments', { body: comment({ body: 'You are an id\u001biot and a fool.' }) });
+  assert.equal(r.status, 202);
+  assert.equal(r.json.status, 'pending');
+});
+
+test('an email with a control character is refused', async () => {
+  const r = await call('POST', '/v1/posts/hello-post/comments', { body: comment({ email: 'a\u001b[2J@example.com' }) });
+  assert.equal(r.status, 400);
+});
+
+test('an edit is cleaned the same way', async () => {
+  const a = await mk();
+  const r = await edit(a.id, a.token, 'Changed \u001b[31mtext\u001b[0m\u0085 here\u009b\nline two');
+  assert.equal(r.status, 200);
+  const row = rawRow(a.id);
+  assert.equal(hasCtrl(row), false);
+  assert.equal(row.body, 'Changed [31mtext[0m here\nline two');
+  assert.equal(r.json.comment.body, row.body);
+  const only = await edit(a.id, a.token, '\u001b\u0007\u0085');
+  assert.equal(only.status, 400);
+  assert.equal(rawRow(a.id).body, row.body);
+});
