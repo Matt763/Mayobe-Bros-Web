@@ -388,3 +388,21 @@ test('a missing site argument falls back to the live origin and logo', () => {
   const out = T.farewellEmail(SHORT.farewellEmail);
   assert.match(out.html, /https:\/\/mayobebros\.com\/assets\/img\/icon-192\.png/);
 });
+
+test('reply notice greets by the first word of the name, so a long name is never cut mid-word', () => {
+  const r = T.replyNoticeEmail({ name: 'Neema Wilhelmina Mwakalinga-Kitwana from Mbeya Region, Southern Highlands', postTitle: 'Loans', postUrl: 'https://mayobebros.com/post/a/', replyBody: 'Yes.', unsubscribeUrl: 'https://mayobebros.com/u' }, SITE);
+  assert.match(r.html, />Hi Neema,</);
+  assert.ok(r.text.startsWith('NEW REPLY TO YOUR COMMENT\n\nHi Neema,'));
+  assert.ok(!r.html.includes('…,'));
+  assert.match(T.replyNoticeEmail({ name: '  ', replyBody: 'x' }, SITE).html, />Hello,</);
+});
+
+test('emails to the owner carry no team sign-off; reader emails do; owner commands are on their own line', () => {
+  const held = T.ownerAlertEmail({ ...LONG.ownerAlertEmail, kind: 'held' }, SITE);
+  const owner = [held, T.contactOwnerEmail(SHORT.contactOwnerEmail, SITE)];
+  for (const o of owner) { assert.ok(!o.html.includes('>The Mayobe Bros team</p>')); assert.ok(!o.text.includes('\n\nThe Mayobe Bros team\n')); }
+  assert.match(held.html, /node scripts\/comments\.mjs list<\/span><\/p>/);
+  assert.ok(held.text.includes('\n\n    node scripts/comments.mjs list'));
+  const reader = T.farewellEmail(SHORT.farewellEmail, SITE);
+  assert.ok(reader.html.includes('>The Mayobe Bros team</p>') && reader.text.includes('The Mayobe Bros team'));
+});

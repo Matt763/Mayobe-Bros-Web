@@ -122,7 +122,7 @@ export function link(url, label, extra = '') {
 // The one primary button: a bgcolor cell wrapping a padded link, 14 + 20 + 14 = 48 px tall. Outlook's Word engine
 // ignores padding on the inline <a>, so the cell carries the same padding as mso-padding-alt.
 export function button(url, label) {
-  return `<table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin:8px 0 16px;"><tr><td class="mb-btn" bgcolor="${L.button}" style="background:${L.button};border-radius:4px;mso-padding-alt:14px 32px;">`
+  return `<table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin:24px 0 16px;"><tr><td class="mb-btn" bgcolor="${L.button}" style="background:${L.button};border-radius:4px;mso-padding-alt:14px 32px;">`
     + `<a class="mb-btn-a" href="${esc(url)}" style="display:inline-block;padding:14px 32px;${SANS}font-size:16px;line-height:20px;font-weight:bold;color:${L.buttonText};text-decoration:none;border-radius:4px;">${esc(label)}</a>`
     + '</td></tr></table>';
 }
@@ -137,13 +137,19 @@ export function quote(html, cite = '') {
     + (cite ? `<p class="mb-muted" style="margin:0 0 8px;${SANS}font-size:14px;line-height:1.5;font-weight:bold;color:${L.muted};">${cite}</p>` : '')
     + html + '</td></tr></table>';
 }
+// A command the owner types, set apart in a monospace face so it reads as something to copy, not as prose.
+const FONT_MONO = "Menlo,Consolas,'Courier New',monospace";
+export function code(text) {
+  return `<span class="mb-quote mb-heading" style="background:${L.quote};padding:4px 8px;font-family:${FONT_MONO};font-size:14px;color:${L.heading};white-space:nowrap;">${esc(text)}</span>`;
+}
 export function hairline(mb = 24) {
   return `<table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="margin:0 0 ${mb}px;"><tr><td class="mb-rule" style="border-top:1px solid ${L.rule};height:1px;line-height:1px;">&nbsp;</td></tr></table>`;
 }
-// Label / value rows (owner emails). Values arrive already escaped.
+// Label / value rows (owner emails). Values arrive already escaped. The label sits 2 px lower than the value so the
+// 14 px label and the 16 px value share a baseline; on phones the label stacks above the value (CSS below).
 function details(rows) {
-  const tr = rows.filter(([, v]) => v).map(([k, v]) => `<tr><td class="mb-muted mb-rule" style="padding:8px 16px 8px 0;border-top:1px solid ${L.rule};width:112px;vertical-align:top;${SANS}font-size:14px;line-height:1.6;font-weight:bold;color:${L.muted};">${esc(k)}</td>`
-    + `<td class="mb-body mb-rule" style="padding:8px 0;border-top:1px solid ${L.rule};vertical-align:top;${SANS}font-size:16px;line-height:1.6;color:${L.body};word-break:break-word;">${v}</td></tr>`).join('');
+  const tr = rows.filter(([, v]) => v).map(([k, v]) => `<tr><td class="mb-muted mb-rule mb-dt" width="112" style="padding:10px 16px 8px 0;border-top:1px solid ${L.rule};width:112px;vertical-align:top;${SANS}font-size:14px;line-height:1.6;font-weight:bold;color:${L.muted};">${esc(k)}</td>`
+    + `<td class="mb-body mb-rule mb-dd" style="padding:8px 0;border-top:1px solid ${L.rule};vertical-align:top;${SANS}font-size:16px;line-height:1.6;color:${L.body};word-break:break-word;">${v}</td></tr>`).join('');
   return `<table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">${tr}</table>`;
 }
 const signoff = () => p('The Mayobe Bros team', { mb: 0 });
@@ -160,7 +166,7 @@ export function footer(why, links) {
 const PREHEADER_FILL = '&#847;&zwnj;&nbsp;'.repeat(30);
 const CSS = `:root{color-scheme:light dark;supported-color-schemes:light dark}
 body{margin:0;padding:0;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
-@media (max-width:620px){.mb-wrap{width:100%!important}.mb-outer{padding:0!important}.mb-card{padding:32px 24px!important}.mb-head{padding:20px 24px!important}.mb-foot{padding:32px 24px!important}.mb-h1{font-size:26px!important}}
+@media (max-width:620px){.mb-wrap{width:100%!important}.mb-outer{padding:0!important}.mb-card{padding:32px 24px!important}.mb-head{padding:20px 24px!important}.mb-foot{padding:32px 24px!important}.mb-h1{font-size:26px!important}.mb-dt,.mb-dd{display:block!important;width:auto!important}.mb-dt{padding:12px 0 0!important}.mb-dd{border-top:0!important;padding:0 0 12px!important}}
 @media (prefers-color-scheme: dark){.mb-page{background:${D.page}!important}.mb-card{background:${D.card}!important}.mb-heading{color:${D.heading}!important}.mb-body{color:${D.body}!important}.mb-muted{color:${D.muted}!important}.mb-gold{color:${D.gold}!important}.mb-link{color:${D.link}!important}.mb-btn{background:${D.button}!important}.mb-btn-a{color:${D.buttonText}!important}.mb-quote{background:${D.quote}!important;border-left-color:${D.gold}!important}.mb-rule{border-color:${D.rule}!important}}`;
 
 export function shell({ title, preheader, bodyHtml, footerHtml, site }) {
@@ -207,10 +213,11 @@ function textPart(lines, why, links, origin) {
 }
 const quoteText = (s) => plain(s).trim().split('\n').map((l) => `> ${l}`).join('\n');
 
-function build({ site, subject, title, preheader, eyebrowText, heading, html, text, buttonUrl, buttonShown, buttonLabel, why, links }) {
+// signoff: false for emails to the owner (a team signature on a note to ourselves reads oddly).
+function build({ site, subject, title, preheader, eyebrowText, heading, html, text, buttonUrl, buttonShown, buttonLabel, why, links, signoff: sign = true }) {
   const s = siteOf(site);
-  const bodyHtml = eyebrow(eyebrowText) + h1(heading) + html.before + button(buttonUrl, buttonLabel) + fallback(buttonUrl, buttonShown) + (html.after || '') + hairline() + signoff();
-  const textLines = [heading.text, ...text.before, `${buttonLabel}:\n${buttonUrl}`, ...(text.after || []), 'The Mayobe Bros team'];
+  const bodyHtml = eyebrow(eyebrowText) + h1(heading) + html.before + button(buttonUrl, buttonLabel) + fallback(buttonUrl, buttonShown) + (html.after || '') + (sign ? hairline() + signoff() : '');
+  const textLines = [heading.text, ...text.before, `${buttonLabel}:\n${buttonUrl}`, ...(text.after || []), sign ? 'The Mayobe Bros team' : null];
   return {
     subject: clip(subject, 140),
     html: shell({ title: title || clip(subject, 140), preheader: clip(preheader, 130), bodyHtml, footerHtml: footer(why, links), site: s }),
@@ -262,7 +269,9 @@ export function replyNoticeEmail(data, site) {
   const postUrl = ownUrl(d.postUrl, origin, `${origin}/`);
   const unsub = ownUrl(d.unsubscribeUrl, origin, `${origin}/contact/`);
   const title = clip(d.postTitle, 160) || 'an article';
-  const greet = oneLine(d.name) ? `Hi ${clip(d.name, 60)},` : 'Hello,';
+  // Greet by the first word of the name: a long full name cut at 60 characters ended mid-word ("Sout…,").
+  const first = clip(oneLine(d.name).split(' ')[0], 30);
+  const greet = first ? `Hi ${first},` : 'Hello,';
   const who = d.isTeam ? 'The Mayobe Bros team' : (clip(d.replyAuthor, 60) || 'A reader');
   return build({
     site, subject: d.isTeam ? 'The Mayobe Bros team replied to your comment' : 'New reply to your comment on Mayobe Bros',
@@ -290,13 +299,15 @@ const ALERTS = {
     subject: (d) => `Comment held for review (#${clip(d.commentId, 20)})`,
     preheader: 'A new comment was held by the automatic screen and is waiting for you. The reason and the full text are inside.',
     eyebrow: 'Moderation', heading: 'A comment is waiting for review',
-    lead: () => 'The automatic screen held this comment, so it is not on the site yet. To approve or remove it, run node scripts/comments.mjs list on your computer.',
+    lead: () => 'The automatic screen held this comment, so it is not on the site yet. To approve or remove it, run this on your computer:',
+    command: 'node scripts/comments.mjs list',
   },
   question: {
     subject: (d) => `New reader question on ${clip(d.postSlug, 80) || 'an article'}`,
     preheader: 'A reader asked a question in the comments. The question and a link to the article are inside, ready for a reply.',
     eyebrow: 'Reader question', heading: 'A reader asked a question',
-    lead: () => 'This comment looks like a question. After you reply as the team, run node scripts/qa-sync.mjs so the answer is saved into the page.',
+    lead: () => 'This comment looks like a question. After you reply as the team, run this so the answer is saved into the page:',
+    command: 'node scripts/qa-sync.mjs',
   },
   'contact-failed': {
     subject: () => 'A contact message could not be emailed to you',
@@ -321,9 +332,10 @@ export function ownerAlertEmail(data, site) {
     : { buttonUrl: postUrl || `${origin}/`, buttonLabel: postUrl ? 'Open the article' : 'Open the website' };
   return build({
     site, subject: a.subject(d), preheader: a.preheader, eyebrowText: a.eyebrow, heading: H(esc(a.heading), a.heading.toUpperCase()),
-    html: { before: p(esc(lead)) + details(rows.map(([k, v]) => [k, esc(v)])) + (body ? quote(longHtml(body), 'What they wrote:') : '') },
+    signoff: false,
+    html: { before: p(esc(lead), { mb: a.command ? 8 : 16 }) + (a.command ? `<p style="margin:0 0 24px;line-height:2;">${code(a.command)}</p>` : '') + details(rows.map(([k, v]) => [k, esc(v)])) + (body ? quote(longHtml(body), 'What they wrote:') : '') },
     text: {
-      before: [lead, rows.filter(([, v]) => v).map(([k, v]) => `${k}: ${plain(v)}`).join('\n') || null,
+      before: [a.command ? `${lead}\n\n    ${a.command}` : lead, rows.filter(([, v]) => v).map(([k, v]) => `${k}: ${plain(v)}`).join('\n') || null,
         body ? `What they wrote:\n${quoteText(body)}` : null, postUrl && email ? `Article: ${postUrl}` : null],
     },
     ...btn,
@@ -367,7 +379,7 @@ export function contactOwnerEmail(data, site) {
       after: p(esc(tip), { muted: true }),
     },
     text: { before: [lead, rows.filter(([, v]) => v).map(([k, v]) => `${k}: ${plain(v)}`).join('\n'), `Message:\n${quoteText(message)}`], after: [tip] },
-    buttonUrl: mailto(email, `Re: ${clip(d.subject, 100) || 'Your message to Mayobe Bros'}`), buttonShown: email || '(no address)', buttonLabel: 'Reply to this message',
+    buttonUrl: mailto(email, `Re: ${clip(d.subject, 100) || 'Your message to Mayobe Bros'}`), buttonShown: email || '(no address)', buttonLabel: 'Reply to this message', signoff: false,
     why: 'You got this email because someone sent a message through the contact form on mayobebros.com.',
     links: [['Visit Mayobe Bros', `${origin}/`], ['Contact page', `${origin}/contact/`]],
   });
@@ -428,7 +440,7 @@ export function welcomeEmail(data, site) {
   const b = 'We write clear, honest guides on education, jobs, money and technology for readers in Tanzania.';
   const c = 'You can stop at any time with the unsubscribe link at the bottom of every email.';
   const list = posts.length
-    ? p('<strong>Recent articles</strong>', { mb: 8 }) + `<table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">`
+    ? eyebrow('Recent articles') + `<table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">`
       + posts.map((x) => `<tr><td class="mb-rule" style="padding:16px 0;border-top:1px solid ${L.rule};">`
         + `<p style="margin:0 0 8px;${SERIF}font-size:18px;line-height:1.4;">${link(x.url, esc(x.title))}</p>`
         + (x.excerpt ? p(esc(x.excerpt), { muted: true, size: 15, mb: 0 }) : '') + '</td></tr>').join('') + '</table>'
@@ -437,7 +449,7 @@ export function welcomeEmail(data, site) {
     site, subject: 'Welcome to the Mayobe Bros newsletter',
     preheader: 'You are now subscribed to Mayobe Bros. We will email you when a new article is published, and you can stop any time.',
     eyebrowText: 'Welcome', heading: H('You are subscribed', 'YOU ARE SUBSCRIBED'),
-    html: { before: p(esc(a)) + p(esc(b)) + list, after: p(esc(c), { muted: true }) },
+    html: { before: p(esc(a)) + p(esc(b), { mb: posts.length ? 32 : 16 }) + list, after: p(esc(c), { muted: true }) },
     text: { before: [a, b, posts.length ? 'Recent articles:\n\n' + posts.map((x) => `${plain(x.title)}\n${x.url}`).join('\n\n') : null], after: [c] },
     buttonUrl: `${origin}/post/`, buttonLabel: 'Read the latest articles',
     why: 'You got this email because you confirmed a subscription to new articles from mayobebros.com.',
@@ -462,7 +474,7 @@ export function newPostEmail(data, site) {
     preheader: pre.length >= 90 ? pre : 'A new article is on Mayobe Bros. Read the short summary here, then open the full article when you are ready.',
     eyebrowText: oneLine(post.category) ? `New article · ${clip(post.category, 40)}` : 'New article', heading: H(esc(title), plain(title)),
     html: {
-      before: (image ? `<img src="${esc(image)}" width="520" height="273" alt="${esc(clip(post.imageAlt, 200))}" style="display:block;border:0;width:100%;max-width:520px;height:auto;margin:0 0 24px;">` : '')
+      before: (image ? `<img src="${esc(image)}" width="520" height="273" alt="${esc(clip(post.imageAlt, 200))}" style="display:block;border:0;width:100%;height:auto;margin:0 0 24px;">` : '')
         + (excerpt ? p(esc(excerpt)) : ''),
       after: p(esc(c), { muted: true }),
     },
