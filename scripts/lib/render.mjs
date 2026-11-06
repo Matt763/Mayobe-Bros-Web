@@ -1077,7 +1077,8 @@ ${withIds.html}
   <p class="engage-note" role="status"></p>
 </section>
 <section class="comments" id="comments" data-comments data-slug="${p.slug}" aria-labelledby="comments-h">
-  <h2 id="comments-h">Comments <span class="count" data-comment-count>(0)</span></h2>
+  <h2 id="comments-h" tabindex="-1">Comments <span class="count" data-comment-count>(0)</span></h2>
+  <p class="sr-only" role="status" data-comment-live></p>
   <form class="comment-form" novalidate>
     <div class="form-row">
       <div class="field"><label for="cm-name">Name</label><input id="cm-name" name="name" type="text" maxlength="50" autocomplete="nickname" required placeholder="Your name"></div>

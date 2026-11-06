@@ -537,6 +537,22 @@ body.no-scroll { overflow: hidden; }
 .comment-body { margin-top: 0.3rem; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); font-size: 1.0625rem; line-height: 1.65; }
 .comment-reply { margin-top: 0.5rem; padding: 0.2rem 0; border: 0; background: none; color: var(--link); font-weight: 700; font-size: 0.9688rem; text-decoration: underline; text-underline-offset: 3px; }
 .comment-replies { grid-column: 1 / -1; display: grid; gap: 0.9rem; margin-left: clamp(0rem, 4vw, 3.4rem); padding-left: 1rem; border-left: 3px solid var(--line); }
+.comment-main { min-width: 0; }
+.comment-edited { font-size: 0.9375rem; color: var(--text-3); font-style: italic; }
+.comment-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 1rem; margin-top: 0.4rem; }
+.comment-tool { display: inline-flex; align-items: center; gap: 0.4rem; min-height: 1.75rem; min-width: 1.75rem; padding: 0.2rem 0; border: 0; background: none; color: var(--link); font: inherit; font-weight: 700; font-size: 0.9688rem; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.comment-tool svg { flex: none; }
+.comment-like { padding: 0.2rem 0.7rem; border: 2px solid var(--line); border-radius: 999px; text-decoration: none; }
+.comment-like.is-on { background: var(--btn-bg); border-color: var(--btn-bg); color: var(--btn-text); }
+.comment-like.is-on svg { fill: currentColor; }
+.comment-like-n { font-variant-numeric: tabular-nums; }
+.comment-edit { margin-top: 0.5rem; }
+.comment-edit .comment-actions, .comment-confirm .comment-actions { margin-top: 0.75rem; }
+.comment-confirm { margin-top: 0.6rem; padding: 0.9rem 1rem; border: 2px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.comment-confirm > p:first-child { font-weight: 700; color: var(--text); }
+.comment.is-deleted > .comment-main .comment-body { font-style: italic; color: var(--text-3); }
+.comment.is-deleted .avatar-gone { background: var(--line); }
+@media (pointer: coarse) { .comment-tool { min-height: 2.75rem; min-width: 2.75rem; padding-inline: 0.5rem; } .comment-like { padding-inline: 1rem; } }
 .comment-empty { padding: 1.5rem; text-align: center; color: var(--text-2); border: 2px dashed var(--line); border-radius: var(--radius); }
 
 /* ---------------------------------------------------------------- forms */

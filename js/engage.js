@@ -193,16 +193,167 @@
     return 'just now';
   }
   function hue(name) { var h = 0; for (var i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 360; return h; }
+
+  /* Comments this browser wrote: { "<id>": "<manage token>" }, at most 60 (the lowest ids, the oldest, are dropped).
+     The token is the only proof of ownership. It stays in this browser, goes only in a request body, and is never shown or logged. */
+  var OWN_KEY = 'mb_own', OWN_MAX = 60, EDIT_MS = 30 * 60000;
+  function ownAll() {
+    var o = null;
+    try { o = JSON.parse(store(OWN_KEY) || 'null'); } catch (e) { o = null; }
+    return o && typeof o === 'object' && !Array.isArray(o) ? o : {};
+  }
+  function ownGet(id) { var t = ownAll()[String(id)]; return typeof t === 'string' && /^[A-Za-z0-9_-]{32,64}$/.test(t) ? t : null; }
+  function ownSave(o) { store(OWN_KEY, JSON.stringify(o)); }
+  function ownSet(id, token) {
+    if (id == null || typeof token !== 'string') return;
+    var o = ownAll();
+    o[String(id)] = token;
+    var keys = Object.keys(o).sort(function (a, b) { return Number(a) - Number(b); });
+    while (keys.length > OWN_MAX) delete o[keys.shift()];
+    ownSave(o);
+  }
+  function ownDrop(id) { var o = ownAll(); if (String(id) in o) { delete o[String(id)]; ownSave(o); } }
+  // one polite message for screen readers about what a comment button just did
+  function liveSay(text) {
+    var n = $('[data-comment-live]', cbox);
+    if (!n) return;
+    n.textContent = '';
+    setTimeout(function () { n.textContent = text; }, 60);
+  }
+  var likedIds = {}, likePending = {};
+  var HEART = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/></svg>';
+  function tool(cls, text) { var b = el('button', 'comment-tool ' + cls, text); b.type = 'button'; return b; }
+  function paintLike(btn, c) {
+    var on = !!likedIds[c.id], n = c.likes || 0;
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    btn.setAttribute('aria-label', 'Like this comment, ' + plural(n, 'like', 'likes'));
+    btn.classList.toggle('is-on', on);
+    btn.textContent = '';
+    btn.insertAdjacentHTML('afterbegin', HEART);
+    btn.appendChild(el('span', 'comment-like-text', on ? 'Liked' : 'Like'));
+    if (n > 0) btn.appendChild(el('span', 'comment-like-n', String(n)));
+  }
+  function toggleLike(c, btn) {
+    if (likePending[c.id]) return; // one request per comment at a time
+    likePending[c.id] = true;
+    var want = !likedIds[c.id], was = !want, wasN = c.likes || 0;
+    likedIds[c.id] = want; c.likes = Math.max(0, wasN + (want ? 1 : -1));
+    paintLike(btn, c);
+    post('/comments/' + c.id + '/like', { cid: cid(), on: want }).then(function (j) {
+      if (j && typeof j.likes === 'number') c.likes = j.likes;
+      if (j && typeof j.liked === 'boolean') likedIds[c.id] = j.liked;
+      paintLike(btn, c);
+    }).catch(function (err) {
+      likedIds[c.id] = was; c.likes = wasN;
+      paintLike(btn, c);
+      liveSay(err.message || 'Your like could not be saved. Please try again.');
+    }).then(function () { delete likePending[c.id]; });
+  }
+  function focusAfter(id, sel) {
+    var n = doc.getElementById('comment-' + id);
+    if (!n) { var h = doc.getElementById('comments-h'); if (h) h.focus(); return; }
+    var b = sel ? $(sel, n) : null;
+    (b || n).focus({ preventScroll: false });
+  }
+  function startEdit(c, node) {
+    var main = $('.comment-main', node), body = $('.comment-body', main), tools = $('.comment-tools', main);
+    if ($('.comment-edit', main)) return;
+    var box = el('div', 'comment-edit field');
+    var lab = el('label', null, 'Edit your comment'); lab.setAttribute('for', 'ce-' + c.id);
+    var ta = el('textarea'); ta.id = 'ce-' + c.id; ta.maxLength = 1500; ta.rows = 4; ta.value = c.body;
+    var row = el('div', 'comment-actions');
+    var save = el('button', 'btn btn-primary', 'Save'); save.type = 'button';
+    var cancel = el('button', 'btn btn-outline', 'Cancel'); cancel.type = 'button';
+    var st = el('p', 'form-status'); st.setAttribute('role', 'status');
+    row.appendChild(save); row.appendChild(cancel);
+    box.appendChild(lab); box.appendChild(ta); box.appendChild(row); box.appendChild(st);
+    body.hidden = true; tools.hidden = true;
+    main.insertBefore(box, tools);
+    ta.focus();
+    function close() { box.remove(); body.hidden = false; tools.hidden = false; }
+    function back() { close(); focusAfter(c.id, '.comment-edit-btn'); }
+    cancel.addEventListener('click', back);
+    box.addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.preventDefault(); back(); } });
+    save.addEventListener('click', function () {
+      var text = ta.value.trim();
+      if (text.length < 3) { st.className = 'form-status is-err'; st.textContent = 'Please write your comment.'; ta.focus(); return; }
+      if (/(https?:\/\/|www\.)/i.test(text)) { st.className = 'form-status is-err'; st.textContent = 'Links are not allowed in comments.'; ta.focus(); return; }
+      var token = ownGet(c.id);
+      if (!token) { st.className = 'form-status is-err'; st.textContent = 'This browser can no longer edit this comment.'; return; }
+      save.disabled = true; cancel.disabled = true;
+      st.className = 'form-status'; st.textContent = 'Saving…';
+      post('/comments/' + c.id + '/edit', { token: token, body: text }).then(function (j) {
+        if (j && j.status === 'pending') {
+          // hidden until approved: say so in place of the comment, because the comment is no longer in the public list
+          var msg = 'Your edit needs a quick check by our team. The comment is hidden until it is approved.';
+          close();
+          body.hidden = true; tools.hidden = true;
+          var note = el('p', 'form-status is-ok', msg);
+          main.insertBefore(note, tools);
+          node.tabIndex = -1; node.focus();
+          liveSay(msg);
+          return;
+        }
+        liveSay('Comment updated.');
+        return refresh().then(function () { focusAfter(c.id, '.comment-edit-btn'); });
+      }).catch(function (err) {
+        if (err.status === 404) ownDrop(c.id);
+        st.className = 'form-status is-err'; st.textContent = err.message;
+        save.disabled = false; cancel.disabled = false;
+        ta.focus();
+      });
+    });
+  }
+  function askDelete(c, node) {
+    var main = $('.comment-main', node);
+    if ($('.comment-confirm', main)) return;
+    var tools = $('.comment-tools', main);
+    var box = el('div', 'comment-confirm');
+    box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Delete this comment?');
+    var q = el('p', null, 'Delete this comment? It cannot be undone.');
+    var row = el('div', 'comment-actions');
+    var yes = el('button', 'btn btn-outline', 'Delete'); yes.type = 'button';
+    var keep = el('button', 'btn btn-primary', 'Keep it'); keep.type = 'button';
+    var st = el('p', 'form-status'); st.setAttribute('role', 'status');
+    row.appendChild(yes); row.appendChild(keep);
+    box.appendChild(q); box.appendChild(row); box.appendChild(st);
+    main.insertBefore(box, tools.nextSibling);
+    keep.focus();
+    function back() { box.remove(); focusAfter(c.id, '.comment-delete-btn'); }
+    keep.addEventListener('click', back);
+    box.addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.preventDefault(); back(); } });
+    yes.addEventListener('click', function () {
+      var token = ownGet(c.id);
+      if (!token) { st.className = 'form-status is-err'; st.textContent = 'This browser can no longer delete this comment.'; return; }
+      yes.disabled = true; keep.disabled = true;
+      st.className = 'form-status'; st.textContent = 'Deleting…';
+      post('/comments/' + c.id + '/delete', { token: token }).then(function () {
+        ownDrop(c.id);
+        try { sessionStorage.removeItem('mb_stats'); } catch (e) {}
+        liveSay('Comment deleted.');
+        return refresh().then(function () { var h = doc.getElementById('comments-h'); if (h) h.focus(); });
+      }).catch(function (err) {
+        if (err.status === 404) ownDrop(c.id);
+        st.className = 'form-status is-err'; st.textContent = err.message;
+        yes.disabled = false; keep.disabled = false;
+        keep.focus();
+      });
+    });
+  }
   function commentNode(c, canReply) {
     var wrap = el('article', 'comment');
     wrap.id = 'comment-' + c.id;
-    var av = el('span', 'avatar', c.team ? '' : (c.name[0] || '?').toUpperCase());
+    wrap.tabIndex = -1; // so focus can return to the comment itself when a button is gone
+    var gone = !!c.deleted;
+    if (gone) wrap.classList.add('is-deleted');
+    var av = el('span', 'avatar', c.team || gone ? '' : (c.name[0] || '?').toUpperCase());
     if (c.team) { var logo = el('img', 'avatar-logo'); logo.src = '/assets/img/icon-192.png'; logo.alt = ''; logo.width = 96; logo.height = 96; av.appendChild(logo); }
+    else if (gone) { av.classList.add('avatar-gone'); }
     else { av.style.background = 'hsl(' + hue(c.name) + ' 55% 22%)'; av.style.color = '#fff'; }
     av.setAttribute('aria-hidden', 'true');
-    var main = el('div');
+    var main = el('div', 'comment-main');
     var head = el('div', 'comment-head');
-    head.appendChild(el('span', 'comment-name', c.name));
+    if (!gone) head.appendChild(el('span', 'comment-name', c.name));
     if (c.team) {
       var badge = el('span', 'team-badge');
       badge.title = 'Written by the Mayobe Bros team';
@@ -214,13 +365,32 @@
     var t = el('time', 'comment-time', ago(c.at));
     t.setAttribute('datetime', new Date(c.at).toISOString());
     head.appendChild(t);
+    if (c.edited && !gone) { var ed = el('span', 'comment-edited', 'edited'); ed.title = 'Edited ' + ago(c.edited); head.appendChild(ed); }
     main.appendChild(head);
     main.appendChild(el('p', 'comment-body', c.body)); // text only, never HTML
-    if (canReply) {
-      var r = el('button', 'comment-reply', 'Reply');
-      r.type = 'button';
-      r.addEventListener('click', function () { startReply(c); });
-      main.appendChild(r);
+    var hasReplies = !!(c.replies && c.replies.length);
+    if (!gone) {
+      var tools = el('div', 'comment-tools');
+      var lk = tool('comment-like', '');
+      paintLike(lk, c);
+      lk.addEventListener('click', function () { toggleLike(c, lk); });
+      tools.appendChild(lk);
+      if (canReply) {
+        var r = tool('comment-reply-btn', 'Reply');
+        r.addEventListener('click', function () { startReply(c); });
+        tools.appendChild(r);
+      }
+      if (!c.team && ownGet(c.id)) {
+        if (!hasReplies && Date.now() - c.at < EDIT_MS) {
+          var eb = tool('comment-edit-btn', 'Edit');
+          eb.addEventListener('click', function () { startEdit(c, wrap); });
+          tools.appendChild(eb);
+        }
+        var db = tool('comment-delete-btn', 'Delete');
+        db.addEventListener('click', function () { askDelete(c, wrap); });
+        tools.appendChild(db);
+      }
+      main.appendChild(tools);
     }
     wrap.appendChild(av);
     wrap.appendChild(main);
@@ -257,7 +427,9 @@
     form.elements.body.focus({ preventScroll: true });
   }
   function refresh() {
-    return call('/posts/' + slug).then(function (j) {
+    return call('/posts/' + slug + '?cid=' + encodeURIComponent(cid())).then(function (j) {
+      likedIds = {};
+      (j.liked || []).forEach(function (id) { likedIds[id] = true; });
       showStats(j.stats);
       renderComments(j.comments);
     }).catch(function () {
@@ -295,6 +467,7 @@
       setStatus('', 'Sending…');
       post('/posts/' + slug + '/comments', payload).then(function (j) {
         try { sessionStorage.removeItem('mb_stats'); } catch (e) {}
+        if (j && j.id != null && j.token) ownSet(j.id, j.token); // lets this browser edit or delete the comment later
         f.body.value = ''; f.parent.value = ''; $('[data-cancel-reply]', form).hidden = true;
         if (j && j.status === 'approved' && j.comment) {
           setStatus('is-ok', 'Thank you! Your comment is now live.');

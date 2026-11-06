@@ -55,3 +55,18 @@ test('every ## and ### heading of a post is linked from its table of contents', 
     }
   }
 });
+
+// The comment buttons (like, edit, delete) tell screen-reader users what happened through one polite live region,
+// and move focus to the comments heading after a delete, so both must be in the page.
+test('pages with comments have a live region and a focusable comments heading', () => {
+  let checked = 0;
+  for (const file of postPages()) {
+    const html = fs.readFileSync(file, 'utf8');
+    if (!html.includes('data-comments')) continue;
+    const rel = path.relative(ROOT, file);
+    assert.ok(html.includes('data-comment-live'), `${rel}: no data-comment-live region`);
+    assert.match(html, /<h2 id="comments-h" tabindex="-1">/, `${rel}: the comments heading must have tabindex="-1"`);
+    checked++;
+  }
+  assert.ok(checked > 0, 'no built post page has comments: run node scripts/build.mjs');
+});
