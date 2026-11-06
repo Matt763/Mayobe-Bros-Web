@@ -692,3 +692,96 @@ test('delete: two deletes at once lower the count only once', async () => {
   assert.equal(statCount(), 1);
   assert.equal(statCount(), approvedCount());
 });
+
+/* ---------------------------------------------------------------- admin actions: races and tombstones */
+// Runs `fn` right after the admin route has read the comment, before it writes.
+function afterAdminRead(fn) {
+  let ran = false;
+  const real = env.DB;
+  const wrap = (st, sql) => ({
+    bind: (...a) => wrap(st.bind(...a), sql),
+    first: async () => { const r = await st.first(); if (!ran && sql.startsWith('SELECT id, slug, parent_id, status FROM comments')) { ran = true; fn(); } return r; },
+    all: () => st.all(), run: () => st.run(), _exec: () => st._exec(),
+  });
+  env.DB = { ...real, prepare: (sql) => wrap(real.prepare(sql), sql), batch: (l) => real.batch(l) };
+}
+
+test('admin approve: an owner delete between the read and the write leaves no row and no extra count', async () => {
+  const held = await mk({ body: RUDE });
+  assert.equal(held.status, 'pending');
+  afterAdminRead(() => env.DB.raw.prepare('DELETE FROM comments WHERE id = ?').run(held.id));
+  const r = await admin(held.id, 'approve');
+  assert.equal(r.status, 404);
+  assert.equal(rawRow(held.id), undefined);
+  assert.equal(statCount(), 0);
+  assert.equal(statCount(), approvedCount());
+});
+
+test('admin spam and delete: an owner delete between the read and the write does not subtract twice', async () => {
+  for (const action of ['spam', 'delete']) {
+    env = { DB: makeD1(), ADMIN_TOKEN: 'a-very-long-admin-token-123', SITE_ORIGIN: ORIGIN };
+    const a = await mk();
+    await mk({ body: 'Another approved one', cid: CID2 }, '2.2.2.2');
+    assert.equal(statCount(), 2);
+    afterAdminRead(() => env.DB.raw.exec(`DELETE FROM comments WHERE id = ${a.id}; UPDATE post_stats SET comments = comments - 1 WHERE slug = 'hello-post'`)); // what the owner delete does
+    const r = await admin(a.id, action);
+    assert.equal(r.status, 200);
+    assert.equal(statCount(), 1, `${action}: the other comment is still counted`);
+    assert.equal(statCount(), approvedCount());
+  }
+});
+
+test('admin spam and delete count each approved comment in the thread exactly once', async () => {
+  for (const action of ['spam', 'delete']) {
+    env = { DB: makeD1(), ADMIN_TOKEN: 'a-very-long-admin-token-123', SITE_ORIGIN: ORIGIN };
+    const a = await mk();
+    await reply2(a.id);
+    await mk({ body: 'Unrelated approved one', cid: 'other-other-other-other' }, '4.4.4.4');
+    assert.equal(statCount(), 3);
+    assert.equal((await admin(a.id, action)).json.stats.c, 1, action);
+    assert.equal(statCount(), approvedCount());
+  }
+});
+
+test('admin spam on a tombstone leaves it deleted (and removes it once it is an orphan); approve then refuses it', async () => {
+  const a = await mk();
+  await reply2(a.id);
+  await del(a.id, a.token);
+  assert.equal(rawRow(a.id).status, 'deleted');
+  const r = await admin(a.id, 'spam');
+  assert.equal(r.status, 200);
+  assert.equal(rawRow(a.id), undefined, 'the reply was hidden, so the tombstone has no reason to stay');
+  assert.equal(statCount(), 0);
+  // a tombstone that still has a live reply stays deleted when only the tombstone is acted on by approve
+  const b = await mk({ body: 'Second thread here', cid: 'second-second-second1' }, '5.5.5.5');
+  await reply2(b.id, { cid: 'replier-replier-replier' }, '6.6.6.6'); // a new visitor: CID2 was just marked as spam
+  await del(b.id, b.token, { ip: '5.5.5.5' });
+  const ap = await admin(b.id, 'approve');
+  assert.equal(ap.status, 409);
+  assert.equal(rawRow(b.id).status, 'deleted');
+  assert.equal(rawRow(b.id).body, '');
+  assert.equal(statCount(), 1);
+});
+
+test('admin delete of a tombstone removes it and its replies; delete also removes the like rows', async () => {
+  const a = await mk();
+  const rep = await reply2(a.id);
+  const lk = env.DB.raw.prepare('INSERT INTO comment_likes(comment_id, voter, created) VALUES(?, ?, 1)');
+  lk.run(a.id, 'voter-one-voter-one'); lk.run(rep.id, 'voter-two-voter-two');
+  const other = await mk({ body: 'Unrelated approved one', cid: 'other-other-other-other' }, '4.4.4.4');
+  lk.run(other.id, 'voter-one-voter-one');
+  await del(a.id, a.token); // tombstone: its own likes go already
+  const r = await admin(a.id, 'delete');
+  assert.equal(r.status, 200);
+  assert.equal(rawRow(a.id), undefined);
+  assert.equal(rawRow(rep.id), undefined);
+  const left = env.DB.raw.prepare('SELECT comment_id FROM comment_likes').all().map((x) => x.comment_id);
+  assert.deepEqual(left, [other.id], 'only the unrelated comment keeps its like');
+  assert.equal(statCount(), 1);
+  // a live comment with a reply: both comments' likes go
+  const b = await mk({ body: 'Third thread here', cid: 'third-third-third-third' }, '7.7.7.7');
+  const rb = await reply2(b.id, {}, '8.8.8.8');
+  lk.run(b.id, 'voter-three-voter-3'); lk.run(rb.id, 'voter-four-voter-44');
+  await admin(b.id, 'delete');
+  assert.deepEqual(env.DB.raw.prepare('SELECT comment_id FROM comment_likes').all().map((x) => x.comment_id), [other.id]);
+});

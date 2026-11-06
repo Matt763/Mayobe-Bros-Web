@@ -373,25 +373,33 @@ async function handle(request, env, ctx) {
       const b = await readJson(request);
       const row = await env.DB.prepare('SELECT id, slug, parent_id, status FROM comments WHERE id = ?').bind(id).first();
       if (!row) return fail('No such comment.', 404, cors);
-      const bump = (slug, d) => env.DB.prepare('UPDATE post_stats SET comments = MAX(0, comments + ?) WHERE slug = ?').bind(d, slug);
+      // Every write below only touches rows that are still in the state it expects, and the count moves by the number of rows that really
+      // changed (changes() of the statement just before), so a request that races with an owner delete cannot count twice.
+      const minusChanged = env.DB.prepare('UPDATE post_stats SET comments = MAX(0, comments - changes()) WHERE slug = ? AND changes() > 0').bind(row.slug);
       if (b.action === 'approve') {
         if (row.status === 'deleted') return fail('That comment was deleted by its author and cannot be approved.', 409, cors);
-        const st = [env.DB.prepare("UPDATE comments SET status = 'approved' WHERE id = ?").bind(id)];
-        if (row.status !== 'approved') st.push(bump(row.slug, 1));
-        await env.DB.batch(st);
+        if (row.status !== 'approved') {
+          const done = await env.DB.batch([
+            env.DB.prepare("UPDATE comments SET status = 'approved' WHERE id = ? AND status = ? AND status IN ('pending', 'spam') RETURNING id").bind(id, row.status),
+            env.DB.prepare('UPDATE post_stats SET comments = comments + 1 WHERE slug = ? AND changes() > 0').bind(row.slug), // must stay right after the row statement
+          ]);
+          if (!(done[0]?.results || []).length) return fail('No such comment.', 404, cors); // it changed or was deleted while we looked
+        }
       } else if (b.action === 'spam') {
-        const gone = (await env.DB.prepare("SELECT COUNT(*) AS n FROM comments WHERE (id = ? OR parent_id = ?) AND status = 'approved'").bind(id, id).first())?.n || 0;
-        const st = [];
-        if (gone) st.push(bump(row.slug, -gone));
-        st.push(env.DB.prepare("UPDATE comments SET status = 'spam' WHERE id = ? OR parent_id = ?").bind(id, id));
-        await env.DB.batch(st);
+        await env.DB.batch([
+          env.DB.prepare("UPDATE comments SET status = 'spam' WHERE (id = ? OR parent_id = ?) AND status = 'approved'").bind(id, id),
+          minusChanged,
+          env.DB.prepare("UPDATE comments SET status = 'spam' WHERE (id = ? OR parent_id = ?) AND status NOT IN ('approved', 'spam', 'deleted')").bind(id, id), // a tombstone stays a tombstone
+        ]);
+        await purgeIfOrphan(env, row.id); // a tombstone whose replies were just hidden
         await purgeIfOrphan(env, row.parent_id);
       } else if (b.action === 'delete') {
-        const gone = (await env.DB.prepare("SELECT COUNT(*) AS n FROM comments WHERE (id = ? OR parent_id = ?) AND status = 'approved'").bind(id, id).first())?.n || 0;
-        const st = [];
-        if (gone) st.push(bump(row.slug, -gone));
-        st.push(env.DB.prepare('DELETE FROM comments WHERE id = ? OR parent_id = ?').bind(id, id));
-        await env.DB.batch(st);
+        await env.DB.batch([
+          env.DB.prepare('DELETE FROM comment_likes WHERE comment_id IN (SELECT id FROM comments WHERE id = ? OR parent_id = ?)').bind(id, id),
+          env.DB.prepare("DELETE FROM comments WHERE (id = ? OR parent_id = ?) AND status = 'approved'").bind(id, id),
+          minusChanged,
+          env.DB.prepare('DELETE FROM comments WHERE id = ? OR parent_id = ?').bind(id, id),
+        ]);
         await purgeIfOrphan(env, row.parent_id);
       } else return fail('Unknown action.', 400, cors);
       return reply({ ok: true, stats: await getStats(env, row.slug) }, 200, cors);
