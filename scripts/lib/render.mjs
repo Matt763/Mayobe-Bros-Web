@@ -783,11 +783,10 @@ ${discover()}`;
   }
 
   /* ------------------------------------------------------------ authors */
-  const initials = (name) => { const w = String(name).trim().split(/\s+/).filter(Boolean); return (((w[0] || '')[0] || '') + (w.length > 1 ? w[w.length - 1][0] : '')).toUpperCase(); };
-  // The round portrait: the real photo when the author has one ("photo" in site.config.json), otherwise their initials. Never a stock or generated face.
+  // The round portrait: the real photo when the author has one ("photo" in site.config.json), otherwise a faceless black silhouette (man or woman, from "gender" in site.config.json). Never a stock or generated face.
   const authorAvatar = (a, cls = '') => `<span class="ap-ring${cls ? ' ' + cls : ''}">${a.photo
     ? `<img class="ap-avatar ap-photo" src="${resolveImage(a.photo)}" alt="${e(a.photoAlt || `Portrait of ${a.name}`)}" width="256" height="256" decoding="async">`
-    : `<span class="ap-avatar" aria-hidden="true">${e(initials(a.name))}</span>`}</span>`;
+    : `<img class="ap-avatar ap-photo ap-default" src="${u(a.gender === 'female' ? '/assets/img/avatar-woman.svg' : '/assets/img/avatar-man.svg')}" alt="" width="256" height="256" decoding="async">`}</span>`;
   const SOCIAL_LABEL = { facebook: 'Facebook', twitter: 'X', instagram: 'Instagram', linkedin: 'LinkedIn' };
   const authorSocials = (a) => Object.keys(SOCIAL_LABEL).map((k) => [k, String((a.social || {})[k] || '').trim()]).filter(([, v]) => /^https?:\/\//i.test(v));
   const listText = (items) => (items.length > 1 ? `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}` : items[0] || '');

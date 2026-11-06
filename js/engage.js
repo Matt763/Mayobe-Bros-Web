@@ -196,9 +196,9 @@
   function commentNode(c, canReply) {
     var wrap = el('article', 'comment');
     wrap.id = 'comment-' + c.id;
-    var av = el('span', 'avatar', (c.name[0] || '?').toUpperCase());
-    av.style.background = 'hsl(' + hue(c.name) + ' 55% 22%)';
-    av.style.color = '#fff';
+    var av = el('span', 'avatar', c.team ? '' : (c.name[0] || '?').toUpperCase());
+    if (c.team) { var logo = el('img', 'avatar-logo'); logo.src = '/assets/img/icon-192.png'; logo.alt = ''; logo.width = 96; logo.height = 96; av.appendChild(logo); }
+    else { av.style.background = 'hsl(' + hue(c.name) + ' 55% 22%)'; av.style.color = '#fff'; }
     av.setAttribute('aria-hidden', 'true');
     var main = el('div');
     var head = el('div', 'comment-head');

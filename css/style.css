@@ -530,7 +530,8 @@ body.no-scroll { overflow: hidden; }
 .comment-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2rem 0.75rem; }
 .comment-name { font-weight: 800; }
 .team-badge { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.12rem 0.6rem 0.12rem 0.45rem; border-radius: 999px; background: var(--btn-bg); color: var(--btn-text); font-size: 0.8125rem; font-weight: 700; line-height: 1.4; letter-spacing: 0.02em; align-self: center; }
-.comment.is-team .avatar { background: var(--btn-bg) !important; color: var(--btn-text) !important; box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--gold); }
+.avatar-logo { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
+.comment.is-team .avatar { background: #fff !important; overflow: hidden; box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--gold); }
 .comment-time { font-size: 0.9375rem; color: var(--text-3); }
 .comment-body { margin-top: 0.3rem; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); font-size: 1.0625rem; line-height: 1.65; }
 .comment-reply { margin-top: 0.5rem; padding: 0.2rem 0; border: 0; background: none; color: var(--link); font-weight: 700; font-size: 0.9688rem; text-decoration: underline; text-underline-offset: 3px; }
