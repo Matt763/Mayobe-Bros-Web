@@ -274,3 +274,149 @@ test('bad JSON and oversize bodies', async () => {
   const big = await worker.fetch(new Request('https://api.test/v1/posts/hello-post/react', { method: 'POST', headers: { Origin: ORIGIN }, body: JSON.stringify({ x: 'y'.repeat(5000) }) }), env, { waitUntil() {} });
   assert.equal(big.status, 413);
 });
+
+/* ---------------------------------------------------------------- edit endpoint */
+const mk = async (over = {}, ip = '1.1.1.1') => (await call('POST', '/v1/posts/hello-post/comments', { body: comment(over), ip })).json;
+const edit = (id, token, body, opts = {}) => call('POST', `/v1/comments/${id}/edit`, { body: { token, body }, ...opts });
+const rawRow = (id) => env.DB.raw.prepare('SELECT * FROM comments WHERE id = ?').get(id);
+
+test('edit: owner can change an approved comment within 30 minutes', async () => {
+  const a = await mk();
+  const before = (await call('GET', '/v1/stats?slugs=hello-post')).json['hello-post'].c;
+  const r = await edit(a.id, a.token, 'Thanks, this helped me even more.');
+  assert.equal(r.status, 200);
+  assert.equal(r.json.ok, true);
+  assert.equal(r.json.status, 'approved');
+  assert.equal(r.json.comment.id, a.id);
+  assert.equal(r.json.comment.body, 'Thanks, this helped me even more.');
+  assert.equal(typeof r.json.comment.edited, 'number');
+  assert.equal(r.json.stats.c, before);
+  const pub = (await call('GET', '/v1/posts/hello-post')).json.comments[0];
+  assert.equal(pub.body, 'Thanks, this helped me even more.');
+  assert.equal(typeof pub.edited, 'number');
+  assert.equal(rawRow(a.id).prev_body, 'Thanks, this helped me a lot.');
+  assert.equal(JSON.stringify(r.json).includes('prev_body'), false);
+});
+
+test("edit: wrong token, other comment's token, unknown id and junk all give the same 404", async () => {
+  const a = await mk();
+  const b = await mk({ body: 'A second comment here', cid: CID2 }, '2.2.2.2');
+  const bodies = new Set();
+  for (const tok of ['x'.repeat(32), b.token, '', '💥', null, 12345, { a: 1 }]) {
+    const r = await edit(a.id, tok, 'Changed text that is fine');
+    assert.equal(r.status, 404, String(tok));
+    bodies.add(JSON.stringify(r.json));
+  }
+  for (const id of [999, 0]) {
+    const r = await edit(id, a.token, 'Changed text that is fine');
+    assert.equal(r.status, 404, String(id));
+    bodies.add(JSON.stringify(r.json));
+  }
+  assert.equal(bodies.size, 1, 'every probe gets the identical answer');
+  // an oversize token is refused before it is read, never a 500
+  const big = await edit(a.id, 'x'.repeat(10000), 'Changed text that is fine');
+  assert.ok([400, 413].includes(big.status), String(big.status));
+  // non-numeric and negative ids fall through to the generic 404
+  for (const id of ['abc', '-1', encodeURIComponent('1; DROP')]) assert.equal((await edit(id, a.token, 'Changed text that is fine')).status, 404, id);
+  // nothing was written by any of it
+  assert.equal(rawRow(a.id).prev_body, null);
+  assert.equal(rawRow(a.id).edited_at, null);
+  // a missing token key, and a body that is not an object
+  assert.equal((await call('POST', `/v1/comments/${a.id}/edit`, { body: { body: 'Changed text that is fine' } })).status, 404);
+});
+
+test('edit: refused after 30 minutes, with a reply, with a pending reply, and on a held comment', async () => {
+  const old = await mk();
+  env.DB.raw.exec('UPDATE comments SET created = created - 1860000 WHERE id = ' + old.id);
+  const late = await edit(old.id, old.token, 'Too late to change this');
+  assert.equal(late.status, 409);
+  assert.equal(late.json.error, 'The 30 minutes for editing have passed.');
+
+  const p = await mk({ body: 'A parent comment here', cid: CID2 }, '2.2.2.2');
+  await mk({ body: 'A reply to it here', parent: p.id, cid: 'qqqqqqqqqqqqqqqqqq56' }, '3.3.3.3');
+  const withReply = await edit(p.id, p.token, 'Changing after a reply');
+  assert.equal(withReply.status, 409);
+  assert.equal(withReply.json.error, 'This comment has a reply, so it can no longer be edited.');
+
+  const p2 = await mk({ body: 'Another parent comment', cid: 'wwwwwwwwwwwwwwwwww78' }, '4.4.4.4');
+  const rep = await mk({ body: 'A reply that is held', parent: p2.id, cid: 'eeeeeeeeeeeeeeeeee90' }, '5.5.5.5');
+  env.DB.raw.exec("UPDATE comments SET status = 'pending' WHERE id = " + rep.id);
+  assert.equal((await edit(p2.id, p2.token, 'Changing after pending reply')).status, 409);
+
+  const held = await mk({ body: RUDE, cid: 'rrrrrrrrrrrrrrrrrr12' }, '6.6.6.6');
+  const h = await edit(held.id, held.token, 'Now I am polite and calm');
+  assert.equal(h.status, 409);
+  assert.equal(h.json.error, 'This comment is waiting for review, so it cannot be edited. You can still delete it.');
+});
+
+test('edit: the screen runs again and a flagged edit is held', async () => {
+  const a = await mk();
+  assert.equal((await call('GET', '/v1/stats?slugs=hello-post')).json['hello-post'].c, 1);
+  const r = await edit(a.id, a.token, RUDE);
+  assert.equal(r.status, 200);
+  assert.equal(r.json.status, 'pending');
+  assert.equal(r.json.stats.c, 0);
+  assert.equal((await call('GET', '/v1/posts/hello-post')).json.comments.length, 0);
+  const list = (await call('GET', '/v1/admin/comments', { auth: env.ADMIN_TOKEN, origin: null })).json.comments;
+  assert.equal(list.length, 1);
+  assert.match(list[0].flag, /word:/);
+  assert.equal(list[0].prev_body, 'Thanks, this helped me a lot.');
+  const ok = await call('POST', `/v1/admin/comments/${a.id}`, { auth: env.ADMIN_TOKEN, origin: null, body: { action: 'approve' } });
+  assert.equal(ok.json.stats.c, 1);
+});
+
+test('edit: links and short text are refused; an unchanged or whitespace-only change is a no-op', async () => {
+  const a = await mk();
+  assert.equal((await edit(a.id, a.token, 'see www.x.com')).status, 400);
+  assert.equal((await edit(a.id, a.token, 'ok')).status, 400);
+  assert.equal((await edit(a.id, a.token, 'x'.repeat(1501))).status, 400);
+  for (const text of ['Thanks, this helped me a lot.', '  Thanks, this helped me a lot.\r\n\r\n\r\n  ', '   ']) {
+    const r = await edit(a.id, a.token, text);
+    if (text.trim()) {
+      assert.equal(r.status, 200);
+      assert.equal(r.json.status, 'approved');
+      assert.equal(r.json.comment.body, 'Thanks, this helped me a lot.');
+    } else assert.equal(r.status, 400, 'whitespace only is too short');
+    const row = rawRow(a.id);
+    assert.equal(row.edited_at, null);
+    assert.equal(row.prev_body, null);
+  }
+});
+
+test('edit: needs our Origin and is rate limited', async () => {
+  assert.equal((await edit(1, 'x'.repeat(32), 'Some new text', { origin: null })).status, 403);
+  const made = [];
+  for (let i = 0; i < 3; i++) made.push(await mk({ body: `Comment number ${i} here`, cid: `cid${i}cid${i}cid${i}cid${i}` }, `10.0.0.${i}`));
+  let last;
+  for (let i = 0; i < 20; i++) {
+    last = await edit(made[i % 3].id, made[i % 3].token, `Edited text number ${i} ok`, { ip: '9.9.9.9' });
+    assert.equal(last.status, 200, `edit ${i + 1}`);
+  }
+  const over = await edit(made[0].id, made[0].token, 'The twenty-first edit', { ip: '9.9.9.9' });
+  assert.equal(over.status, 429);
+});
+
+test('edit: the per-comment limit stops the 11th edit of one comment', async () => {
+  const a = await mk();
+  for (let i = 0; i < 10; i++) assert.equal((await edit(a.id, a.token, `Edit number ${i} text`, { ip: `8.8.8.${i}` })).status, 200, `edit ${i + 1}`);
+  assert.equal((await edit(a.id, a.token, 'Edit number eleven', { ip: '8.8.8.99' })).status, 429);
+});
+
+test('edit: AUTO_APPROVE=false holds every edit', async () => {
+  const a = await mk();
+  env.AUTO_APPROVE = 'false';
+  const r = await edit(a.id, a.token, 'A perfectly clean edit');
+  assert.equal(r.json.status, 'pending');
+  assert.match((await call('GET', '/v1/admin/comments', { auth: env.ADMIN_TOKEN, origin: null })).json.comments[0].flag, /auto-approve-off/);
+});
+
+test('edit: a visitor with an earlier spam comment is held', async () => {
+  const bad = await mk({ body: 'Buy my stuff now please', cid: CID2 }, '2.2.2.2');
+  await call('POST', `/v1/admin/comments/${bad.id}`, { auth: env.ADMIN_TOKEN, origin: null, body: { action: 'spam' } });
+  const a = await mk({ body: 'A normal comment here' }, '7.7.7.7');
+  assert.equal(a.status, 'approved');
+  env.DB.raw.exec("UPDATE comments SET cid = '" + CID2 + "' WHERE id = " + a.id); // same visitor as the spam comment
+  const r = await edit(a.id, a.token, 'A normal edited comment');
+  assert.equal(r.json.status, 'pending');
+  assert.match((await call('GET', '/v1/admin/comments', { auth: env.ADMIN_TOKEN, origin: null })).json.comments[0].flag, /earlier-spam/);
+});

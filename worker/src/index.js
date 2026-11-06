@@ -75,7 +75,7 @@ async function ownerRow(env, id, token) {
   const given = typeof token === 'string' ? token : '';
   const givenHash = await sha(given);
   const row = Number.isInteger(id) && id > 0
-    ? await env.DB.prepare('SELECT id, slug, parent_id, status, created, body, cid, ip_hash, name, manage_hash FROM comments WHERE id = ?').bind(id).first()
+    ? await env.DB.prepare('SELECT id, slug, parent_id, status, created, body, cid, ip_hash, name, edited_at, manage_hash FROM comments WHERE id = ?').bind(id).first()
     : null;
   const match = same(givenHash, row?.manage_hash || '0'.repeat(64)); // a comment with no hash (older, or from the team) is compared with zeros and never matches
   if (!row || !row.manage_hash || !match || !TOKEN_RE.test(given) || !['approved', 'pending'].includes(row.status)) return null;
@@ -85,6 +85,17 @@ async function ownerRow(env, id, token) {
 // A reply counts when it is approved or still waiting for review.
 async function hasReplies(env, id) {
   return !!(await env.DB.prepare("SELECT 1 AS ok FROM comments WHERE parent_id = ? AND status IN ('approved', 'pending') LIMIT 1").bind(id).first());
+}
+// Cleans a comment's name and text the way they are stored, and checks length and links. Shared by the create and edit routes.
+// Returns { name, body } or { error } (a message for a 400).
+function cleanComment(rawName, rawBody) {
+  const name = String(rawName || '').normalize('NFKC').replace(/\p{Cf}+/gu, '').replace(/\s+/g, ' ').trim(); // stored exactly as it was checked: no invisible characters
+  const body = String(rawBody || '').replace(/\r\n?/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  if (name.length < 2 || name.length > 50) return { error: 'Please enter your name (2 to 50 characters).' };
+  if (body.length < 3) return { error: 'Your comment is too short.' };
+  if (body.length > 1500) return { error: 'Your comment is too long (1,500 characters at most).' };
+  if (LINK_RE.test(body) || LINK_RE.test(name)) return { error: 'Links are not allowed in comments.' };
+  return { name, body };
 }
 function isAdmin(request, env) {
   const t = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
@@ -221,14 +232,11 @@ async function handle(request, env, ctx) {
       const j = await r.json().catch(() => ({}));
       if (!j.success) return fail('Please complete the security check and try again.', 400, cors);
     }
-    const name = String(b.name || '').normalize('NFKC').replace(/\p{Cf}+/gu, '').replace(/\s+/g, ' ').trim(); // stored exactly as it was checked: no invisible characters
     const email = String(b.email || '').trim().slice(0, 120);
-    const body = String(b.body || '').replace(/\r\n?/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
-    if (name.length < 2 || name.length > 50) return fail('Please enter your name (2 to 50 characters).', 400, cors);
-    if (body.length < 3) return fail('Your comment is too short.', 400, cors);
-    if (body.length > 1500) return fail('Your comment is too long (1,500 characters at most).', 400, cors);
+    const clean = cleanComment(b.name, b.body);
+    if (clean.error) return fail(clean.error, 400, cors);
+    const { name, body } = clean;
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail('That email address does not look right.', 400, cors);
-    if (LINK_RE.test(body) || LINK_RE.test(name)) return fail('Links are not allowed in comments.', 400, cors);
     if (!CID_RE.test(String(b.cid || ''))) return fail('Missing visitor id.', 400, cors);
     const ih = await ipHash(request, env);
     if (!(await hit(env, ctx, `c:${ih}:${Math.floor(now() / 3600000)}`, 5, 3700))) return fail('You have posted several comments already. Please try again later.', 429, cors);
@@ -268,13 +276,44 @@ async function handle(request, env, ctx) {
     return reply({ ok: true, status, comment: shown, ...(newId ? { id: newId, token } : {}) }, status === 'approved' ? 201 : 202, cors);
   }
 
+  if ((m = path.match(/^\/v1\/comments\/(\d+)\/edit$/)) && method === 'POST') {
+    const id = Number(m[1]);
+    const b = await readJson(request);
+    if (typeof b.token !== 'string' || !TOKEN_RE.test(b.token)) return fail(NOT_FOUND, 404, cors);
+    const ih = await ipHash(request, env);
+    const hour = Math.floor(now() / 3600000);
+    if (!(await hit(env, ctx, `ed:${ih}:${hour}`, 20, 3700))) return fail('You have edited several comments already. Please try again later.', 429, cors);
+    const row = await ownerRow(env, id, b.token);
+    if (!row) return fail(NOT_FOUND, 404, cors);
+    // counted per comment only once the owner is proven, so strangers guessing ids cannot lock the owner out
+    if (!(await hit(env, ctx, `edc:${id}:${hour}`, 10, 3700))) return fail('You have edited this comment several times already. Please try again later.', 429, cors);
+    if (row.status !== 'approved') return fail('This comment is waiting for review, so it cannot be edited. You can still delete it.', 409, cors);
+    if (await hasReplies(env, id)) return fail('This comment has a reply, so it can no longer be edited.', 409, cors);
+    if (now() - row.created > 30 * 60000) return fail('The 30 minutes for editing have passed.', 409, cors);
+    const clean = cleanComment(row.name, b.body);
+    if (clean.error) return fail(clean.error, 400, cors);
+    const shown = (edited) => ({ id, body: clean.body, ...(edited ? { edited } : {}) });
+    if (clean.body === row.body) return reply({ ok: true, status: 'approved', comment: shown(row.edited_at), stats: await getStats(env, row.slug) }, 200, cors); // nothing changed: write nothing
+    let reasons;
+    try { reasons = [...screen(`${row.name}\n${clean.body}`).reasons]; } catch (err) { console.error('screen failed', err && err.stack ? err.stack : err); reasons = ['screen-error']; }
+    if (String(env.AUTO_APPROVE).toLowerCase() === 'false') reasons.push('auto-approve-off');
+    if ((await env.DB.prepare("SELECT COUNT(*) AS n FROM comments WHERE (cid = ? OR ip_hash = ?) AND status = 'spam'").bind(row.cid, row.ip_hash).first())?.n) reasons.push('earlier-spam');
+    const status = reasons.length ? 'pending' : 'approved';
+    const t = now();
+    const st = [env.DB.prepare('UPDATE comments SET body = ?, prev_body = ?, edited_at = ?, status = ?, flag = ? WHERE id = ?')
+      .bind(clean.body, row.body, t, status, reasons.length ? reasons.join(', ').slice(0, 300) : null, id)];
+    if (status === 'pending') st.push(env.DB.prepare('UPDATE post_stats SET comments = MAX(0, comments - 1) WHERE slug = ?').bind(row.slug));
+    await env.DB.batch(st);
+    return reply({ ok: true, status, comment: shown(t), stats: await getStats(env, row.slug) }, 200, cors);
+  }
+
   /* ------------------------------------------------------------- moderation */
   if (path.startsWith('/v1/admin/')) {
     if (!isAdmin(request, env)) return fail('Unauthorized.', 401, cors);
     if (method === 'GET' && path === '/v1/admin/comments') {
       const status = ['pending', 'approved', 'spam'].includes(url.searchParams.get('status')) ? url.searchParams.get('status') : 'pending';
       const limit = Math.min(200, Math.max(1, Number(url.searchParams.get('limit')) || 50));
-      const rows = await env.DB.prepare('SELECT id, slug, parent_id, name, email, body, status, created, flag FROM comments WHERE status = ? ORDER BY created DESC LIMIT ?').bind(status, limit).all();
+      const rows = await env.DB.prepare('SELECT id, slug, parent_id, name, email, body, prev_body, status, created, flag FROM comments WHERE status = ? ORDER BY created DESC LIMIT ?').bind(status, limit).all();
       return reply({ comments: rows.results || [] }, 200, cors);
     }
     if (method === 'POST' && path === '/v1/admin/reply') {
