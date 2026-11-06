@@ -510,3 +510,185 @@ test('edit: a team reply and a spam-marked comment give the same generic 404', a
   assert.equal(JSON.stringify(team.json), JSON.stringify(probe.json));
   assert.equal(JSON.stringify(spam.json), JSON.stringify(probe.json));
 });
+
+/* ---------------------------------------------------------------- delete endpoint */
+const del = (id, token, opts = {}) => call('POST', `/v1/comments/${id}/delete`, { body: { token }, ...opts });
+const GENERIC = 'That comment could not be found.';
+const reply2 = (parent, over = {}, ip = '2.2.2.2') => mk({ body: 'A reply from someone', cid: CID2, parent, ...over }, ip);
+const admin = (id, action) => call('POST', `/v1/admin/comments/${id}`, { auth: env.ADMIN_TOKEN, origin: null, body: { action } });
+
+test('delete: a comment without replies is removed and counted down', async () => {
+  const a = await mk();
+  assert.equal(statCount(), 1);
+  const r = await del(a.id, a.token);
+  assert.equal(r.status, 200);
+  assert.equal(r.json.ok, true);
+  assert.equal(r.json.removed, 'deleted');
+  assert.equal(r.json.stats.c, 0);
+  assert.equal(rawRow(a.id), undefined);
+  assert.equal((await call('GET', '/v1/posts/hello-post')).json.comments.length, 0);
+  assert.equal((await del(a.id, a.token)).status, 404, 'a second delete finds nothing');
+});
+
+test('delete: a comment with a reply becomes a blanked tombstone and the reply stays', async () => {
+  const a = await mk({ email: 'asha@example.com' });
+  env.DB.raw.prepare("UPDATE comments SET prev_body = 'old', edited_at = 5, likes = 2, flag = 'x' WHERE id = ?").run(a.id);
+  env.DB.raw.prepare('INSERT INTO comment_likes(comment_id, voter, created) VALUES(?, ?, 1)').run(a.id, 'voter-one-voter-one');
+  const rep = await reply2(a.id);
+  assert.equal(statCount(), 2);
+  const r = await del(a.id, a.token);
+  assert.equal(r.status, 200);
+  assert.equal(r.json.removed, 'tombstone');
+  assert.equal(r.json.stats.c, 1);
+  const pub = (await call('GET', '/v1/posts/hello-post')).json.comments;
+  assert.equal(pub.length, 1);
+  assert.equal(pub[0].deleted, true);
+  assert.equal(pub[0].name, '');
+  assert.equal(pub[0].body, 'This comment was deleted.');
+  assert.equal(pub[0].replies.length, 1);
+  const raw = rawRow(a.id);
+  assert.equal(raw.status, 'deleted');
+  assert.equal(raw.name, '');
+  assert.equal(raw.body, '');
+  for (const f of ['email', 'manage_hash', 'prev_body', 'ip_hash', 'cid', 'flag', 'edited_at']) assert.equal(raw[f], null, f);
+  assert.equal(raw.likes, 0);
+  assert.equal(env.DB.raw.prepare('SELECT COUNT(*) AS n FROM comment_likes WHERE comment_id = ?').get(a.id).n, 0);
+  assert.equal((await del(a.id, a.token)).status, 404, 'the tombstone cannot be deleted again');
+  // deleting the last reply takes the tombstone with it
+  const r2 = await del(rep.id, rep.token, { ip: '2.2.2.2' });
+  assert.equal(r2.status, 200);
+  assert.equal(rawRow(a.id), undefined);
+  assert.equal(rawRow(rep.id), undefined);
+  assert.equal((await call('GET', '/v1/posts/hello-post')).json.comments.length, 0);
+  assert.equal(statCount(), 0);
+});
+
+test('delete: a held comment can be deleted without changing the count; a spam-marked or team comment cannot', async () => {
+  const ok = await mk({ body: 'A normal approved one' });
+  const held = await mk({ body: RUDE, cid: CID2 }, '2.2.2.2');
+  assert.equal(held.status, 'pending');
+  const r = await del(held.id, held.token, { ip: '2.2.2.2' });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.stats.c, 1);
+  assert.equal(statCount(), 1);
+  assert.equal(rawRow(held.id), undefined);
+
+  const bad = await mk({ body: 'Something I will regret', cid: 'spammer-spammer-spammer1' }, '3.3.3.3');
+  await admin(bad.id, 'spam');
+  const s = await del(bad.id, bad.token, { ip: '3.3.3.3' });
+  assert.equal(s.status, 404);
+  assert.equal(s.json.error, GENERIC);
+  assert.equal(rawRow(bad.id).status, 'spam');
+  const next = await mk({ body: 'Another comment from the spammer', cid: 'spammer-spammer-spammer1' }, '3.3.3.3');
+  assert.equal(next.status, 'pending');
+  assert.match(env.DB.raw.prepare('SELECT flag FROM comments WHERE id = ?').get(next.id).flag, /earlier-spam/);
+
+  const t = await call('POST', '/v1/admin/reply', { auth: env.ADMIN_TOKEN, origin: null, body: { parent: ok.id, body: 'Thanks from the team' } });
+  const team = await del(t.json.comment.id, ok.token);
+  assert.equal(team.status, 404);
+  assert.equal(team.json.error, GENERIC);
+  assert.ok(rawRow(t.json.comment.id));
+  // an older comment with no hash cannot be deleted either
+  env.DB.raw.prepare('UPDATE comments SET manage_hash = NULL WHERE id = ?').run(ok.id);
+  assert.equal((await del(ok.id, ok.token)).status, 404);
+});
+
+test('delete: junk ids and tokens are 404, not 500; needs Origin; rate limited', async () => {
+  const a = await mk();
+  for (const id of ['abc', '-5', '0', '99999999999999999999', '1.5']) assert.equal((await del(id, a.token)).status, 404, id);
+  for (const tok of ['', 'short', 'x'.repeat(3000), 'é'.repeat(40), null, 12345]) {
+    const r = await call('POST', `/v1/comments/${a.id}/delete`, { body: { token: tok } });
+    assert.equal(r.status, 404, String(tok).slice(0, 10));
+    assert.equal(r.json.error, GENERIC);
+  }
+  assert.equal((await del(a.id, 'x'.repeat(10000))).status, 413, 'a huge body is refused by the size limit, not a 500');
+  assert.equal((await call('POST', `/v1/comments/${a.id}/delete`, { body: {} })).status, 404);
+  assert.equal((await del(a.id, 'x'.repeat(32))).json.error, GENERIC);
+  assert.ok(rawRow(a.id), 'nothing was deleted');
+  assert.equal((await del(a.id, a.token, { origin: null })).status, 403);
+  let last;
+  for (let i = 0; i < 20; i++) { last = await del(a.id, 'x'.repeat(32), { ip: '8.8.8.8' }); assert.equal(last.status, 404); }
+  assert.equal((await del(a.id, 'x'.repeat(32), { ip: '8.8.8.8' })).status, 429);
+});
+
+test('admin: deleting or hiding the last reply removes an orphan tombstone', async () => {
+  for (const action of ['spam', 'delete']) {
+    env = { DB: makeD1(), ADMIN_TOKEN: 'a-very-long-admin-token-123', SITE_ORIGIN: ORIGIN };
+    const a = await mk();
+    const r1 = await reply2(a.id);
+    const r2 = await reply2(a.id, { body: 'A second reply' }, '3.3.3.3');
+    await del(a.id, a.token);
+    assert.equal(rawRow(a.id).status, 'deleted');
+    await admin(r1.id, action);
+    assert.equal(rawRow(a.id).status, 'deleted', `${action}: another reply remains`);
+    await admin(r2.id, action);
+    assert.equal(rawRow(a.id), undefined, `${action}: tombstone gone`);
+    assert.equal((await call('GET', '/v1/posts/hello-post')).json.comments.length, 0);
+    assert.equal(statCount(), 0);
+  }
+});
+
+test('admin: approve refuses a deleted tombstone', async () => {
+  const a = await mk();
+  await reply2(a.id);
+  await del(a.id, a.token);
+  const r = await admin(a.id, 'approve');
+  assert.equal(r.status, 409);
+  assert.equal(rawRow(a.id).status, 'deleted');
+  assert.equal(rawRow(a.id).body, '');
+  assert.equal(statCount(), 1);
+});
+
+test('a deleted question with a team reply keeps the public shape qa-sync needs', async () => {
+  const q = await mk({ body: 'How much does the bus cost?' });
+  await call('POST', '/v1/admin/reply', { auth: env.ADMIN_TOKEN, origin: null, body: { parent: q.id, body: 'It costs TSh 600.' } });
+  assert.equal((await del(q.id, q.token)).json.removed, 'tombstone');
+  const top = (await call('GET', '/v1/posts/hello-post')).json.comments[0];
+  assert.equal(top.name, '');
+  assert.ok(top.body.length > 0);
+  assert.equal(top.deleted, true);
+  assert.equal(top.replies[0].team, true);
+});
+
+// Runs `fn` right after the owner check (the SELECT of the comment), before the "has replies" check and the write.
+function afterOwnerRow(fn) {
+  let ran = false;
+  const real = env.DB;
+  const wrap = (st, sql) => ({
+    bind: (...a) => wrap(st.bind(...a), sql),
+    first: async () => { const r = await st.first(); if (!ran && sql.includes('manage_hash FROM comments WHERE id = ?')) { ran = true; fn(); } return r; },
+    all: () => st.all(), run: () => st.run(), _exec: () => st._exec(),
+  });
+  env.DB = { ...real, prepare: (sql) => wrap(real.prepare(sql), sql), batch: (l) => real.batch(l) };
+}
+
+test('delete: a comment that became spam between the checks is not removed and the count is not lowered', async () => {
+  const a = await mk();
+  afterOwnerRow(() => env.DB.raw.exec(`UPDATE comments SET status = 'spam' WHERE id = ${a.id}; UPDATE post_stats SET comments = 0 WHERE slug = 'hello-post'`));
+  const r = await del(a.id, a.token);
+  assert.equal(r.status, 404);
+  assert.equal(r.json.error, GENERIC);
+  assert.equal(rawRow(a.id).status, 'spam');
+  assert.equal(statCount(), 0);
+});
+
+test('delete: a reply that arrives between the checks turns the removal into a tombstone', async () => {
+  const a = await mk();
+  env.DB.raw.prepare('INSERT INTO comment_likes(comment_id, voter, created) VALUES(?, ?, 1)').run(a.id, 'voter-one-voter-one');
+  afterOwnerRow(() => env.DB.raw.exec(`INSERT INTO comments(slug, parent_id, name, body, status, created, cid) VALUES('hello-post', ${a.id}, 'Sam', 'A quick reply', 'approved', ${Date.now()}, 'zzzzzzzzzzzzzzzzzz99'); UPDATE post_stats SET comments = comments + 1`));
+  const r = await del(a.id, a.token);
+  assert.equal(r.status, 200);
+  assert.equal(r.json.removed, 'tombstone');
+  assert.equal(rawRow(a.id).status, 'deleted');
+  assert.equal(statCount(), 1);
+  assert.equal(env.DB.raw.prepare('SELECT COUNT(*) AS n FROM comment_likes WHERE comment_id = ?').get(a.id).n, 0);
+});
+
+test('delete: two deletes at once lower the count only once', async () => {
+  const a = await mk();
+  await mk({ body: 'Another approved one', cid: CID2 }, '2.2.2.2');
+  const out = await Promise.all([del(a.id, a.token), del(a.id, a.token)]);
+  assert.deepEqual(out.map((r) => r.status).sort(), [200, 404]);
+  assert.equal(statCount(), 1);
+  assert.equal(statCount(), approvedCount());
+});

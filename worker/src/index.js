@@ -86,6 +86,11 @@ async function ownerRow(env, id, token) {
 async function hasReplies(env, id) {
   return !!(await env.DB.prepare("SELECT 1 AS ok FROM comments WHERE parent_id = ? AND status IN ('approved', 'pending') LIMIT 1").bind(id).first());
 }
+// Removes a deleted-comment tombstone once no approved or pending reply is left under it. One statement, so it is safe if two run together.
+async function purgeIfOrphan(env, parentId) {
+  if (!parentId) return;
+  await env.DB.prepare("DELETE FROM comments WHERE id = ? AND status = 'deleted' AND NOT EXISTS (SELECT 1 FROM comments WHERE parent_id = ? AND status IN ('approved', 'pending'))").bind(parentId, parentId).run();
+}
 // Cleans a comment's name and text the way they are stored, and checks length and links. Shared by the create and edit routes.
 // Returns { name, body } or { error } (a message for a 400).
 function cleanComment(rawName, rawBody) {
@@ -314,6 +319,34 @@ async function handle(request, env, ctx) {
     return reply({ ok: true, status, comment: shown(t), stats: await getStats(env, row.slug) }, 200, cors);
   }
 
+  if ((m = path.match(/^\/v1\/comments\/(\d+)\/delete$/)) && method === 'POST') {
+    const id = Number(m[1]);
+    const b = await readJson(request);
+    if (typeof b.token !== 'string' || !TOKEN_RE.test(b.token)) return fail(NOT_FOUND, 404, cors);
+    const ih = await ipHash(request, env);
+    if (!(await hit(env, ctx, `del:${ih}:${Math.floor(now() / 3600000)}`, 20, 3700))) return fail('You have deleted several comments already. Please try again later.', 429, cors);
+    // Each write only applies while the row is still in the status that was read (and still has / has no replies), and the count is lowered
+    // only if that row really changed. If another request got there first, read again; after three tries answer the generic 404.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const row = await ownerRow(env, id, b.token); // approved or pending only, so a spam, deleted or team comment is the generic 404
+      if (!row) return fail(NOT_FOUND, 404, cors);
+      const replies = await hasReplies(env, id);
+      const anyReply = "EXISTS (SELECT 1 FROM comments WHERE parent_id = ? AND status IN ('approved', 'pending'))";
+      const st = [replies
+        ? env.DB.prepare(`UPDATE comments SET status = 'deleted', name = '', body = '', email = NULL, manage_hash = NULL, prev_body = NULL, ip_hash = NULL, cid = NULL, flag = NULL, edited_at = NULL, likes = 0 WHERE id = ? AND status = ? AND ${anyReply} RETURNING id`).bind(id, row.status, id)
+        : env.DB.prepare(`DELETE FROM comments WHERE id = ? AND status = ? AND NOT ${anyReply} RETURNING id`).bind(id, row.status, id)];
+      if (row.status === 'approved') st.push(env.DB.prepare('UPDATE post_stats SET comments = MAX(0, comments - 1) WHERE slug = ? AND changes() > 0').bind(row.slug)); // must stay right after the row statement
+      st.push(replies
+        ? env.DB.prepare("DELETE FROM comment_likes WHERE comment_id = ? AND EXISTS (SELECT 1 FROM comments WHERE id = ? AND status = 'deleted')").bind(id, id)
+        : env.DB.prepare('DELETE FROM comment_likes WHERE comment_id = ? AND NOT EXISTS (SELECT 1 FROM comments WHERE id = ?)').bind(id, id));
+      const done = await env.DB.batch(st);
+      if (!(done[0]?.results || []).length) continue;
+      await purgeIfOrphan(env, row.parent_id);
+      return reply({ ok: true, removed: replies ? 'tombstone' : 'deleted', stats: await getStats(env, row.slug) }, 200, cors);
+    }
+    return fail(NOT_FOUND, 404, cors);
+  }
+
   /* ------------------------------------------------------------- moderation */
   if (path.startsWith('/v1/admin/')) {
     if (!isAdmin(request, env)) return fail('Unauthorized.', 401, cors);
@@ -338,10 +371,11 @@ async function handle(request, env, ctx) {
     if ((m = path.match(/^\/v1\/admin\/comments\/(\d+)$/)) && method === 'POST') {
       const id = Number(m[1]);
       const b = await readJson(request);
-      const row = await env.DB.prepare('SELECT id, slug, status FROM comments WHERE id = ?').bind(id).first();
+      const row = await env.DB.prepare('SELECT id, slug, parent_id, status FROM comments WHERE id = ?').bind(id).first();
       if (!row) return fail('No such comment.', 404, cors);
       const bump = (slug, d) => env.DB.prepare('UPDATE post_stats SET comments = MAX(0, comments + ?) WHERE slug = ?').bind(d, slug);
       if (b.action === 'approve') {
+        if (row.status === 'deleted') return fail('That comment was deleted by its author and cannot be approved.', 409, cors);
         const st = [env.DB.prepare("UPDATE comments SET status = 'approved' WHERE id = ?").bind(id)];
         if (row.status !== 'approved') st.push(bump(row.slug, 1));
         await env.DB.batch(st);
@@ -351,12 +385,14 @@ async function handle(request, env, ctx) {
         if (gone) st.push(bump(row.slug, -gone));
         st.push(env.DB.prepare("UPDATE comments SET status = 'spam' WHERE id = ? OR parent_id = ?").bind(id, id));
         await env.DB.batch(st);
+        await purgeIfOrphan(env, row.parent_id);
       } else if (b.action === 'delete') {
         const gone = (await env.DB.prepare("SELECT COUNT(*) AS n FROM comments WHERE (id = ? OR parent_id = ?) AND status = 'approved'").bind(id, id).first())?.n || 0;
         const st = [];
         if (gone) st.push(bump(row.slug, -gone));
         st.push(env.DB.prepare('DELETE FROM comments WHERE id = ? OR parent_id = ?').bind(id, id));
         await env.DB.batch(st);
+        await purgeIfOrphan(env, row.parent_id);
       } else return fail('Unknown action.', 400, cors);
       return reply({ ok: true, stats: await getStats(env, row.slug) }, 200, cors);
     }
