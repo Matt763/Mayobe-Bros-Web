@@ -48,7 +48,7 @@ function dataUrls(v, key = '', out = []) {
   return out;
 }
 
-function lint(out, data) {
+function lint(out, data, { checkUrls = true } = {}) {
   const errs = [];
   const { subject, html, text } = out;
   const n = (re) => (html.match(re) || []).length;
@@ -90,15 +90,18 @@ function lint(out, data) {
   if (!subject.trim() || subject.length > 150) errs.push('subject length ' + subject.length);
   if (text.includes('\r')) errs.push('CR in text');
   // primary action: exactly one bgcolor cell wrapping an <a>, 48 px tall, same URL as a text link and in text
-  const buttons = [...html.matchAll(/<td\b[^>]*\bbgcolor="[^"]*"[^>]*>\s*<a\b([^>]*)>/g)];
+  const buttons = [...html.matchAll(/<td\b([^>]*\bbgcolor="[^"]*"[^>]*)>\s*<a\b([^>]*)>/g)];
   if (buttons.length !== 1) errs.push('buttons ' + buttons.length);
   else {
-    const a = buttons[0][1];
+    const td = buttons[0][1];
+    const a = buttons[0][2];
     const href = (a.match(/href="([^"]*)"/) || [])[1];
     const st = (a.match(/style="([^"]*)"/) || [, ''])[1];
-    const pad = st.match(/padding:(\d+)px (\d+)px/);
+    const pad = st.match(/[;"]?padding:(\d+)px (\d+)px/);
     const lh = st.match(/line-height:(\d+)px/);
     if (!pad || !lh || 2 * Number(pad[1]) + Number(lh[1]) < 48) errs.push('button under 48px: ' + st);
+    // Outlook (Word engine) ignores padding on an inline <a>: the cell must carry the same padding as mso-padding-alt.
+    if (!pad || !td.includes(`mso-padding-alt:${pad[1]}px ${pad[2]}px`)) errs.push('button cell without matching mso-padding-alt: ' + td);
     if (!href) errs.push('button without href');
     else {
       if (html.split(`href="${href}"`).length - 1 < 2) errs.push('button URL not repeated as a text link');
@@ -108,14 +111,126 @@ function lint(out, data) {
   // plain text
   if (!text.trim()) errs.push('empty text');
   if (/<\/?[a-z][^>]*>/i.test(text)) errs.push('tag in text');
-  for (const u of dataUrls(data)) if (!text.includes(u)) errs.push('url missing from text ' + u);
+  if (checkUrls) for (const u of dataUrls(data)) if (!text.includes(u)) errs.push('url missing from text ' + u);
+  // well-formed output: no lone surrogates, no control characters in the subject, none but \n and \t in text
+  for (const [k, v] of Object.entries(out)) if (!v.isWellFormed()) errs.push(k + ' has a lone surrogate');
+  if (/[\x00-\x1f\x7f\x85\u2028\u2029\u202a-\u202e\u2066-\u2069]/.test(subject)) errs.push('control character in subject');
+  if (/[\x00-\x08\x0b-\x1f\x7f\x85\u202a-\u202e\u2066-\u2069]/.test(text)) errs.push('control character in text');
   return errs;
 }
 
-test('esc escapes the five HTML characters; oneLine removes line breaks', () => {
+test('esc escapes the five HTML characters; oneLine removes line breaks and control characters', () => {
   assert.equal(T.esc(`<a href="x" title='y'>&</a>`), '&lt;a href=&quot;x&quot; title=&#39;y&#39;&gt;&amp;&lt;/a&gt;');
   assert.equal(T.esc(null), '');
   assert.equal(T.oneLine('a\r\nBcc: b\u2028c\n'), 'a Bcc: b c');
+  assert.equal(T.oneLine('a\vb\0c\u0085d\u2029e\x7ff\x1bg\u202eh\u2066i'), 'a b c d e f g h i');
+  assert.equal(T.esc('x\ud800y'), 'x\ufffdy');
+  assert.equal(T.oneLine('x\udc00y'), 'x\ufffdy');
+});
+
+// Absurd and hostile values: lone surrogates, vertical tab, NUL, NEL, bidi overrides, huge strings, wrong types.
+const WEIRD = ['\ud800', 'a\udc00b', '\v\0\u0085', '\u202eevil\u202c', 'x'.repeat(100000), '"\ud83d', 12345, null, undefined, {}, [], true, { toString: () => 'obj' }];
+function weirdData(name, w) {
+  const keys = Object.keys(LONG[name]);
+  const d = Object.fromEntries(keys.map((k) => [k, w]));
+  if (name === 'newPostEmail') d.post = Object.fromEntries(Object.keys(LONG.newPostEmail.post).map((k) => [k, w]));
+  if (name === 'welcomeEmail' && typeof w === 'string') d.latestPosts = [{ title: w, url: w, excerpt: w }, w, null];
+  return d;
+}
+for (const name of BUILDERS) {
+  test(`${name} never throws and stays valid on lone surrogates, control characters, bidi overrides, huge and wrong-typed values`, () => {
+    for (const w of WEIRD) {
+      let out;
+      assert.doesNotThrow(() => { out = T[name](weirdData(name, w), SITE); }, `${name} threw on ${typeof w === 'string' ? JSON.stringify(w.slice(0, 20)) : String(w)}`);
+      assert.deepEqual(lint(out, {}, { checkUrls: false }), [], `${name} with ${typeof w === 'string' ? JSON.stringify(w.slice(0, 20)) : String(w)}`);
+    }
+    assert.doesNotThrow(() => T[name](undefined, SITE));
+    assert.doesNotThrow(() => T[name](null));
+  });
+}
+
+test('a hostile visitor address cannot break the mailto button', () => {
+  const email = 'a"b<c>\'d@x.y\r\nBcc: z@q.r\ud800 %0D%0A?cc=e@f.g&subject=x';
+  const out = T.contactOwnerEmail({ ...SHORT.contactOwnerEmail, email, subject: 'Hi\ud800 "there"\r\nBcc: x@y.z' }, SITE);
+  assert.deepEqual(lint(out, {}, { checkUrls: false }), []);
+  const href = decode(out.html.match(/<td\b[^>]*bgcolor="[^"]*"[^>]*>\s*<a\b[^>]*href="([^"]*)"/)[1]);
+  assert.match(href, /^mailto:[A-Za-z0-9@._+%-]+\?subject=[A-Za-z0-9%._~!*'()-]*$/);
+  assert.ok(!/[\s"<>]/.test(href));
+  assert.equal((href.match(/\?/g) || []).length, 1, 'only our own ?subject= query');
+  assert.ok(!/&(cc|bcc|subject)=/i.test(href), 'no extra mailto fields from the address');
+});
+
+test('links that must be ours are dropped unless they are on the site origin', () => {
+  const evil = ['https://evil.example/manage/#t', 'https://mayobebros.com.evil.example/', 'https://mayobebros.com@evil.example/', 'http://mayobebros.com/x', '//evil.example/'];
+  for (const u of evil) {
+    const all = [
+      T.manageLinkEmail({ ...SHORT.manageLinkEmail, manageUrl: u, postUrl: u }, SITE),
+      T.replyNoticeEmail({ ...SHORT.replyNoticeEmail, postUrl: u, unsubscribeUrl: u }, SITE),
+      T.ownerAlertEmail({ ...SHORT.ownerAlertEmail, postUrl: u }, SITE),
+      T.confirmSubscriptionEmail({ confirmUrl: u }, SITE),
+      T.welcomeEmail({ unsubscribeUrl: u, latestPosts: [{ title: 'T', url: u }] }, SITE),
+      T.newPostEmail({ post: { title: 'T', url: u, image: u }, unsubscribeUrl: u }, SITE),
+      T.farewellEmail({ resubscribeUrl: u }, SITE),
+    ];
+    for (const o of all) assert.ok(!o.html.includes(u) && !o.text.includes(u), `${u} leaked`);
+  }
+  // Scheme and host compare case-insensitively.
+  const ok = T.confirmSubscriptionEmail({ confirmUrl: 'HTTPS://MayobeBros.com/newsletter/#c' }, SITE);
+  assert.ok(ok.text.includes('HTTPS://MayobeBros.com/newsletter/#c'));
+});
+
+// Emails to addresses nobody has verified yet must not carry visitor free text (phishing / spam relay).
+const MARK = { name: 'NAMEMARK Win a prize at evil.example', commentExcerpt: 'EXCERPTMARK visit evil.example', subject: 'SUBJECTMARK evil.example', message: 'MESSAGEMARK', email: 'EMAILMARK@evil.example', replyAuthor: 'AUTHORMARK', type: 'TYPEMARK' };
+const leaks = (o) => ['NAMEMARK', 'EXCERPTMARK', 'SUBJECTMARK', 'MESSAGEMARK', 'EMAILMARK', 'AUTHORMARK', 'TYPEMARK', 'evil.example'].filter((m) => o.subject.includes(m) || o.html.includes(m) || o.text.includes(m));
+test('manage link email (unverified address) shows no visitor name or comment text', () => {
+  for (const notifyWanted of [true, false]) {
+    const o = T.manageLinkEmail({ ...LONG.manageLinkEmail, name: MARK.name, commentExcerpt: MARK.commentExcerpt, postTitle: 'How to apply for a loan', notifyWanted }, SITE);
+    assert.deepEqual(leaks(o), []);
+    assert.match(o.text, /Hello,/);
+    assert.match(o.text, /You asked for a link to manage a comment you left on/);
+    assert.ok(o.html.includes('How to apply for a loan'));
+  }
+});
+test('contact visitor email (unverified address) is fixed text: no name, subject or type echo', () => {
+  const o = T.contactVisitorEmail({ name: MARK.name, subject: MARK.subject, type: MARK.type }, SITE);
+  assert.deepEqual(leaks(o), []);
+  assert.match(o.text, /Hello,/);
+  assert.match(o.text, /Your message reached us\./);
+  assert.match(o.text, /We read every message and will reply to the address you gave us\./);
+});
+test('newsletter emails never echo visitor fields even if a caller passes them', () => {
+  for (const name of ['confirmSubscriptionEmail', 'welcomeEmail', 'newPostEmail', 'farewellEmail']) {
+    assert.deepEqual(leaks(T[name]({ ...SHORT[name], ...MARK }, SITE)), [], name);
+  }
+});
+test('owner emails keep the full escaped visitor content; reply notices keep the reply', () => {
+  const own = T.contactOwnerEmail({ ...SHORT.contactOwnerEmail, name: 'NAMEMARK', subject: 'SUBJECTMARK', message: 'MESSAGEMARK <b>' }, SITE);
+  for (const m of ['NAMEMARK', 'SUBJECTMARK', 'MESSAGEMARK &lt;b&gt;']) assert.ok(own.html.includes(m), m);
+  const al = T.ownerAlertEmail({ ...SHORT.ownerAlertEmail, name: 'NAMEMARK', body: 'BODYMARK' }, SITE);
+  assert.ok(al.html.includes('NAMEMARK') && al.html.includes('BODYMARK'));
+  const rep = T.replyNoticeEmail({ ...SHORT.replyNoticeEmail, isTeam: false, replyAuthor: 'AUTHORMARK', replyBody: 'REPLYMARK' }, SITE);
+  assert.ok(rep.html.includes('AUTHORMARK') && rep.html.includes('REPLYMARK') && rep.text.includes('REPLYMARK'));
+});
+test('contact-failed alert states facts and offers a reply to the visitor', () => {
+  const o = T.ownerAlertEmail({ kind: 'contact-failed', reason: 'status=500', name: 'Jo', email: 'jo@example.com', body: 'My question' }, SITE);
+  assert.match(o.text, /could not be emailed to you/);
+  assert.match(o.html, /href="mailto:jo@example\.com\?subject=/);
+  assert.ok(o.text.includes('My question'));
+  assert.deepEqual(lint(o, {}, { checkUrls: false }), []);
+});
+test('no reply-time promises and no claims beyond site.config.json anywhere', () => {
+  for (const name of BUILDERS) for (const data of [LONG[name], SHORT[name]]) {
+    for (const kind of name === 'ownerAlertEmail' ? ['held', 'question', 'contact-failed'] : [undefined]) {
+      for (const type of name.startsWith('contact') ? ['technical', 'support', 'general'] : [undefined]) {
+        const o = T[name]({ ...data, ...(kind ? { kind } : {}), ...(type ? { type } : {}) }, SITE);
+        const all = o.subject + o.html + o.text;
+        for (const bad of [/24 hours/i, /working days/i, /business days/i, /checked against official sources/i, /student loans/i, /small business/i, /daily life/i, /expect a reply within/i]) {
+          assert.ok(!bad.test(all), `${name} ${kind || type || ''}: ${bad}`);
+        }
+      }
+    }
+  }
+  assert.match(T.farewellEmail(SHORT.farewellEmail, SITE).html, /Clear, honest guides on education, jobs, money and technology for readers in Tanzania\./);
 });
 
 test('contrast() follows WCAG relative luminance', () => {
@@ -193,13 +308,9 @@ test('a javascript: URL in data never becomes a link', () => {
   assert.ok(!/javascript:/i.test(out.html) && !/javascript:/i.test(out.text));
 });
 
-test('contact visitor email states the reply time and never repeats the message', () => {
-  const tech = T.contactVisitorEmail({ name: 'Jo', subject: 'Login', type: 'technical' }, SITE);
-  assert.match(tech.html, /within 24 hours/);
-  assert.match(tech.text, /within 24 hours/);
-  const gen = T.contactVisitorEmail({ name: 'Jo', subject: 'Hello', type: 'general' }, SITE);
-  assert.match(gen.html, /within 2 to 3 working days/);
-  assert.match(gen.text, /within 2 to 3 working days/);
+test('contact visitor email never repeats the message; the owner email has it', () => {
+  const vis = T.contactVisitorEmail({ name: 'Jo', subject: 'Login', type: 'technical', message: 'SECRET-BODY' }, SITE);
+  assert.ok(!vis.html.includes('SECRET-BODY') && !vis.text.includes('SECRET-BODY'));
   const own = T.contactOwnerEmail({ ...SHORT.contactOwnerEmail, message: 'SECRET-BODY' }, SITE);
   assert.match(own.html, /SECRET-BODY/);
 });
