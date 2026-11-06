@@ -1,6 +1,6 @@
 # Comment controls, Resend email and newsletter: design
 
-Date: 2026-11-06. Status: draft for the owner's approval. Nothing here is built yet.
+Date: 2026-11-06. Status: Phase 1 (comment edit, delete and likes) is implemented on branch `comment-controls`, pending the owner's deploy. Phase 2 (email) is not built yet.
 
 ## Why
 

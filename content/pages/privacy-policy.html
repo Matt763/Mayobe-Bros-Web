@@ -3,7 +3,7 @@ title: Privacy Policy
 description: How Mayobe Bros collects, uses and protects personal information, including cookies, browser storage, any comments or reactions, and Google AdSense advertising.
 kind: legal
 order: 10
-updated: 2026-11-05
+updated: 2026-11-06
 ---
 <p>This policy explains what personal information {{site-name}} ("we", "us") collects when you use {{site-url}}, why we collect it, who else handles it, and the choices you have. We have tried to write it in plain English. If anything is unclear, email {{email:general}}.</p>
 
@@ -13,8 +13,9 @@ updated: 2026-11-05
 <h2>2. What we collect and why</h2>
 {{#comments}}<h3>Comments</h3>
 <p>If you post a comment we collect the name you type, your optional email address, your comment, the time, a random visitor ID saved in your browser, and a short code made from your IP address. We use this to show your comment, to contact you if needed and to stop spam. An automatic check (a list of abusive and spam words in English and Swahili, run inside our own comments service, with no other outside service involved) decides whether your comment appears at once or waits for a person to review it. If the check flags a comment we keep a short note of why, visible only to us. Your email address is never shown publicly. The IP code is a one-way hash that changes every day, and we do not store your raw IP address.</p>
-<h3>Reactions</h3>
-<p>When you press Like, Amazed, Sad or Angry we store which post, which reaction and the same random visitor ID, so that each browser counts once and can change its mind. This ID is not linked to your name or email.</p>{{/comments}}
+<p>When you post a comment, your browser also keeps a secret code. It proves the comment is yours, so that you can edit or delete it. We store only a one-way hash of that code, never the code itself. If you edit a comment, we keep the text from before the edit so that we can check what changed. When you delete a comment, we erase the name, text, email address and IP code, the secret hash and the earlier text. If the comment has replies, a short note "This comment was deleted" stays in its place. We also remove control characters from names and comments.</p>
+<h3>Reactions and likes</h3>
+<p>When you press Like, Amazed, Sad or Angry on a post we store which post, which reaction and the same random visitor ID, so that each browser counts once and can change its mind. When you like a comment we store which comment, the visitor ID and the time. This ID is not linked to your name or email.</p>{{/comments}}
 {{^comments}}<h3>Comments and reactions</h3>
 <p>Comments and reactions are switched off at the moment, so we do not collect that data. We will update this page before we turn them on.</p>{{/comments}}
 <h3>Contact messages</h3>
@@ -57,13 +58,14 @@ updated: 2026-11-05
 <h2>6. How long we keep data</h2>
 <ul>
 {{#comments}}  <li>Approved comments stay until you ask us to remove them or we delete them.</li>
+  <li>If you delete a comment, its name, text, email, IP code, secret hash and earlier text are erased at once. Only a short "deleted" note stays if it has replies.</li>
   <li>Comments we reject as spam are deleted from time to time.</li>{{/comments}}
-  <li>Reactions stay until you remove them or the post is deleted.</li>
+  <li>Reactions stay until you remove them or the post is deleted.{{#comments}} Likes on comments stay until you take the like back or the comment is deleted.{{/comments}}</li>
   <li>Emails we receive are kept as long as needed to deal with your request and for our records.</li>
 </ul>
 
 <h2>7. Your rights</h2>
-<p>You can ask us to show you, correct or delete the personal information we hold about you, for example{{#comments}} to remove one of your comments{{/comments}}. Email {{email:general}}{{#comments}} with the link to the article and the text of the comment{{/comments}}. If you are in the European Economic Area or the United Kingdom, you also have the rights set out in the GDPR, including the right to object and to complain to your data protection authority. In Tanzania, the Personal Data Protection Act, 2022 gives you similar rights, and you may complain to the Personal Data Protection Commission.</p>
+<p>You can ask us to show you, correct or delete the personal information we hold about you, for example{{#comments}} to remove one of your comments. You can also edit or delete your own comment yourself, in the browser where you posted it{{/comments}}. Email {{email:general}}{{#comments}} with the link to the article and the text of the comment{{/comments}}. If you are in the European Economic Area or the United Kingdom, you also have the rights set out in the GDPR, including the right to object and to complain to your data protection authority. In Tanzania, the Personal Data Protection Act, 2022 gives you similar rights, and you may complain to the Personal Data Protection Commission.</p>
 <p>You can change your cookie choice at any time with the "Cookie choices" link at the bottom of every page, and you can clear your browser's stored data to remove your preferences and visitor ID.</p>
 
 <h2>8. Security</h2>

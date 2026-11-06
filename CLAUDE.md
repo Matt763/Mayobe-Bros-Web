@@ -130,6 +130,7 @@ Comments publish at once unless the automatic screen (`worker/src/moderation.js`
 `delete <id>` act on them. Read each comment before approving. Approve only polite, on-topic comments with no
 links or personal data, and apply `content/pages/comment-policy.html`. Needs the Worker deployed (`worker/README.md`)
 and `.admin-token` (git-ignored) or `ADMIN_TOKEN`.
+Readers can edit their own comment for 30 minutes (only while it has no reply; edits are re-checked) and delete it at any time; a deleted comment with replies stays as a "This comment was deleted." note. After a reader deletes a comment that was an answered question, run `node scripts/qa-sync.mjs`, then build and push, so the saved copy in `content/qa.json` is rewritten.
 
 ## RSS feed
 `feed.xml` is plain RSS 2.0 for feed readers (the W3C validator passes it). Browsers show it as code, and XSLT styling is being removed from Chrome on 2026-11-17,
