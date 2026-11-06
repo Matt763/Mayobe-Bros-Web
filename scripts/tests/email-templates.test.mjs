@@ -13,7 +13,7 @@ const SITE = { origin: 'https://mayobebros.com', logoUrl: 'https://mayobebros.co
 const EVIL = `<script>alert(1)</script> "quoted" 'single' & <b>bold</b>\r\nBcc: x@y.z`;
 const NAME = (`"Ann" <script>alert(1)</script> 'O'Neil' &\r\nBcc: x@y.z ` + 'n'.repeat(200)).slice(0, 120);
 const MSG = (EVIL + '\n\n' + 'This is a long message line. '.repeat(80)).slice(0, 2000);
-const U = (p) => `https://mayobebros.com/${p}?a=1&b="2"`;
+const U = (p) => `https://mayobebros.com/${p}?a=1&b=2`; // links are emitted normalised (new URL().href), so test URLs are already normal
 const POSTS = [1, 2, 3].map((i) => ({ title: `${EVIL} title ${i}`, url: U(`post/x/p${i}/`), excerpt: MSG.slice(0, 300) }));
 
 const LONG = {
@@ -149,6 +149,29 @@ for (const name of BUILDERS) {
   });
 }
 
+test('throwing getters and Proxies as data never make a builder throw', () => {
+  const trap = () => new Proxy({}, { get() { throw new Error('trap'); }, has() { throw new Error('trap'); }, ownKeys() { throw new Error('trap'); } });
+  const getterData = { get kind() { throw new Error('getter'); }, get name() { throw new Error('getter'); }, post: trap(), latestPosts: new Proxy([], { get() { throw new Error('trap'); } }), title: 'ok' };
+  const badSite = { get origin() { throw new Error('getter'); } };
+  for (const name of BUILDERS) {
+    for (const data of [trap(), getterData]) {
+      let out;
+      assert.doesNotThrow(() => { out = T[name](data, SITE); }, name);
+      assert.deepEqual(lint(out, {}, { checkUrls: false }), [], name);
+    }
+    assert.doesNotThrow(() => T[name](SHORT[name], badSite), name + ' with a throwing site');
+    assert.doesNotThrow(() => T[name](SHORT[name], trap()), name + ' with a Proxy site');
+  }
+});
+
+test('zero-width and direction marks are removed from owner-bound text', () => {
+  const ZW = '​‌‍‎‏؜⁠﻿';
+  const own = T.contactOwnerEmail({ ...SHORT.contactOwnerEmail, name: `Jo${ZW}x`, subject: `S${ZW}y`, message: `M${ZW}z` }, SITE);
+  const al = T.ownerAlertEmail({ ...SHORT.ownerAlertEmail, name: `Jo${ZW}x`, body: `B${ZW}z`, reason: `R${ZW}q` }, SITE);
+  for (const o of [own, al]) for (const part of [o.subject, o.html, o.text]) assert.ok(!/[​-‏؜⁠﻿]/.test(part), 'zero-width or direction mark left');
+  assert.ok(own.text.includes('M z') || own.text.includes('Mz'));
+});
+
 test('a hostile visitor address cannot break the mailto button', () => {
   const email = 'a"b<c>\'d@x.y\r\nBcc: z@q.r\ud800 %0D%0A?cc=e@f.g&subject=x';
   const out = T.contactOwnerEmail({ ...SHORT.contactOwnerEmail, email, subject: 'Hi\ud800 "there"\r\nBcc: x@y.z' }, SITE);
@@ -161,7 +184,11 @@ test('a hostile visitor address cannot break the mailto button', () => {
 });
 
 test('links that must be ours are dropped unless they are on the site origin', () => {
-  const evil = ['https://evil.example/manage/#t', 'https://mayobebros.com.evil.example/', 'https://mayobebros.com@evil.example/', 'http://mayobebros.com/x', '//evil.example/'];
+  const evil = ['https://evil.example/manage/#t', 'https://mayobebros.com.evil.example/', 'https://mayobebros.com@evil.example/', 'http://mayobebros.com/x', '//evil.example/',
+    'https://mayobebros.com\\@evil.example/', // backslash: WHATWG reads it as a path, some linkifiers as userinfo
+    'https://mayobebros。com/x', // ideographic full stop in the host
+    'https://ｍａｙｏｂｅｂｒｏｓ.com/x', // fullwidth letters in the host
+    'https://mayobebros.com/a b', 'https://mayobebros.com/é\u202e'];
   for (const u of evil) {
     const all = [
       T.manageLinkEmail({ ...SHORT.manageLinkEmail, manageUrl: u, postUrl: u }, SITE),
@@ -172,11 +199,29 @@ test('links that must be ours are dropped unless they are on the site origin', (
       T.newPostEmail({ post: { title: 'T', url: u, image: u }, unsubscribeUrl: u }, SITE),
       T.farewellEmail({ resubscribeUrl: u }, SITE),
     ];
-    for (const o of all) assert.ok(!o.html.includes(u) && !o.text.includes(u), `${u} leaked`);
+    for (const o of all) assert.ok(!o.html.includes(u) && !o.text.includes(u) && !o.html.includes('evil.example') && !o.text.includes('evil.example'), `${u} leaked`);
   }
-  // Scheme and host compare case-insensitively.
-  const ok = T.confirmSubscriptionEmail({ confirmUrl: 'HTTPS://MayobeBros.com/newsletter/#c' }, SITE);
-  assert.ok(ok.text.includes('HTTPS://MayobeBros.com/newsletter/#c'));
+  // A non-ASCII host is rejected outright, not mapped to our host by the URL parser.
+  for (const u of evil.filter((x) => /^https:\/\/[^/]*[^\x00-\x7f]/.test(x))) {
+    const o = T.confirmSubscriptionEmail({ confirmUrl: u }, SITE);
+    assert.ok(!o.text.includes('mayobebros.com/x'), `${u} was mapped instead of rejected`);
+  }
+  // Scheme and host compare case-insensitively and are emitted normalised (lower case), for every link-bearing builder.
+  for (const [u, want] of [['HTTPS://MAYOBEBROS.COM/x', 'https://mayobebros.com/x'], ['HTTPS://MayobeBros.com/newsletter/#c', 'https://mayobebros.com/newsletter/#c']]) {
+    const outs = [
+      T.manageLinkEmail({ ...SHORT.manageLinkEmail, manageUrl: u, postUrl: u }, SITE),
+      T.replyNoticeEmail({ ...SHORT.replyNoticeEmail, postUrl: u, unsubscribeUrl: u }, SITE),
+      T.ownerAlertEmail({ ...SHORT.ownerAlertEmail, postUrl: u }, SITE),
+      T.confirmSubscriptionEmail({ confirmUrl: u }, SITE),
+      T.welcomeEmail({ unsubscribeUrl: u, latestPosts: [{ title: 'T', url: u }] }, SITE),
+      T.newPostEmail({ post: { title: 'T', url: u }, unsubscribeUrl: u }, SITE),
+      T.farewellEmail({ resubscribeUrl: u }, SITE),
+    ];
+    for (const o of outs) {
+      assert.ok(o.text.includes(want) && o.html.includes(`href="${want}"`), `${u} not emitted as ${want}`);
+      assert.ok(!o.text.includes(u) && !o.html.includes(u), `${u} emitted raw`);
+    }
+  }
 });
 
 // Emails to addresses nobody has verified yet must not carry visitor free text (phishing / spam relay).
@@ -196,7 +241,8 @@ test('contact visitor email (unverified address) is fixed text: no name, subject
   assert.deepEqual(leaks(o), []);
   assert.match(o.text, /Hello,/);
   assert.match(o.text, /Your message reached us\./);
-  assert.match(o.text, /We read every message and will reply to the address you gave us\./);
+  assert.match(o.text, /If it needs a reply, we will write to the address you gave us\./);
+  assert.match(o.html, /If it needs a reply, we will write to the address you gave us\./);
 });
 test('newsletter emails never echo visitor fields even if a caller passes them', () => {
   for (const name of ['confirmSubscriptionEmail', 'welcomeEmail', 'newPostEmail', 'farewellEmail']) {
@@ -224,7 +270,8 @@ test('no reply-time promises and no claims beyond site.config.json anywhere', ()
       for (const type of name.startsWith('contact') ? ['technical', 'support', 'general'] : [undefined]) {
         const o = T[name]({ ...data, ...(kind ? { kind } : {}), ...(type ? { type } : {}) }, SITE);
         const all = o.subject + o.html + o.text;
-        for (const bad of [/24 hours/i, /working days/i, /business days/i, /checked against official sources/i, /student loans/i, /small business/i, /daily life/i, /expect a reply within/i]) {
+        for (const bad of [/24 hours/i, /working days/i, /business days/i, /checked against official sources/i, /student loans/i, /small business/i, /daily life/i, /expect a reply/i,
+          /read every message/i, /will reply/i, /\bwithin\b[^.]{0,40}\b(hours?|days?|weeks?)\b/i, /we aim to/i]) {
           assert.ok(!bad.test(all), `${name} ${kind || type || ''}: ${bad}`);
         }
       }

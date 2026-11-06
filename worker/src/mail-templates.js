@@ -40,13 +40,16 @@ function str(v) {
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 export function esc(s) { return str(s).replace(/[&<>"']/g, (c) => ESC[c]); }
 // For anything that ends up in a subject, header or single line: no control characters (C0, DEL, NEL), no line or
-// paragraph separators, no bidi overrides or isolates (they can disguise text). Each becomes a space.
+// paragraph separators, no bidi overrides or isolates (they can disguise text): each becomes a space. Zero-width
+// characters and direction marks (U+200B-U+200F, U+061C, U+2060, U+FEFF) are removed.
 const ONE_LINE_BAD = /[\x00-\x1f\x7f\x85\u2028\u2029\u202a-\u202e\u2066-\u2069]+/g;
-export function oneLine(s) { return str(s).replace(ONE_LINE_BAD, ' ').replace(/[ ]{2,}/g, ' ').trim(); }
+const INVISIBLE = /[​-‏؜⁠﻿]/g;
+export function oneLine(s) { return str(s).replace(INVISIBLE, '').replace(ONE_LINE_BAD, ' ').replace(/[ ]{2,}/g, ' ').trim(); }
 const cut = (v, n) => (v.length > n ? str(v.slice(0, n - 1)).trimEnd() + '…' : v); // str() repairs a pair split by slice
 const clip = (s, n) => cut(oneLine(s), n);
-// Text that may span lines (comments, replies, messages): line breaks become \n, other control and bidi characters a space.
-const normText = (s) => str(s).replace(/\r\n?|\u2028|\u2029|\x85/g, '\n').replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\u202a-\u202e\u2066-\u2069]/g, ' ');
+// Text that may span lines (comments, replies, messages): line breaks become \n, other control and bidi characters a
+// space, zero-width characters and direction marks are removed.
+const normText = (s) => str(s).replace(INVISIBLE, '').replace(/\r\n?|\u2028|\u2029|\x85/g, '\n').replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\u202a-\u202e\u2066-\u2069]/g, ' ');
 const clipText = (s, n) => cut(normText(s).replace(/\n{3,}/g, '\n\n').trim(), n);
 // Visitor text for the plain-text part: < > become look-alike angle quotes so the text part never holds anything tag-like.
 const plain = (s) => normText(s).replace(/</g, '‹').replace(/>/g, '›');
@@ -64,22 +67,39 @@ const longHtml = (s) => {
   while (part.length > 1 && bytes(multi(part)) > HTML_BUDGET) part = clipText(part, Math.floor(part.length * 0.8));
   return multi(part) + (part !== full ? '<br><br><em>This text was cut short here. The plain-text version of this email has all of it.</em>' : '');
 };
-// Every link we write points at our own site: same scheme and host as the site origin (compared by the URL parser, so
-// case-insensitively), at most 500 characters, no spaces or control characters. Anything else uses the fallback.
+// Every link we write points at our own site. Rejected before parsing: more than 500 characters, any backslash,
+// whitespace or control character, a scheme other than http(s), or any non-ASCII character in the host part
+// (ideographic full stops and fullwidth letters are mapped by the URL parser but read differently by some
+// linkifiers). After parsing, the origin must equal the site origin and there must be no user:password. The PARSED
+// href is returned, so scheme and host come out lower case and the path is percent-encoded.
 const originOf = (u) => { try { return new URL(u).origin; } catch { return ''; } };
 const ownUrl = (u, origin, fallback) => {
   const s = str(u).trim();
-  if (!s || s.length > 500 || /[\x00-\x20\x7f]/.test(s) || !/^https?:\/\//i.test(s)) return fallback;
-  return originOf(s) !== '' && originOf(s) === originOf(origin) ? s : fallback;
+  if (!s || s.length > 500 || /[\\\s\x00-\x1f\x7f]/.test(s) || !/^https?:\/\//i.test(s)) return fallback;
+  const host = s.slice(s.indexOf('//') + 2).split(/[/?#]/)[0];
+  if (!host || /[^\x21-\x7e]/.test(host)) return fallback;
+  let x;
+  try { x = new URL(s); } catch { return fallback; }
+  if (x.origin !== originOf(origin) || x.username || x.password || x.href.length > 2000) return fallback;
+  return x.href;
 };
 const siteOf = (site) => {
-  const o = str(site?.origin).trim().replace(/\/+$/, '');
-  const origin = /^https:\/\//i.test(o) && originOf(o) && o.length <= 200 && !/[\x00-\x20\x7f]/.test(o) ? originOf(o) : DEFAULT_SITE.origin;
-  const logo = str(site?.logoUrl).trim();
-  const logoUrl = /^https:\/\//i.test(logo) && originOf(logo) && logo.length <= 500 && !/[\x00-\x20\x7f]/.test(logo) ? logo : DEFAULT_SITE.logoUrl;
+  let o = '', logo = '';
+  try { o = str(site?.origin).trim().replace(/\/+$/, ''); logo = str(site?.logoUrl).trim(); } catch { /* a hostile site object: use the defaults */ }
+  const origin = /^https:\/\//i.test(o) && originOf(o) && o.length <= 200 && !/[\\\s\x00-\x1f\x7f]/.test(o) ? originOf(o) : DEFAULT_SITE.origin;
+  const logoUrl = /^https:\/\//i.test(logo) && originOf(logo) && logo.length <= 500 && !/[\\\s\x00-\x1f\x7f]/.test(logo) ? new URL(logo).href : DEFAULT_SITE.logoUrl;
   return { origin, logoUrl };
 };
-const obj = (d) => (d && typeof d === 'object' ? d : {});
+// Copies the fields a builder needs once, at the top. A field whose getter (or Proxy trap) throws becomes undefined,
+// so no later read can throw.
+function pick(d, keys) {
+  const out = {};
+  let ok = false;
+  try { ok = !!d && typeof d === 'object'; } catch { ok = false; }
+  for (const k of keys) { try { out[k] = ok ? d[k] : undefined; } catch { out[k] = undefined; } }
+  return out;
+}
+const asList = (v) => { try { return Array.isArray(v) ? Array.from(v).slice(0, 20) : []; } catch { return []; } };
 
 /* ------------------------------------------------------------------ components */
 const SANS = `font-family:${FONT_SANS};`;
@@ -210,7 +230,7 @@ const mailto = (addr, subject) => `mailto:${oneLine(addr).replace(/[^A-Za-z0-9@.
 // Sent to an address that has not been verified: only our article title and fixed text. data.name and
 // data.commentExcerpt are accepted for compatibility and deliberately not shown.
 export function manageLinkEmail(data, site) {
-  const d = obj(data);
+  const d = pick(data, ['manageUrl', 'postUrl', 'postTitle', 'notifyWanted']);
   const { origin } = siteOf(site);
   const manageUrl = ownUrl(d.manageUrl, origin, `${origin}/`);
   const postUrl = ownUrl(d.postUrl, origin, `${origin}/`);
@@ -237,7 +257,7 @@ export function manageLinkEmail(data, site) {
 
 // Sent only to addresses confirmed by opening the manage link, so the reply (escaped) is shown.
 export function replyNoticeEmail(data, site) {
-  const d = obj(data);
+  const d = pick(data, ['postUrl', 'unsubscribeUrl', 'postTitle', 'name', 'isTeam', 'replyAuthor', 'replyBody']);
   const { origin } = siteOf(site);
   const postUrl = ownUrl(d.postUrl, origin, `${origin}/`);
   const unsub = ownUrl(d.unsubscribeUrl, origin, `${origin}/contact/`);
@@ -288,9 +308,9 @@ const ALERTS = {
 
 // Owner only: full content, escaped. data.email is used by kind 'contact-failed' (the visitor's address).
 export function ownerAlertEmail(data, site) {
-  const d = obj(data);
+  const d = pick(data, ['kind', 'postUrl', 'email', 'reason', 'postSlug', 'commentId', 'name', 'body']);
   const { origin } = siteOf(site);
-  const kind = Object.prototype.hasOwnProperty.call(ALERTS, d.kind) ? d.kind : 'held';
+  const kind = typeof d.kind === 'string' && Object.prototype.hasOwnProperty.call(ALERTS, d.kind) ? d.kind : 'held';
   const a = ALERTS[kind];
   const postUrl = ownUrl(d.postUrl, origin, '');
   const email = kind === 'contact-failed' ? clip(d.email, 254) : '';
@@ -320,14 +340,16 @@ const CONTACT_TYPES = {
 };
 const typeLabel = (t) => (typeof t === 'string' && Object.prototype.hasOwnProperty.call(CONTACT_TYPES, t) ? CONTACT_TYPES[t] : (oneLine(t) ? 'Other' : 'General question'));
 const when = (v) => {
-  if (v === undefined || v === null || v === '') return '';
-  const t = typeof v === 'number' || v instanceof Date ? new Date(v) : new Date(str(v));
-  return Number.isNaN(t.getTime()) ? clip(v, 40) : t.toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
+  try {
+    if (v === undefined || v === null || v === '') return '';
+    const t = typeof v === 'number' || v instanceof Date ? new Date(v) : new Date(str(v));
+    return Number.isNaN(t.getTime()) ? clip(v, 40) : t.toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
+  } catch { return clip(v, 40); }
 };
 
 // Owner only: the full message, escaped. reply_to is set to the visitor by the sender (Task 6).
 export function contactOwnerEmail(data, site) {
-  const d = obj(data);
+  const d = pick(data, ['subject', 'type', 'email', 'name', 'receivedAt', 'message']);
   const { origin } = siteOf(site);
   const subj = clip(d.subject, 120) || '(no subject)';
   const type = typeLabel(d.type);
@@ -356,14 +378,14 @@ export function contactVisitorEmail(data, site) {
   const { origin } = siteOf(site);
   const lines = [
     'Hello,',
-    'Your message reached us.',
-    'We read every message and will reply to the address you gave us. If you do not see our reply, please check your spam folder.',
+    'Your message reached us. If it needs a reply, we will write to the address you gave us.',
+    'Emails sometimes land in the spam folder, so please check there too.',
   ];
   const privacy = 'For your privacy, this email does not repeat your message.';
-  const wait = 'While you wait, you are welcome to read our latest articles.';
+  const wait = 'You are welcome to read our latest articles.';
   return build({
     site, subject: 'We received your message',
-    preheader: 'Thank you for writing to Mayobe Bros. Your message reached us, and we will reply to the address you gave us.',
+    preheader: 'Thank you for writing to Mayobe Bros. Your message reached us. If it needs a reply, we will write to the address you gave.',
     eyebrowText: 'Message received', heading: H('Thank you for your message', 'THANK YOU FOR YOUR MESSAGE'),
     html: { before: lines.map((l) => p(esc(l))).join('') + p(esc(privacy), { muted: true }) + p(esc(wait)) },
     text: { before: [...lines, privacy, wait] },
@@ -376,7 +398,7 @@ export function contactVisitorEmail(data, site) {
 /* ------------------------------------------------------------------ newsletter (sent by Plan 3; never visitor text) */
 
 export function confirmSubscriptionEmail(data, site) {
-  const d = obj(data);
+  const d = pick(data, ['confirmUrl']);
   const { origin } = siteOf(site);
   const url = ownUrl(d.confirmUrl, origin, `${origin}/`);
   const a = 'Someone, we hope you, asked to get new Mayobe Bros articles by email at this address. Press the button to confirm.';
@@ -395,11 +417,12 @@ export function confirmSubscriptionEmail(data, site) {
 
 // latestPosts = [{ title, url, excerpt? }] from the site's own data (search.json); at most 3 are shown.
 export function welcomeEmail(data, site) {
-  const d = obj(data);
+  const d = pick(data, ['unsubscribeUrl', 'latestPosts']);
   const { origin } = siteOf(site);
   const unsub = ownUrl(d.unsubscribeUrl, origin, `${origin}/contact/`);
-  const posts = (Array.isArray(d.latestPosts) ? d.latestPosts : [])
-    .map((x) => ({ title: clip(x?.title, 160), url: ownUrl(x?.url, origin, ''), excerpt: clip(x?.excerpt, 220) }))
+  const posts = asList(d.latestPosts)
+    .map((item) => pick(item, ['title', 'url', 'excerpt']))
+    .map((x) => ({ title: clip(x.title, 160), url: ownUrl(x.url, origin, ''), excerpt: clip(x.excerpt, 220) }))
     .filter((x) => x.title && x.url).slice(0, 3);
   const a = 'Thank you for confirming. When we publish a new article, we will send you one short email about it.';
   const b = 'We write clear, honest guides on education, jobs, money and technology for readers in Tanzania.';
@@ -424,9 +447,9 @@ export function welcomeEmail(data, site) {
 
 // post = { title, url, excerpt?, image? (same-origin https URL of the 1200 x 630 share card), imageAlt?, category? }
 export function newPostEmail(data, site) {
-  const d = obj(data);
+  const d = pick(data, ['post', 'unsubscribeUrl']);
   const { origin } = siteOf(site);
-  const post = obj(d.post);
+  const post = pick(d.post, ['title', 'url', 'excerpt', 'image', 'imageAlt', 'category']);
   const url = ownUrl(post.url, origin, `${origin}/`);
   const unsub = ownUrl(d.unsubscribeUrl, origin, `${origin}/contact/`);
   const title = clip(post.title, 200) || 'A new article';
@@ -451,7 +474,7 @@ export function newPostEmail(data, site) {
 }
 
 export function farewellEmail(data, site) {
-  const d = obj(data);
+  const d = pick(data, ['resubscribeUrl']);
   const { origin } = siteOf(site);
   const url = ownUrl(d.resubscribeUrl, origin, `${origin}/`);
   const a = 'We have removed this address from our newsletter list. This is the last newsletter email we will send to it.';
