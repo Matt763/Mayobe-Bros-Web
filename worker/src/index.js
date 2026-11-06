@@ -194,8 +194,13 @@ async function handle(request, env, ctx) {
     const byId = Object.fromEntries(tops.map((c) => [c.id, c]));
     for (const c of all) if (c.parent_id && byId[c.parent_id]) byId[c.parent_id].replies.push(pub(c));
     tops.reverse(); // newest conversation first, replies oldest first
+    // with a valid visitor id, also say which of these comments that visitor liked (the key is absent without one)
+    const cid = url.searchParams.get('cid') || '';
+    const liked = CID_RE.test(cid)
+      ? ((await env.DB.prepare("SELECT l.comment_id AS id FROM comment_likes l JOIN comments c ON c.id = l.comment_id WHERE l.voter = ? AND c.slug = ? AND c.status = 'approved'").bind(cid, slug).all()).results || []).map((r) => r.id)
+      : null;
     // always revalidate: a visitor who just reacted or whose comment was just approved must see it on reload
-    return reply({ stats: await getStats(env, slug), comments: tops }, 200, cors, 'no-cache');
+    return reply({ stats: await getStats(env, slug), comments: tops, ...(liked ? { liked } : {}) }, 200, cors, 'no-cache');
   }
 
   if ((m = path.match(/^\/v1\/posts\/([^/]+)\/mine$/)) && method === 'GET') {
@@ -345,6 +350,29 @@ async function handle(request, env, ctx) {
       return reply({ ok: true, removed: replies ? 'tombstone' : 'deleted', stats: await getStats(env, row.slug) }, 200, cors);
     }
     return fail(NOT_FOUND, 404, cors);
+  }
+
+  if ((m = path.match(/^\/v1\/comments\/(\d+)\/like$/)) && method === 'POST') {
+    const id = Number(m[1]);
+    const b = await readJson(request);
+    if (!CID_RE.test(String(b.cid || ''))) return fail('Missing visitor id.', 400, cors);
+    if (typeof b.on !== 'boolean') return fail('Say whether to like or unlike.', 400, cors);
+    const ih = await ipHash(request, env);
+    if (!(await hit(env, ctx, `l:${ih}:${Math.floor(now() / 600000)}`, 120, 700))) return fail('Too many likes. Please wait a few minutes.', 429, cors);
+    const row = Number.isSafeInteger(id) && id > 0 ? await env.DB.prepare("SELECT id, slug FROM comments WHERE id = ? AND status = 'approved'").bind(id).first() : null;
+    if (!row) return fail(NOT_FOUND, 404, cors);
+    // Every statement only applies while the comment is still approved. The like row is added with INSERT OR IGNORE (a double tap or a second tab is
+    // "already liked", never an error), and the counter is then set from the rows themselves, so it equals the number of rows after any interleaving.
+    const approved = "EXISTS (SELECT 1 FROM comments WHERE id = ? AND status = 'approved')";
+    await env.DB.batch([
+      b.on
+        ? env.DB.prepare(`INSERT OR IGNORE INTO comment_likes(comment_id, voter, created) SELECT ?, ?, ? WHERE ${approved}`).bind(id, b.cid, now(), id)
+        : env.DB.prepare(`DELETE FROM comment_likes WHERE comment_id = ? AND voter = ? AND ${approved}`).bind(id, b.cid, id),
+      env.DB.prepare("UPDATE comments SET likes = (SELECT COUNT(*) FROM comment_likes WHERE comment_id = ?) WHERE id = ? AND status = 'approved'").bind(id, id),
+    ]);
+    const now2 = await env.DB.prepare("SELECT likes FROM comments WHERE id = ? AND status = 'approved'").bind(id).first();
+    if (!now2) return fail(NOT_FOUND, 404, cors); // hidden or deleted while we worked
+    return reply({ ok: true, likes: now2.likes, liked: b.on }, 200, cors);
   }
 
   /* ------------------------------------------------------------- moderation */

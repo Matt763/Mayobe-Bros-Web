@@ -785,3 +785,137 @@ test('admin delete of a tombstone removes it and its replies; delete also remove
   await admin(b.id, 'delete');
   assert.deepEqual(env.DB.raw.prepare('SELECT comment_id FROM comment_likes').all().map((x) => x.comment_id), [other.id]);
 });
+
+/* ---------------------------------------------------------------- likes */
+const like = (id, cid, on = true, opts = {}) => call('POST', `/v1/comments/${id}/like`, { body: { cid, on }, ...opts });
+const likeRows = (id) => env.DB.raw.prepare('SELECT COUNT(*) AS n FROM comment_likes WHERE comment_id = ?').get(id).n;
+const likesCol = (id) => rawRow(id).likes;
+const pubLikes = async (id) => (await call('GET', '/v1/posts/hello-post')).json.comments.find((c) => c.id === id).likes;
+
+test('like: add, repeat, remove; counts per comment', async () => {
+  const a = await mk();
+  const b = await mk({ body: 'A second comment here', cid: CID2 }, '2.2.2.2');
+  let r = await like(a.id, CID);
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.json, { ok: true, likes: 1, liked: true });
+  r = await like(a.id, CID2);
+  assert.equal(r.json.likes, 2);
+  r = await like(a.id, CID);
+  assert.deepEqual(r.json, { ok: true, likes: 2, liked: true }, 'the same visitor twice does not double count');
+  assert.equal(await pubLikes(a.id), 2);
+  assert.equal(await pubLikes(b.id), 0, 'another comment is not affected');
+  const mine = await call('GET', `/v1/posts/hello-post?cid=${CID}`);
+  assert.deepEqual(mine.json.liked, [a.id]);
+  assert.equal(mine.headers.get('cache-control'), 'no-cache');
+  await like(b.id, CID2);
+  assert.deepEqual((await call('GET', `/v1/posts/hello-post?cid=${CID2}`)).json.liked.sort(), [a.id, b.id].sort());
+  assert.deepEqual((await call('GET', `/v1/posts/hello-post?cid=${CID}`)).json.liked, [a.id], 'not listed for the other visitor');
+  for (const q of ['', '?cid=short', '?cid=%00%00']) assert.equal('liked' in (await call('GET', `/v1/posts/hello-post${q}`)).json, false, `no liked key for "${q}"`);
+  r = await like(a.id, CID, false);
+  assert.deepEqual(r.json, { ok: true, likes: 1, liked: false });
+  r = await like(a.id, CID, false);
+  assert.deepEqual(r.json, { ok: true, likes: 1, liked: false }, 'removing twice does not go lower');
+  r = await like(a.id, CID2, false);
+  assert.equal(r.json.likes, 0);
+  r = await like(a.id, 'visitor-who-never-liked', false);
+  assert.equal(r.json.likes, 0, 'never below 0');
+  assert.equal(await pubLikes(a.id), 0);
+  assert.equal(likesCol(a.id), likeRows(a.id));
+});
+
+test('like: only approved comments, valid visitor id, our Origin', async () => {
+  const held = await mk({ body: RUDE });
+  assert.equal(held.status, 'pending');
+  assert.equal((await like(held.id, CID)).status, 404, 'held comment');
+  const a = await mk({ body: 'A normal approved one', cid: CID2 }, '2.2.2.2');
+  assert.equal((await like(a.id, 'short')).status, 400);
+  assert.equal((await call('POST', `/v1/comments/${a.id}/like`, { body: { cid: CID } })).status, 400, 'on must be true or false');
+  assert.equal((await like(a.id, CID, true, { origin: null })).status, 403);
+  assert.equal((await like(a.id, CID, true, { origin: 'https://evil.example' })).status, 403);
+  assert.equal((await like(99999, CID)).status, 404);
+  for (const id of ['abc', '-1', '0', '99999999999999999999999']) assert.equal((await like(id, CID)).status, 404, id);
+  assert.equal(likeRows(a.id), 0);
+  // spam, and a comment that a flagged edit moved back to pending
+  const s = await mk({ body: 'Soon to be hidden', cid: 'spam-spam-spam-spam-1' }, '3.3.3.3');
+  await like(s.id, CID);
+  await admin(s.id, 'spam');
+  assert.equal((await like(s.id, CID2)).status, 404);
+  assert.equal((await like(s.id, CID, false)).status, 404, 'unlike on a hidden comment is the same 404');
+  const e = await mk({ body: 'Edit me please', cid: 'edit-edit-edit-edit-1' }, '4.4.4.4');
+  assert.equal((await edit(e.id, e.token, RUDE, { ip: '4.4.4.4' })).json.status, 'pending');
+  assert.equal((await like(e.id, CID)).status, 404);
+  assert.equal(likesCol(e.id), likeRows(e.id));
+});
+
+test('like: a tombstone cannot be liked', async () => {
+  const a = await mk();
+  await reply2(a.id);
+  await del(a.id, a.token);
+  assert.equal(rawRow(a.id).status, 'deleted');
+  assert.equal((await like(a.id, CID)).status, 404);
+  assert.equal(likeRows(a.id), 0);
+  assert.equal(likesCol(a.id), 0);
+});
+
+test('like: a UNIQUE conflict from a double tap is not an error', async () => {
+  const a = await mk();
+  // the row exists but the counter was not moved yet (as if another tap was half way through)
+  env.DB.raw.prepare('INSERT INTO comment_likes(comment_id, voter, created) VALUES(?, ?, 1)').run(a.id, CID);
+  let r = await like(a.id, CID);
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.json, { ok: true, likes: 1, liked: true }, 'the count agrees with the rows');
+  assert.equal(likesCol(a.id), likeRows(a.id));
+  // two taps at once
+  const b = await mk({ body: 'Another approved one', cid: CID2 }, '2.2.2.2');
+  const out = await Promise.all([like(b.id, CID, true, { ip: '5.5.5.5' }), like(b.id, CID, true, { ip: '5.5.5.5' })]);
+  assert.deepEqual(out.map((x) => x.status), [200, 200]);
+  assert.equal(likesCol(b.id), 1);
+  assert.equal(likeRows(b.id), 1);
+});
+
+test('like: parallel on/off/on requests leave the counter equal to the rows', async () => {
+  const a = await mk();
+  for (let round = 0; round < 5; round++) {
+    const out = await Promise.all([like(a.id, CID, true), like(a.id, CID, false), like(a.id, CID, true), like(a.id, CID2, true), like(a.id, CID2, false), like(a.id, CID, false)]);
+    for (const x of out) assert.equal(x.status, 200);
+    assert.equal(likesCol(a.id), likeRows(a.id), `round ${round}`);
+  }
+  // a race hook: the row is hidden between the check and the write
+  const real = env.DB;
+  let ran = false;
+  const wrap = (st, sql) => ({
+    bind: (...x) => wrap(st.bind(...x), sql),
+    first: async () => { const r = await st.first(); if (!ran && sql.startsWith("SELECT id, slug FROM comments WHERE id = ? AND status = 'approved'")) { ran = true; real.raw.exec(`UPDATE comments SET status = 'spam' WHERE id = ${a.id}`); } return r; },
+    all: () => st.all(), run: () => st.run(), _exec: () => st._exec(),
+  });
+  env.DB = { ...real, prepare: (sql) => wrap(real.prepare(sql), sql), batch: (l) => real.batch(l) };
+  const before = { rows: likeRows(a.id), col: likesCol(a.id) };
+  const r = await like(a.id, 'brand-new-visitor-id-1');
+  assert.ok([404, 200].includes(r.status));
+  assert.equal(likeRows(a.id), before.rows, 'no like row for a comment that was hidden meanwhile');
+  assert.equal(likesCol(a.id), before.col);
+});
+
+test('like: deleting a comment removes its likes', async () => {
+  const a = await mk();
+  await like(a.id, CID); await like(a.id, CID2);
+  assert.equal(likeRows(a.id), 2);
+  assert.equal((await del(a.id, a.token)).json.removed, 'deleted');
+  assert.equal(likeRows(a.id), 0);
+  assert.equal((await like(a.id, CID)).status, 404);
+  const b = await mk({ body: 'Second thread starter', cid: 'second-second-second-2' }, '3.3.3.3');
+  await like(b.id, CID); await like(b.id, CID2);
+  await reply2(b.id);
+  assert.equal((await del(b.id, b.token, { ip: '3.3.3.3' })).json.removed, 'tombstone');
+  assert.equal(likeRows(b.id), 0);
+  assert.equal(likesCol(b.id), 0);
+});
+
+test('like: rate limited', async () => {
+  const a = await mk();
+  let last;
+  for (let i = 0; i < 120; i++) { last = await like(a.id, CID, i % 2 === 0, { ip: '9.9.9.9' }); assert.equal(last.status, 200, `request ${i + 1}`); }
+  last = await like(a.id, CID, true, { ip: '9.9.9.9' });
+  assert.equal(last.status, 429);
+  assert.equal((await like(a.id, CID, true, { ip: '8.8.8.8' })).status, 200, 'another visitor address is not limited');
+});
