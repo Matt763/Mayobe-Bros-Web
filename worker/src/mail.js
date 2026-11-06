@@ -8,7 +8,9 @@ const DEFAULT_FROM_SUPPORT = 'Mayobe Bros <support@mayobebros.com>';
 export const CAPS = { owner: 10, commenter: 25, contact: 10, news: 35 };
 const EMAIL_RE = /^[^\s@<>(),;:"\\]+@[^\s@<>(),;:"\\]+\.[^\s@<>(),;:"\\.]{2,}$/;
 
-let warnedNoKey = false;
+const warnedNoKey = new WeakSet(); // log the missing key once per env (per isolate in production)
+const TIMEOUT_MS = 10000;
+const TAG_RE = /^[A-Za-z0-9_-]{1,256}$/;
 // env.MAIL_TEST_DAY (optional, tests only) replaces today's UTC date so a day rollover can be tested.
 const today = (env) => env.MAIL_TEST_DAY || new Date().toISOString().slice(0, 10);
 
@@ -26,26 +28,38 @@ async function giveBack(env, kind, day) {
 }
 
 const oneLine = (s) => String(s ?? '').replace(/[\r\n\u2028\u2029]+/g, ' ').trim();
+const validEmail = (s) => { const v = String(s ?? '').trim().toLowerCase(); return v.length > 0 && v.length <= 254 && !/[\r\n]/.test(String(s)) && EMAIL_RE.test(v); };
 const logFail = (what, status, bodyText) => console.error(`mail: ${what}${status ? ` status=${status}` : ''}${bodyText ? ` body=${String(bodyText).slice(0, 300)}` : ''}`);
 
+// Resolves to { ok, skipped?, id?, status? }; skipped is 'no-key' (no API key, or no idempotency key on the message),
+// 'bad-address', 'suppressed' or 'budget'. A skipped or failed send never throws.
 export async function sendMail(env, ctx, msg) {
   try {
     if (!env.RESEND_API_KEY) {
-      if (!warnedNoKey) { warnedNoKey = true; console.error('mail: RESEND_API_KEY is not set; email is switched off'); }
+      if (!warnedNoKey.has(env)) { warnedNoKey.add(env); console.error('mail: RESEND_API_KEY is not set; email is switched off'); }
       return { ok: false, skipped: 'no-key' };
     }
     const to = String(msg?.to ?? '').trim().toLowerCase();
     if (!to || to.length > 254 || /[\r\n]/.test(String(msg.to)) || !EMAIL_RE.test(to)) return { ok: false, skipped: 'bad-address' };
     if (await env.DB.prepare('SELECT 1 AS x FROM suppressed WHERE email = ?').bind(to).first()) return { ok: false, skipped: 'suppressed' };
 
+    if (typeof msg.key !== 'string' || !msg.key.trim()) { logFail('message has no idempotency key; not sent'); return { ok: false, skipped: 'no-key' }; }
+
     const day = today(env);
     if (!(await takeBudget(env, msg.kind, day))) return { ok: false, skipped: 'budget' };
 
     const from = msg.from === 'support' ? (env.MAIL_FROM_SUPPORT || DEFAULT_FROM_SUPPORT) : oneLine(msg.from) || env.MAIL_FROM || DEFAULT_FROM;
     const body = { from, to: [to], subject: oneLine(msg.subject), html: msg.html, text: msg.text };
-    if (msg.replyTo) body.reply_to = oneLine(msg.replyTo);
-    if (msg.headers) body.headers = msg.headers;
-    if (msg.tags) body.tags = msg.tags;
+    if (msg.replyTo && validEmail(msg.replyTo)) body.reply_to = oneLine(msg.replyTo);
+    if (msg.headers && typeof msg.headers === 'object') {
+      const h = {};
+      for (const [k, v] of Object.entries(msg.headers)) if (typeof v === 'string' && oneLine(k)) h[oneLine(k)] = oneLine(v);
+      if (Object.keys(h).length) body.headers = h;
+    }
+    if (Array.isArray(msg.tags)) {
+      const t = msg.tags.filter((x) => x && typeof x.name === 'string' && typeof x.value === 'string' && TAG_RE.test(x.name) && TAG_RE.test(x.value)).map((x) => ({ name: x.name, value: x.value }));
+      if (t.length) body.tags = t;
+    }
 
     let res, text = '';
     try {
@@ -55,24 +69,27 @@ export async function sendMail(env, ctx, msg) {
           Authorization: `Bearer ${env.RESEND_API_KEY}`,
           'Content-Type': 'application/json',
           'User-Agent': 'mayobe-engage/1.0',
-          'Idempotency-Key': String(msg.key || '').slice(0, 256),
+          'Idempotency-Key': msg.key.slice(0, 256),
         },
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(TIMEOUT_MS), // a hung connection must not hold waitUntil open
       });
       text = await res.text();
     } catch (e) {
-      logFail(`fetch failed (${oneLine(e?.message).slice(0, 100)})`);
+      logFail(`fetch failed or timed out (${oneLine(e?.name)} ${oneLine(e?.message).slice(0, 100)})`);
       await giveBack(env, msg.kind, day);
       return { ok: false };
     }
     let json = null;
     try { json = JSON.parse(text); } catch { /* not JSON */ }
-    if (!res.ok || !json?.id) {
-      logFail(res.ok ? 'unexpected reply' : 'send failed', res.status, text);
-      await giveBack(env, msg.kind, day);
+    if (!res.ok) {
+      logFail('send failed', res.status, text);
+      if (res.status === 429 || res.status >= 500) await giveBack(env, msg.kind, day); // a retry can work; a permanent 4xx keeps its unit
       return { ok: false, status: res.status };
     }
-    return { ok: true, id: String(json.id), status: res.status };
+    // 2xx means Resend took it. Without an id we still call it sent: a retry under a new key could duplicate the mail.
+    if (!json?.id) logFail('sent, but the reply had no id', res.status, text);
+    return { ok: true, id: json?.id ? String(json.id) : undefined, status: res.status };
   } catch (e) {
     try { logFail(`error (${oneLine(e?.message).slice(0, 100)})`); } catch { /* nothing more to do */ }
     return { ok: false };

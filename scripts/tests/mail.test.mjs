@@ -84,7 +84,6 @@ test('429, 500, a thrown fetch and a non-JSON body all return ok:false and never
     () => new Response('{"message":"slow down"}', { status: 429 }),
     () => new Response('boom ' + 'x'.repeat(1000), { status: 500 }),
     () => { throw new Error('network down'); },
-    () => new Response('<html>not json</html>', { status: 200 }),
   ]) {
     reply = make; logs.length = 0;
     const r = await sendMail(env, ctx, msg({ key: 'f' + Math.random() }));
@@ -93,6 +92,69 @@ test('429, 500, a thrown fetch and a non-JSON body all return ok:false and never
     assert.ok(!logs.join('\n').includes(KEY), 'key must not be logged');
     assert.ok(logs.join('\n').length < 700, 'response body is truncated');
   }
+});
+
+test('a 2xx reply without an id counts as sent (no refund, logged)', async () => {
+  env.MAIL_TEST_DAY = '2026-03-03';
+  reply = () => new Response('<html>not json</html>', { status: 200 });
+  const r = await sendMail(env, ctx, msg());
+  assert.deepEqual(r, { ok: true, id: undefined, status: 200 });
+  assert.ok(logs.length === 1 && !logs[0].includes(KEY));
+  assert.equal((await env.DB.prepare('SELECT n FROM mail_budget WHERE day = ?').bind('2026-03-03').first()).n, 1);
+});
+
+test('a missing key is logged once per env, not on every send', async () => {
+  delete env.RESEND_API_KEY;
+  await sendMail(env, ctx, msg()); await sendMail(env, ctx, msg()); await sendMail(env, ctx, msg());
+  assert.equal(logs.length, 1);
+});
+
+test('no idempotency key = skipped, no fetch, no budget taken', async () => {
+  for (const key of [undefined, '', '   ', 5, null]) {
+    assert.deepEqual(await sendMail(env, ctx, msg({ key })), { ok: false, skipped: 'no-key' });
+  }
+  assert.equal(calls.length, 0);
+  assert.equal((await env.DB.prepare('SELECT COUNT(*) AS c FROM mail_budget').first()).c, 0);
+});
+
+test('headers, tags and reply-to are sanitised', async () => {
+  await sendMail(env, ctx, msg({
+    replyTo: 'a@x.com, b@y.com',
+    headers: { 'List-Unsubscribe': '<https://x.test/u>\r\nBcc: evil@x.com', 'X-N\r\nname': 'v', 'X-Bad': 5 },
+    tags: [{ name: 'kind', value: 'owner' }, { name: 'bad name', value: 'x' }, { name: 'k', value: 'a\r\nb' }, { name: 'ok_1-', value: 'fine' }, null],
+  }));
+  const b = JSON.parse(calls[0].init.body);
+  assert.equal('reply_to' in b, false);
+  assert.deepEqual(b.headers, { 'List-Unsubscribe': '<https://x.test/u> Bcc: evil@x.com', 'X-N name': 'v' });
+  assert.deepEqual(b.tags, [{ name: 'kind', value: 'owner' }, { name: 'ok_1-', value: 'fine' }]);
+  assert.ok(!/[\r\n]/.test(Object.keys(b.headers).join('') + Object.values(b.headers).join('')));
+  await sendMail(env, ctx, msg({ key: 'k-ok', replyTo: 'Good@Example.com' }));
+  assert.equal(JSON.parse(calls[1].init.body).reply_to, 'Good@Example.com');
+});
+
+test('the fetch has a timeout signal; a timeout is a network failure and is refunded', async () => {
+  env.MAIL_TEST_DAY = '2026-04-04';
+  globalThis.fetch = async (url, init) => { calls.push({ url, init }); throw new DOMException('The operation timed out', 'TimeoutError'); };
+  const r = await sendMail(env, ctx, msg());
+  assert.deepEqual(r, { ok: false });
+  assert.ok(calls[0].init.signal instanceof AbortSignal);
+  assert.equal((await env.DB.prepare('SELECT n FROM mail_budget WHERE day = ?').bind('2026-04-04').first()).n, 0);
+});
+
+test('a permanent 4xx keeps its budget unit; 429 and 5xx return it', async () => {
+  env.MAIL_TEST_DAY = '2026-05-05';
+  const n = async () => (await env.DB.prepare('SELECT n FROM mail_budget WHERE day = ? AND kind = ?').bind('2026-05-05', 'owner').first()).n;
+  for (const status of [400, 401, 403, 409, 422]) { reply = () => new Response('no', { status }); assert.equal((await sendMail(env, ctx, msg({ key: 'p' + status }))).ok, false); }
+  assert.equal(await n(), 5);
+  for (const status of [429, 500, 503]) { reply = () => new Response('later', { status }); await sendMail(env, ctx, msg({ key: 't' + status })); }
+  assert.equal(await n(), 5);
+});
+
+test('the refund never takes the count below 0', async () => {
+  env.MAIL_TEST_DAY = '2026-06-06';
+  globalThis.fetch = async () => { await env.DB.prepare('UPDATE mail_budget SET n = 0').run(); return new Response('x', { status: 500 }); };
+  await sendMail(env, ctx, msg());
+  assert.equal((await env.DB.prepare('SELECT n FROM mail_budget WHERE day = ?').bind('2026-06-06').first()).n, 0);
 });
 
 test('CR/LF in subject are stripped; in an address they are rejected', async () => {
@@ -104,7 +166,7 @@ test('CR/LF in subject are stripped; in an address they are rejected', async () 
   assert.equal(calls.length, 1);
 });
 
-test('a failed send gives its budget unit back, and never below 0', async () => {
+test('a failed (retryable) send gives its budget unit back', async () => {
   env.MAIL_TEST_DAY = '2026-02-02';
   reply = () => new Response('err', { status: 500 });
   for (let i = 0; i < 12; i++) assert.equal((await sendMail(env, ctx, msg({ key: `r${i}` }))).ok, false);
