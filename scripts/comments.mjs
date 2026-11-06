@@ -20,6 +20,7 @@ let token = process.env.ADMIN_TOKEN || '';
 if (!token && fs.existsSync(path.join(ROOT, '.admin-token'))) token = fs.readFileSync(path.join(ROOT, '.admin-token'), 'utf8').trim();
 
 const [cmd = 'list', ...rest] = process.argv.slice(2);
+let STATIC_COPY_NOTE = false;
 if (!api) { console.error('No API address. Set "commentsApi" in site.config.json (or MAYOBE_API) after deploying the Worker.'); process.exit(1); }
 if (!token) { console.error('No admin token. Set ADMIN_TOKEN, or save it in a file named .admin-token in the project root.'); process.exit(1); }
 
@@ -39,6 +40,7 @@ try {
       console.log(`#${c.id}  [${c.status}]  ${new Date(c.created).toISOString().slice(0, 16).replace('T', ' ')}  on "${c.slug}"${c.parent_id ? `  (reply to #${c.parent_id})` : ''}`);
       console.log(`   ${c.name}${c.email ? ` <${c.email}>` : ''}: ${c.body.replace(/\n/g, ' ')}`);
       if (c.flag) console.log(`   held because: ${c.flag}`);
+      if (c.prev_body) console.log(`   edited; before the edit: ${c.prev_body.replace(/\n/g, ' ')}`);
       console.log('');
     }
   } else if (['approve', 'spam', 'delete'].includes(cmd)) {
@@ -47,12 +49,16 @@ try {
       const j = await call('POST', `/admin/comments/${Number(id)}`, { action: cmd });
       console.log(`#${id}: ${cmd} ok (post now has ${j.stats.c} approved comment${j.stats.c === 1 ? '' : 's'})`);
     }
+    if (cmd !== 'approve') STATIC_COPY_NOTE = true;
   } else if (cmd === 'reply') {
     const [id, text, name] = rest;
     if (!id || !text) throw new Error('Usage: reply <comment id> "your reply" ["Display name"]');
     const j = await call('POST', '/admin/reply', { parent: Number(id), body: text, ...(name ? { name } : {}) });
     console.log(`#${j.comment.id}: team reply published under #${id} (post now has ${j.stats.c} comment${j.stats.c === 1 ? '' : 's'})`);
+    STATIC_COPY_NOTE = true;
   } else throw new Error(`Unknown command "${cmd}". Use: list, approve, spam, delete, reply.`);
+  // Answered questions are also saved as plain text in the post pages (content/qa.json). Hiding or deleting a comment does not remove that copy.
+  if (STATIC_COPY_NOTE) console.log('\nNext: node scripts/qa-sync.mjs && node scripts/build.mjs, then push. Until then the saved copy of an answered question stays in the page. Comments that readers delete themselves also stay in the saved copy until you run qa-sync. If a comment held personal data, tell me: git history needs cleaning too.');
 } catch (err) {
   console.error(`✖ ${err.message}`);
   process.exit(1);

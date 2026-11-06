@@ -365,6 +365,23 @@ test('edit: the screen runs again and a flagged edit is held', async () => {
   assert.equal(ok.json.stats.c, 1);
 });
 
+test('admin list shows the text before an edit', async () => {
+  const a = await mk();
+  const before = Date.now();
+  assert.equal((await edit(a.id, a.token, RUDE)).json.status, 'pending');
+  const row = (await call('GET', '/v1/admin/comments', { auth: env.ADMIN_TOKEN, origin: null })).json.comments[0];
+  assert.equal(row.prev_body, 'Thanks, this helped me a lot.');
+  assert.equal(typeof row.edited_at, 'number');
+  assert.ok(row.edited_at >= before - 1000);
+  // approved again: the public list shows only the "edited" time, never the old text or edited_at
+  await admin(a.id, 'approve');
+  const pub = (await call('GET', '/v1/posts/hello-post')).json;
+  const raw = JSON.stringify(pub);
+  assert.equal(raw.includes('prev_body'), false);
+  assert.equal(raw.includes('edited_at'), false);
+  assert.equal(raw.includes('Thanks, this helped'), false);
+});
+
 test('edit: links and short text are refused; an unchanged or whitespace-only change is a no-op', async () => {
   const a = await mk();
   assert.equal((await edit(a.id, a.token, 'see www.x.com')).status, 400);

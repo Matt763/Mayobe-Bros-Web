@@ -381,7 +381,7 @@ async function handle(request, env, ctx) {
     if (method === 'GET' && path === '/v1/admin/comments') {
       const status = ['pending', 'approved', 'spam'].includes(url.searchParams.get('status')) ? url.searchParams.get('status') : 'pending';
       const limit = Math.min(200, Math.max(1, Number(url.searchParams.get('limit')) || 50));
-      const rows = await env.DB.prepare('SELECT id, slug, parent_id, name, email, body, prev_body, status, created, flag FROM comments WHERE status = ? ORDER BY created DESC LIMIT ?').bind(status, limit).all();
+      const rows = await env.DB.prepare('SELECT id, slug, parent_id, name, email, body, prev_body, edited_at, status, created, flag FROM comments WHERE status = ? ORDER BY created DESC LIMIT ?').bind(status, limit).all();
       return reply({ comments: rows.results || [] }, 200, cors);
     }
     if (method === 'POST' && path === '/v1/admin/reply') {

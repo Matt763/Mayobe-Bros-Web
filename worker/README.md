@@ -61,6 +61,41 @@ node scripts/comments.mjs delete 6          # remove
 node scripts/comments.mjs reply 1 "Thanks for the love"   # publish a reply from the team under comment 1 (shows a Team badge)
 ```
 
+## Edit, delete and like (readers, no accounts)
+
+Every new comment gets a secret "manage token" (24 random bytes, shown once in the reply to the visitor's browser, which keeps it). The Worker stores only its SHA-256 hash, so
+nobody, including you, can read it back. The token goes in the JSON body, never in the address. All three routes need our `Origin` and are rate limited.
+
+```text
+POST /v1/comments/12/edit    {"token":"<token>","body":"New text of the comment"}
+POST /v1/comments/12/delete  {"token":"<token>"}
+POST /v1/comments/12/like    {"cid":"<visitor id>","on":true}      (on:false removes the like)
+GET  /v1/posts/<slug>?cid=<visitor id>      also returns "liked": the ids of comments this visitor liked
+```
+
+- **Edit rule:** a reader can change their own comment for 30 minutes after posting, and only while it is published and has no reply (a published or waiting reply both count).
+  The window is `EDIT_WINDOW_MINUTES` (a variable under `vars` in `wrangler.jsonc`; leave it out for 30). The new text goes through the same automatic screen as a new comment,
+  so a flagged edit is held until you approve it. Saving the same text, or the same text with different spaces, changes nothing and does not restart the window.
+- **Delete:** a comment with no replies is removed. A comment with replies stays as a blank "tombstone" so the replies keep their place: the public sees "This comment was deleted.",
+  and the name, email, text, token hash and visitor hashes are erased. The tombstone disappears when its last reply is removed. A comment you marked as spam cannot be deleted by its author.
+- **Wrong token, unknown id, team comment, spam or deleted comment:** all give the same `404` ("That comment could not be found."), so nothing can be probed.
+- **Likes:** one per visitor id per comment; liking twice is not an error and does not count twice.
+- **Old text of an edit (`prev_body`):** kept only so you can see what was changed. `node scripts/comments.mjs list` prints it under the comment as "edited; before the edit: ...".
+  It is never sent to the public, and it is erased when the comment is deleted (by the reader or by you).
+
+**Rollout, in this order** (each step is yours to run; nothing here is automatic):
+
+```bash
+cd worker
+npx wrangler d1 migrations apply mayobe-engage --remote   # 1. applies 0004_comment_controls.sql (new columns and the likes table)
+npx wrangler deploy                                       # 2. deploys the new Worker
+cd .. && node scripts/build.mjs                           # 3. rebuild the site, then commit and push
+```
+
+The migration only adds columns and a table, so the old Worker keeps working until step 2, and the old site keeps working with the new Worker until step 3.
+**After the first real deploy, test one edit and one hide on the live Worker** (post a comment, edit it, then `node scripts/comments.mjs spam <id>` and check the count). The tests prove
+the logic on a local SQLite copy of D1; D1's `RETURNING` and `changes()` inside `batch()` were only proven there, not on Cloudflare itself.
+
 ## What protects the site from spam
 
 The automatic screen above (flagged comments are held until approved) · links are refused · a hidden field and a minimum
