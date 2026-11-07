@@ -31,8 +31,9 @@ const oneLine = (s) => String(s ?? '').replace(/[\r\n\u2028\u2029]+/g, ' ').trim
 export const validEmail = (s) => { const v = String(s ?? '').trim().toLowerCase(); return v.length > 0 && v.length <= 254 && !/[\r\n]/.test(String(s)) && EMAIL_RE.test(v); };
 const logFail = (what, status, bodyText) => console.error(`mail: ${what}${status ? ` status=${status}` : ''}${bodyText ? ` body=${String(bodyText).slice(0, 300)}` : ''}`);
 
-// Resolves to { ok, skipped?, id?, status? }; skipped is 'no-key' (no API key, or no idempotency key on the message),
-// 'bad-address', 'suppressed' or 'budget'. A skipped or failed send never throws.
+// Resolves to { ok, skipped?, id?, status?, error? }; skipped is 'no-key' (no API key, or no idempotency key on the message),
+// 'bad-address', 'suppressed' or 'budget'. error 'local' means something failed here (usually a D1 query) before Resend was called,
+// so the message was certainly not sent. A skipped or failed send never throws.
 export async function sendMail(env, ctx, msg) {
   try {
     if (!env.RESEND_API_KEY) {
@@ -41,7 +42,9 @@ export async function sendMail(env, ctx, msg) {
     }
     const to = String(msg?.to ?? '').trim().toLowerCase();
     if (!to || to.length > 254 || /[\r\n]/.test(String(msg.to)) || !EMAIL_RE.test(to)) return { ok: false, skipped: 'bad-address' };
-    if (await env.DB.prepare('SELECT 1 AS x FROM suppressed WHERE email = ?').bind(to).first()) {
+    // msg.suppressionChecked: the caller already checked the list in the same statement that claimed the send (newsletter cron),
+    // which saves one D1 query per send on a plan that allows 50 per invocation.
+    if (!msg.suppressionChecked && await env.DB.prepare('SELECT 1 AS x FROM suppressed WHERE email = ?').bind(to).first()) {
       if (msg.kind === 'owner') console.error('mail: an owner-kind message was skipped because its address is on the suppressed list');
       return { ok: false, skipped: 'suppressed' };
     }
@@ -94,7 +97,8 @@ export async function sendMail(env, ctx, msg) {
     if (!json?.id) logFail('sent, but the reply had no id', res.status, text);
     return { ok: true, id: json?.id ? String(json.id) : undefined, status: res.status };
   } catch (e) {
-    try { logFail(`error (${oneLine(e?.message).slice(0, 100)})`); } catch { /* nothing more to do */ }
-    return { ok: false };
+    // The Resend fetch has its own catch above, so this is a local error (D1, a bad message) before anything was sent.
+    try { logFail(`local error before sending, not sent (database or message: ${oneLine(e?.message).slice(0, 100)})`); } catch { /* nothing more to do */ }
+    return { ok: false, error: 'local' };
   }
 }

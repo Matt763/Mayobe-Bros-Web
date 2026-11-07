@@ -6,7 +6,7 @@
 //   POST /v1/newsletter/unsubscribe { token }                          -> 200 { ok: true } (also when already unsubscribed) | 404; one farewell per row
 //   POST /v1/newsletter/one-click?t=  body List-Unsubscribe=One-Click  -> 200 for any token (RFC 8058, no Origin check, no farewell) | 400 for a wrong body
 //   GET  /v1/newsletter/one-click?t=                                   -> 303 to the /newsletter/ page; changes nothing (link scanners GET)
-//   runNewsletter(env, ctx, opts)  the daily Cron Trigger job: seed guard, one email per new article per subscriber, clean-up
+//   runNewsletter(env, ctx, opts)  the Cron Trigger job (six runs each morning): seed guard, one email per new article per subscriber, clean-up
 
 import { sendMail, validEmail, CAPS } from './mail.js';
 import { confirmSubscriptionEmail, welcomeEmail, farewellEmail, newPostEmail } from './mail-templates.js';
@@ -28,16 +28,22 @@ const apiOrigin = (env) => {
   return /^https:\/\/[^/\s]+$/.test(o) || /^http:\/\/127\.0\.0\.1:\d+$/.test(o) ? o : '';
 };
 
-// A new unsubscribe token for one subscriber (only its hash is stored; it never expires). Returns the page link for the mail body and,
-// when API_ORIGIN is valid, the two headers that let a mail app unsubscribe with one POST.
-export async function unsubscribeKit(env, subscriberId) {
+// A new unsubscribe token for one subscriber (only its hash is stored; it never expires). `insert` is the statement that stores it,
+// so the daily sender can put it in one batch with its claim. Returns the page link for the mail body and, when API_ORIGIN is valid,
+// the two headers that let a mail app unsubscribe with one POST.
+async function unsubscribeParts(env, subscriberId) {
   const token = await newToken();
-  await env.DB.prepare("INSERT INTO newsletter_tokens(hash, subscriber_id, kind, expires, created) VALUES(?, ?, 'unsub', NULL, ?)").bind(await sha(token), subscriberId, now()).run();
   const api = apiOrigin(env);
   return {
+    insert: env.DB.prepare("INSERT INTO newsletter_tokens(hash, subscriber_id, kind, expires, created) VALUES(?, ?, 'unsub', NULL, ?)").bind(await sha(token), subscriberId, now()),
     pageUrl: `${siteOrigin(env)}/newsletter/#u=${token}`,
     headers: api ? { 'List-Unsubscribe': `<${api}/v1/newsletter/one-click?t=${token}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' } : {},
   };
+}
+export async function unsubscribeKit(env, subscriberId) {
+  const { insert, pageUrl, headers } = await unsubscribeParts(env, subscriberId);
+  await insert.run();
+  return { pageUrl, headers };
 }
 
 // Creates or revives the subscriber row and sends the confirmation, unless a limit says no. Runs after the answer is decided.
@@ -214,114 +220,185 @@ function postMail(env, p, unsubscribeUrl) {
   }, siteOf(env));
 }
 
-// Deletes what is no longer needed; returns the number of rows removed.
-async function cleanUp(env, t) {
-  const n = async (sql, ...a) => (await env.DB.prepare(sql).bind(...a).run())?.meta?.changes || 0;
-  // pending rows older than 7 days with no live confirm token (a row revived by a new sign-up keeps its old `created` but has a fresh token)
-  const stalePending = "SELECT id FROM newsletter_subscribers s WHERE s.status = 'pending' AND s.created < ? AND NOT EXISTS (SELECT 1 FROM newsletter_tokens k WHERE k.subscriber_id = s.id AND k.kind = 'confirm' AND k.expires > ?)";
-  const gone = "SELECT id FROM newsletter_subscribers WHERE status = 'unsubscribed' AND unsubscribed < ?";
-  const pc = t - PENDING_DAYS * D;
-  const gc = t - GONE_DAYS * D;
-  let purged = 0;
-  purged += await n(`DELETE FROM newsletter_tokens WHERE subscriber_id IN (${stalePending})`, pc, t);
-  purged += await n(`DELETE FROM newsletter_subscribers WHERE id IN (${stalePending})`, pc, t);
-  purged += await n("DELETE FROM newsletter_tokens WHERE kind = 'confirm' AND expires < ?", t);
-  purged += await n(`DELETE FROM newsletter_tokens WHERE subscriber_id IN (${gone})`, gc);
-  purged += await n(`DELETE FROM newsletter_deliveries WHERE subscriber_id IN (${gone})`, gc);
-  purged += await n(`DELETE FROM newsletter_subscribers WHERE id IN (${gone})`, gc);
-  purged += await n('DELETE FROM newsletter_deliveries WHERE slug IN (SELECT slug FROM newsletter_sent WHERE sent_at IS NOT NULL AND sent_at < ?)', t - DELIVERY_DAYS * D);
-  return purged;
+// Free plan: 50 subrequests per invocation, and every D1 query (a db.batch counts as one) and every fetch is one
+// (developers.cloudflare.com/workers/platform/limits/ and /d1/platform/limits/, checked 2026-11-07). The run counts its own and stops
+// at this ceiling, leaving room to spare. A send costs at most SEND_COST: claim+token batch, takeBudget, the Resend fetch, giveBack
+// (only after a 429/5xx/timeout), mark or release, and the post's closing update. About 9 sends fit in one run, so the cron fires six
+// times in the sending window (wrangler.jsonc) and the daily news budget (CAPS.news) still bounds the day.
+const SUBREQUEST_CEILING = 45;
+const SEND_COST = 6;
+
+// env.DB with a counter: each first/all/run and each batch adds one.
+function metered(db, meter) {
+  const wrap = (st) => ({
+    inner: st,
+    bind: (...a) => wrap(st.bind(...a)),
+    first: (...a) => { meter.n++; return st.first(...a); },
+    all: (...a) => { meter.n++; return st.all(...a); },
+    run: (...a) => { meter.n++; return st.run(...a); },
+  });
+  return { prepare: (sql) => wrap(db.prepare(sql)), batch: (list) => { meter.n++; return db.batch(list.map((x) => x.inner || x)); } };
 }
 
-// The daily job. Seeds on the first run (nothing old is ever mass-mailed), records old unknown posts without sending, then sends each
-// new post once per subscriber: every send is claimed in newsletter_deliveries first, so an overlapping run or a crash never sends twice.
-// mode 'dry' writes nothing and sends nothing; 'seed' records posts and cleans up but sends nothing. Never throws.
+// Deletes what is no longer needed, in one batch; returns the number of rows removed.
+async function cleanUp(env, t) {
+  // pending rows older than 7 days with no live confirm token (a row revived by a new sign-up keeps its old `created` but has a fresh token)
+  const stalePending = "SELECT id FROM newsletter_subscribers s WHERE s.status = 'pending' AND s.created < ?1 AND NOT EXISTS (SELECT 1 FROM newsletter_tokens k WHERE k.subscriber_id = s.id AND k.kind = 'confirm' AND k.expires > ?2)";
+  const gone = "SELECT id FROM newsletter_subscribers WHERE status = 'unsubscribed' AND unsubscribed < ?1";
+  const pc = t - PENDING_DAYS * D;
+  const gc = t - GONE_DAYS * D;
+  const q = (sql, ...a) => env.DB.prepare(`${sql} RETURNING 1`).bind(...a);
+  const out = await env.DB.batch([
+    q(`DELETE FROM newsletter_tokens WHERE subscriber_id IN (${stalePending})`, pc, t),
+    q(`DELETE FROM newsletter_subscribers WHERE id IN (${stalePending})`, pc, t),
+    q("DELETE FROM newsletter_tokens WHERE kind = 'confirm' AND expires < ?1", t),
+    q(`DELETE FROM newsletter_tokens WHERE subscriber_id IN (${gone})`, gc),
+    q(`DELETE FROM newsletter_deliveries WHERE subscriber_id IN (${gone})`, gc),
+    q(`DELETE FROM newsletter_subscribers WHERE id IN (${gone})`, gc),
+    // newsletter_sent itself is never purged: it is what stops a post from being sent again
+    q('DELETE FROM newsletter_deliveries WHERE slug IN (SELECT slug FROM newsletter_sent WHERE sent_at IS NOT NULL AND sent_at < ?1)', t - DELIVERY_DAYS * D),
+  ]);
+  return out.reduce((n, r) => n + (r?.results?.length || 0), 0);
+}
+
+// The cron job (several runs a day). Seeds on the first run (nothing old is ever mass-mailed), records old unknown posts without sending,
+// then sends each new post once per subscriber: every send is claimed in newsletter_deliveries first, so an overlapping run or a crash
+// never sends twice. mode 'dry' writes nothing and sends nothing; 'seed' records posts and cleans up but sends nothing. Never throws.
+// opts.subrequestLimit replaces SUBREQUEST_CEILING (tests only).
 export async function runNewsletter(env, ctx, opts = {}) {
   const report = { paused: env.NEWSLETTER_SEND !== 'true', seeded: [], tooOld: [], posts: [], stopped: null, purged: 0 };
   const mode = opts.mode === 'dry' || opts.mode === 'seed' ? opts.mode : 'send';
   const dry = mode === 'dry';
   const sleep = opts.sleep || ((ms) => new Promise((r) => setTimeout(r, ms)));
+  const meter = { n: 0, limit: Number.isFinite(opts.subrequestLimit) ? opts.subrequestLimit : SUBREQUEST_CEILING };
+  const t = Number.isFinite(opts.now) ? opts.now : now();
+  let menv = env;
   try {
-    const t = Number.isFinite(opts.now) ? opts.now : now();
+    menv = { ...env, DB: metered(env.DB, meter) };
+  } catch (err) {
+    console.error('newsletter: no database', err && err.message ? err.message : err);
+    return report;
+  }
+  // clean-up first and on its own, so a failure later in the run can never skip it
+  if (!dry) {
+    try { report.purged = await cleanUp(menv, t); } catch (err) { console.error('newsletter clean-up failed', err && err.message ? err.message : err); }
+  }
+  try {
+    meter.n++; // the list fetch
     const list = await publishedPosts(env, dayStr(t));
     if (!list) {
       report.stopped = 'no-list';
       console.error('newsletter: the post list could not be read or had no valid entry; nothing recorded or sent');
     } else {
-      await sendRun(env, ctx, report, list, { t, dry, mode, sleep });
+      await sendRun(menv, ctx, report, list, { t, dry, mode, sleep, meter });
     }
-    if (!dry) report.purged = await cleanUp(env, t);
   } catch (err) {
+    if (!report.stopped) report.stopped = 'error';
     console.error('newsletter run failed', err && err.message ? err.message : err);
   }
-  console.log(`newsletter: ${JSON.stringify({ mode, ...report, seeded: report.seeded.length })}`);
+  console.log(`newsletter: ${JSON.stringify({ mode, ...report, seeded: report.seeded.length, subrequests: meter.n })}`);
   return report;
 }
 
-async function sendRun(env, ctx, report, list, { t, dry, mode, sleep }) {
+const insertSent = (DB, p, t, seeded) => DB.prepare('INSERT OR IGNORE INTO newsletter_sent(slug, title, queued_at, sent_at, seeded) VALUES(?, ?, ?, ?, ?)').bind(p.s, str(p.t, 200), t, seeded ? t : null, seeded ? 1 : 0);
+
+async function sendRun(env, ctx, report, list, { t, dry, mode, sleep, meter }) {
   const DB = env.DB;
-  // (2) first run ever: record every listed post as already handled, send nothing
-  const any = await DB.prepare('SELECT 1 AS x FROM newsletter_sent LIMIT 1').first();
-  if (!any) {
+  const known = new Map((await DB.prepare('SELECT slug, queued_at, sent_at, seeded FROM newsletter_sent').all()).results.map((r) => [r.slug, r]));
+  // (2) first run ever: record every listed post as already handled, send nothing. If that first list is valid but partial (a build
+  // that wrote only some posts), the missing ones count as new on the next good run; the 7-day rule below limits that to last week's posts.
+  if (!known.size) {
     report.seeded = list.map((p) => p.s);
-    if (!dry) await DB.batch(list.map((p) => DB.prepare('INSERT OR IGNORE INTO newsletter_sent(slug, title, queued_at, sent_at, seeded) VALUES(?, ?, ?, ?, 1)').bind(p.s, str(p.t, 200), t, t)));
+    if (!dry) await DB.batch(list.map((p) => insertSent(DB, p, t, true)));
     return;
   }
-  const known = new Map((await DB.prepare('SELECT slug, queued_at, sent_at, seeded FROM newsletter_sent').all()).results.map((r) => [r.slug, r]));
   const freshFrom = dayStr(t - FRESH_DAYS * D);
   const unknown = list.filter((p) => !known.has(p.s));
-  // (3) an unknown post older than 7 days (a renamed slug, or a list that was down) is recorded and never emailed
+  // (3) an unknown post older than 7 days (a renamed slug, or a list that was down) is recorded and never emailed. A post renamed within
+  // 7 days of its date is NOT caught (search.json carries no aliases): it would be sent again under the new slug. Do not rename a post in
+  // its first week.
   const old = unknown.filter((p) => p.d < freshFrom);
   report.tooOld = old.map((p) => p.s);
-  if (old.length && !dry) await DB.batch(old.map((p) => DB.prepare('INSERT OR IGNORE INTO newsletter_sent(slug, title, queued_at, sent_at, seeded) VALUES(?, ?, ?, ?, 1)').bind(p.s, str(p.t, 200), t, t)));
-  // (4)
-  if (mode === 'seed') return;
-  if (report.paused && !dry) return;
-  if (!apiOrigin(env)) { report.stopped = 'no-api-origin'; console.error('newsletter: API_ORIGIN is missing or not https; nothing sent'); return; }
-  if (!env.RESEND_API_KEY && !dry) { report.stopped = 'no-key'; console.error('newsletter: RESEND_API_KEY is not set; nothing sent'); return; }
-  // (5) queue new posts, oldest first
   const fresh = unknown.filter((p) => p.d >= freshFrom);
-  if (fresh.length && !dry) await DB.batch(fresh.map((p) => DB.prepare('INSERT OR IGNORE INTO newsletter_sent(slug, title, queued_at, sent_at, seeded) VALUES(?, ?, ?, NULL, 0)').bind(p.s, str(p.t, 200), t)));
   const bySlug = new Map(list.map((p) => [p.s, p]));
-  const queue = dry
-    ? [...[...known.values()].filter((r) => r.sent_at === null && !r.seeded), ...fresh.map((p) => ({ slug: p.s, queued_at: t }))]
-    : (await DB.prepare('SELECT slug, queued_at FROM newsletter_sent WHERE sent_at IS NULL AND seeded = 0').all()).results;
+  const writes = old.map((p) => insertSent(DB, p, t, true));
+  // (4)
+  const sending = mode !== 'seed' && (!report.paused || dry); // dry reports what it would send even while paused
+  if (sending && !dry) {
+    if (!apiOrigin(env)) report.stopped = 'no-api-origin';
+    else if (!env.RESEND_API_KEY) report.stopped = 'no-key';
+  }
+  const queueing = sending && !report.stopped;
+  if (queueing) {
+    // (5) queue new posts. A queued post that has left the list (unpublished) is not sent; after 7 days it is closed so it cannot come back.
+    for (const p of fresh) writes.push(insertSent(DB, p, t, false));
+    for (const r of known.values()) if (r.sent_at === null && !bySlug.has(r.slug) && r.queued_at < t - FRESH_DAYS * D) writes.push(DB.prepare('UPDATE newsletter_sent SET sent_at = ? WHERE slug = ? AND sent_at IS NULL').bind(t, r.slug));
+  }
+  if (writes.length && !dry) await DB.batch(writes);
+  if (report.stopped) { console.error(`newsletter: ${report.stopped === 'no-key' ? 'RESEND_API_KEY is not set' : 'API_ORIGIN is missing or not https'}; nothing sent`); return; }
+  if (!queueing) return;
+
+  // From the snapshot (no second read). A run started at the same moment may have queued the same slug a few ms apart; harmless.
+  const queue = [...[...known.values()].filter((r) => r.sent_at === null && !r.seeded), ...fresh.map((p) => ({ slug: p.s, queued_at: t }))];
   const todo = queue.filter((r) => bySlug.has(r.slug)).sort((a, b) => {
     const x = bySlug.get(a.slug), y = bySlug.get(b.slug);
     return x.d < y.d ? -1 : x.d > y.d ? 1 : a.slug < b.slug ? -1 : 1;
   });
-  // A queued post that has left the list (unpublished) is not sent; after 7 days it is closed so it cannot come back to life.
-  if (!dry) for (const r of queue) if (!bySlug.has(r.slug) && r.queued_at < t - FRESH_DAYS * D) await DB.prepare('UPDATE newsletter_sent SET sent_at = ? WHERE slug = ? AND sent_at IS NULL').bind(t, r.slug).run();
 
   const eligible = "FROM newsletter_subscribers s WHERE s.status = 'active' AND s.confirmed <= ? AND NOT EXISTS (SELECT 1 FROM newsletter_deliveries d WHERE d.slug = ? AND d.subscriber_id = s.id)";
+  const room = (cost) => meter.n + cost <= meter.limit;
   let calls = 0; // Resend calls in this run: at most CAPS.news, whatever happens to the budget (a 429 or 5xx gives its unit back)
   for (const row of todo) {
     const p = bySlug.get(row.slug);
-    const stat = { slug: p.s, recipients: (await DB.prepare(`SELECT COUNT(*) AS n ${eligible}`).bind(row.queued_at, p.s).first())?.n || 0, sent: 0, skipped: 0, failed: 0 };
+    const stat = { slug: p.s, recipients: 0, sent: 0, skipped: 0, failed: 0 };
     report.posts.push(stat);
-    if (dry) continue;
+    if (dry) { stat.recipients = (await DB.prepare(`SELECT COUNT(*) AS n ${eligible}`).bind(row.queued_at, p.s).first())?.n || 0; continue; }
     let after = 0;
     for (;;) {
-      const page = (await DB.prepare(`SELECT s.id, s.email ${eligible} AND s.id > ? ORDER BY s.id LIMIT ${PAGE}`).bind(row.queued_at, p.s, after).all()).results;
+      if (!room(1 + SEND_COST)) { report.stopped = 'subrequests'; return; }
+      // one read per page: who is left, and whether the address is on the do-not-email list
+      const page = (await DB.prepare(`SELECT s.id, s.email, EXISTS (SELECT 1 FROM suppressed x WHERE x.email = s.email) AS sup ${eligible} AND s.id > ? ORDER BY s.id LIMIT ${PAGE}`).bind(row.queued_at, p.s, after).all()).results;
       if (!page.length) break;
       for (const s of page) {
-        after = s.id;
+        if (s.sup) {
+          if (!room(2)) { report.stopped = 'subrequests'; return; }
+          after = s.id;
+          await DB.prepare("INSERT OR IGNORE INTO newsletter_deliveries(slug, subscriber_id, status, at) VALUES(?, ?, 'skipped', ?)").bind(p.s, s.id, now()).run();
+          stat.recipients++; stat.skipped++;
+          continue;
+        }
         if (calls >= CAPS.news) { report.stopped = 'budget'; return; }
+        if (!room(SEND_COST)) { report.stopped = 'subrequests'; return; }
+        after = s.id;
         if (calls > 0) await sleep(GAP_MS);
-        // the claim re-checks the subscriber, so someone who left since the page was read gets nothing
-        const claimed = await DB.prepare("INSERT OR IGNORE INTO newsletter_deliveries(slug, subscriber_id, status, at) SELECT ?, id, 'claimed', ? FROM newsletter_subscribers WHERE id = ? AND status = 'active' RETURNING subscriber_id")
-          .bind(p.s, now(), s.id).first();
-        if (!claimed) continue;
-        const kit = await unsubscribeKit(env, s.id);
-        const m = postMail(env, p, kit.pageUrl);
-        const res = await sendMail(env, ctx, { kind: 'news', to: s.email, ...m, headers: kit.headers, key: `nl-post-${p.s}-${s.id}` });
-        const mark = (status) => DB.prepare('UPDATE newsletter_deliveries SET status = ?, at = ? WHERE slug = ? AND subscriber_id = ?').bind(status, now(), p.s, s.id).run();
+        // One batch: the claim (which re-checks that the subscriber is still active and not suppressed, so someone who left since the
+        // page was read gets nothing) and the unsubscribe token for this email. If the claim is lost to another run the token row is
+        // simply never mailed; it is deleted with the subscriber.
+        const kit = await unsubscribeParts(env, s.id);
+        const [claim] = await DB.batch([
+          DB.prepare("INSERT OR IGNORE INTO newsletter_deliveries(slug, subscriber_id, status, at) SELECT ?, s.id, 'claimed', ? FROM newsletter_subscribers s WHERE s.id = ? AND s.status = 'active' AND NOT EXISTS (SELECT 1 FROM suppressed x WHERE x.email = s.email) RETURNING subscriber_id").bind(p.s, now(), s.id),
+          kit.insert,
+        ]);
+        if (!claim?.results?.length) continue;
+        stat.recipients++;
         const release = () => DB.prepare("DELETE FROM newsletter_deliveries WHERE slug = ? AND subscriber_id = ? AND status = 'claimed'").bind(p.s, s.id).run();
-        if (res.ok) { calls++; stat.sent++; await mark('sent'); continue; }
-        if (res.skipped === 'suppressed' || res.skipped === 'bad-address') { stat.skipped++; await mark('skipped'); continue; }
+        const mark = (status) => DB.prepare('UPDATE newsletter_deliveries SET status = ?, at = ? WHERE slug = ? AND subscriber_id = ?').bind(status, now(), p.s, s.id).run();
+        let res;
+        try {
+          const m = postMail(env, p, kit.pageUrl);
+          meter.n++; // the Resend fetch
+          res = await sendMail(env, ctx, { kind: 'news', to: s.email, ...m, headers: kit.headers, key: `nl-post-${p.s}-${s.id}`, suppressionChecked: true });
+        } catch (err) {
+          await release(); // nothing reached Resend
+          throw err;
+        }
+        // nothing reached Resend: give the claim back and end the run
+        if (res.error === 'local') { await release(); report.stopped = 'error'; return; }
         if (res.skipped === 'budget') { await release(); report.stopped = 'budget'; return; }
-        if (res.skipped) { await release(); report.stopped = 'no-key'; return; } // no key: nothing reached Resend
+        if (res.skipped === 'bad-address' || res.skipped === 'suppressed') { stat.skipped++; await mark('skipped'); continue; }
+        if (res.skipped) { await release(); report.stopped = 'no-key'; return; }
         calls++;
+        if (res.ok) { stat.sent++; await mark('sent'); continue; }
         if (res.status === 429) { await release(); report.stopped = 'rate'; return; }
         stat.failed++; await mark('failed'); // 5xx, thrown, timed out: Resend may have taken it, so never retried
       }

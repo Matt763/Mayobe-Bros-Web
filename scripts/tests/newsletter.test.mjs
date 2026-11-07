@@ -23,8 +23,10 @@ let pendingMail = [];
 let searchList = FIXTURE; // what /data/search.json answers
 let searchMode = 'ok'; // 'ok' | 'fail' (HTTP 500) | 'throw'
 let resendFn = null; // optional (callNumber, body) => Response, or throws; replaces the default 200
+let onFetch = null; // optional hook called for every fetch (counts subrequests)
 test.before(() => {
   globalThis.fetch = async (u, init) => {
+    if (onFetch) onFetch(String(u));
     if (String(u).endsWith('/data/search.json')) {
       if (searchMode === 'throw') throw new Error('site down');
       if (searchMode === 'fail') return new Response('oops', { status: 500 });
@@ -42,7 +44,7 @@ test.before(() => {
 test.after(() => { globalThis.fetch = realFetch; });
 const flushMail = async () => { while (pendingMail.length) await Promise.all(pendingMail.splice(0)); };
 test.afterEach(flushMail);
-test.beforeEach(() => { sent = []; resendMode = 'ok'; pendingMail = []; searchList = FIXTURE; searchMode = 'ok'; resendFn = null; env = { DB: makeD1(), SITE_ORIGIN: ORIGIN, RESEND_API_KEY: 're_test_key', API_ORIGIN: 'https://worker.test' }; });
+test.beforeEach(() => { sent = []; resendMode = 'ok'; pendingMail = []; searchList = FIXTURE; searchMode = 'ok'; resendFn = null; onFetch = null; env = { DB: makeD1(), SITE_ORIGIN: ORIGIN, RESEND_API_KEY: 're_test_key', API_ORIGIN: 'https://worker.test' }; });
 
 async function call(path, { body, origin = ORIGIN, ip = '1.1.1.1' } = {}) {
   const headers = { 'CF-Connecting-IP': ip, 'Content-Type': 'application/json' };
@@ -393,6 +395,12 @@ async function run(opts = {}) {
   await flushMail();
   return r;
 }
+// Runs again while a run stops at the subrequest ceiling (as the six cron runs of a morning would); returns the last report.
+async function runAll(opts = {}) {
+  let r;
+  for (let i = 0; i < 20; i++) { r = await run(opts); if (r.stopped !== 'subrequests') return r; }
+  throw new Error('runAll did not finish');
+}
 function addSub(email, { status = 'active', confirmed = Date.now() - 86400000, created = Date.now() - 2 * 86400000, unsubscribed = null } = {}) {
   return Number(env.DB.raw.prepare('INSERT INTO newsletter_subscribers(email, email_key, status, created, confirmed, unsubscribed) VALUES(?, ?, ?, ?, ?, ?)')
     .run(email, email, status, created, status === 'pending' ? null : confirmed, unsubscribed).lastInsertRowid);
@@ -514,7 +522,7 @@ test('40 subscribers: today sends what is left of the 35 news units and stops wi
   for (let i = 1; i <= 40; i++) addSub(`s${i}@example.com`);
   for (let i = 0; i < 3; i++) assert.equal(await takeBudget(env, 'news'), true);
   searchList = [...OLD_LIST, entry('fresh-post', dayOf(0))];
-  const r1 = await run();
+  const r1 = await runAll();
   assert.equal(r1.stopped, 'budget');
   assert.equal(postMails().length, 32);
   assert.equal(rows("SELECT sent_at FROM newsletter_sent WHERE slug = 'fresh-post'")[0].sent_at, null, 'not finished yet');
@@ -523,7 +531,7 @@ test('40 subscribers: today sends what is left of the 35 news units and stops wi
   assert.equal(again.stopped, 'budget');
   assert.equal(postMails().length, 32);
   env.MAIL_TEST_DAY = '2030-01-02';
-  const r2 = await run();
+  const r2 = await runAll();
   assert.equal(r2.stopped, null);
   assert.equal(postMails().length, 40);
   assert.equal(new Set(postMails().map(to)).size, 40, 'each subscriber once');
@@ -535,7 +543,7 @@ test('two runs started together send each (post, subscriber) once', async () => 
   sendOn();
   for (let i = 1; i <= 12; i++) addSub(`t${i}@example.com`);
   searchList = [...OLD_LIST, entry('fresh-post', dayOf(0)), entry('other-post', dayOf(-1))];
-  await Promise.all([run(), run(), run()]);
+  await Promise.all([runAll(), runAll(), runAll()]);
   assert.equal(postMails().length, 24);
   assert.equal(new Set(postMails().map((m) => m.headers['Idempotency-Key'])).size, 24);
   assert.equal(rows("SELECT COUNT(*) AS n FROM newsletter_deliveries WHERE status = 'sent'")[0].n, 24);
@@ -590,9 +598,9 @@ test('a subscriber unsubscribed between pages gets nothing', async () => {
   searchList = [...OLD_LIST, entry('fresh-post', dayOf(0))];
   sleepHook = (n) => {
     if (n === 2) env.DB.raw.prepare("UPDATE newsletter_subscribers SET status = 'unsubscribed', unsubscribed = ? WHERE id = ?").run(Date.now(), ids[4]); // same page, not yet sent
-    if (n === 9) env.DB.raw.prepare("UPDATE newsletter_subscribers SET status = 'unsubscribed', unsubscribed = ? WHERE id = ?").run(Date.now(), ids[12]); // on the second page, read after this
+    if (n === 7) env.DB.raw.prepare("UPDATE newsletter_subscribers SET status = 'unsubscribed', unsubscribed = ? WHERE id = ?").run(Date.now(), ids[12]); // on the second page, read after this
   };
-  await run();
+  await runAll();
   const got = postMails().map(to);
   assert.equal(got.length, 13);
   assert.equal(got.includes('u5@example.com'), false);
@@ -637,7 +645,7 @@ test('sleep(200) is awaited between sends and a run makes at most 35 Resend call
   let overlap = 0;
   sleepHook = async () => { inSleep = true; await new Promise((r) => setTimeout(r, 3)); inSleep = false; };
   resendFn = () => { if (inSleep) overlap++; return new Response('{}', { status: 500 }); }; // 500 gives the budget unit back, so only the call cap stops it
-  const r = await run();
+  const r = await run({ subrequestLimit: 10000 }); // lift the platform ceiling to reach the per-run call cap
   assert.equal(sent.length, 35);
   assert.equal(r.stopped, 'budget');
   assert.equal(overlap, 0, 'no send while a sleep is still running');
@@ -713,4 +721,164 @@ test('mode dry writes nothing and calls Resend never, but reports what it would 
   assert.deepEqual(r.tooOld, ['renamed-post']);
   assert.deepEqual(r.posts, [{ slug: 'fresh-post', recipients: 2, sent: 0, skipped: 0, failed: 0 }]);
   assert.deepEqual(sleeps, []);
+});
+
+// ---- Task 3 fix round 1: the Free plan's 50 subrequests per invocation ----
+// env.DB wrapper that counts D1 calls (each first/all/run, each batch) plus every fetch, and throws like D1 does past `limit`.
+function limitedDB(limit, { failAt = null } = {}) {
+  const base = env.DB;
+  const c = { n: 0, over: false, d1: 0 };
+  const tick = () => {
+    c.n++; c.d1++;
+    if (failAt !== null && c.d1 === failAt) throw new Error('D1_ERROR: injected');
+    if (c.n > limit) { c.over = true; throw new Error('Too many API requests by single worker invocation.'); }
+  };
+  const wrap = (st) => ({ inner: st, bind: (...a) => wrap(st.bind(...a)), first: (...a) => { tick(); return st.first(...a); }, all: (...a) => { tick(); return st.all(...a); }, run: (...a) => { tick(); return st.run(...a); } });
+  onFetch = () => { c.n++; if (c.n > limit) { c.over = true; throw new Error('Too many subrequests.'); } };
+  return { db: { prepare: (sql) => wrap(base.prepare(sql)), batch: (l) => { tick(); return base.batch(l.map((x) => x.inner || x)); }, raw: base.raw }, c, base };
+}
+// every row still 'claimed' must belong to a mail Resend was actually given (a crash after the send), never to an unsent one
+function noUnsentClaims() {
+  const keys = new Set(sent.map((m) => m.headers['Idempotency-Key']));
+  for (const r of rows("SELECT slug, subscriber_id FROM newsletter_deliveries WHERE status = 'claimed'")) assert.ok(keys.has(`nl-post-${r.slug}-${r.subscriber_id}`), `claimed but unsent: ${r.slug} ${r.subscriber_id}`);
+}
+
+test('under a D1 + fetch wrapper that throws past 50 calls, each run stops cleanly with subrequests, leaves no unsent claim, and later runs finish everyone once', async () => {
+  await seeded();
+  sendOn();
+  for (let i = 1; i <= 30; i++) addSub(`w${i}@example.com`);
+  searchList = [...OLD_LIST, entry('fresh-post', dayOf(0)), entry('other-post', dayOf(-1))];
+  let r;
+  let runs = 0;
+  do {
+    const { db, c, base } = limitedDB(50);
+    env.DB = db;
+    r = await run();
+    env.DB = base; onFetch = null;
+    runs++;
+    assert.equal(c.over, false, `run ${runs} went over 50 (${c.n})`);
+    assert.ok(c.n <= 45, `run ${runs} used ${c.n}`);
+    noUnsentClaims();
+    assert.ok(r.stopped === 'subrequests' || r.stopped === 'budget' || r.stopped === null, String(r.stopped));
+    if (r.stopped === 'subrequests') assert.ok(r.posts.reduce((n, p) => n + p.sent, 0) >= 9, `a full run sends at least 9 (run ${runs}: ${JSON.stringify(r.posts)})`);
+  } while (r.stopped === 'subrequests' && runs < 20);
+  assert.equal(r.stopped, 'budget', 'the 35-a-day budget ends the day');
+  assert.ok(runs >= 4 && runs <= 6, `35 sends took ${runs} runs (the cron fires 6 times)`);
+  assert.equal(postMails().length, 35);
+  assert.equal(new Set(postMails().map((m) => m.headers['Idempotency-Key'])).size, 35, 'nobody gets the same post twice');
+  env.MAIL_TEST_DAY = dayOf(1);
+  await runAll();
+  assert.equal(postMails().length, 60);
+  assert.equal(new Set(postMails().map((m) => m.headers['Idempotency-Key'])).size, 60);
+  assert.equal(rows("SELECT 1 FROM newsletter_sent WHERE sent_at IS NULL").length, 0);
+});
+
+test('a D1 error at any point of a run leaves no claimed-but-unsent row, clean-up still runs, and the next run sends each subscriber once', async () => {
+  const origErr = console.error;
+  for (let k = 1; k <= 22; k++) {
+    env = { DB: makeD1(), SITE_ORIGIN: ORIGIN, RESEND_API_KEY: 're_test_key', API_ORIGIN: 'https://worker.test' };
+    sent = [];
+    await seeded();
+    sendOn();
+    for (let i = 1; i <= 4; i++) addSub(`k${i}@example.com`);
+    addSub('stale@example.com', { status: 'pending', created: Date.now() - 9 * 86400000 });
+    searchList = [...OLD_LIST, entry('fresh-post', dayOf(0))];
+    const { db, base } = limitedDB(1000, { failAt: k });
+    env.DB = db;
+    console.error = () => {};
+    let r;
+    try { r = await run(); } finally { console.error = origErr; env.DB = base; onFetch = null; }
+    assert.equal(typeof r, 'object', `k=${k}`);
+    noUnsentClaims();
+    if (k > 1) assert.equal(rows("SELECT 1 FROM newsletter_subscribers WHERE email = 'stale@example.com'").length, 0, `clean-up ran (k=${k})`);
+    await runAll();
+    noUnsentClaims();
+    const got = postMails().map(to).sort();
+    assert.equal(new Set(got).size, got.length, `nobody twice (k=${k})`);
+    // a mail whose 'sent' mark failed stays claimed (sent once, never again); everyone else got exactly one
+    assert.deepEqual(got, ['k1@example.com', 'k2@example.com', 'k3@example.com', 'k4@example.com'], `k=${k}`);
+  }
+});
+
+test('a D1 error inside sendMail is reported as a local error, logged as such, and the claim is released', async () => {
+  await seeded();
+  sendOn();
+  addSub('a@example.com');
+  searchList = [...OLD_LIST, entry('fresh-post', dayOf(0))];
+  const base = env.DB;
+  env.DB = { prepare: (sql) => (sql.includes('mail_budget') ? { bind: () => ({ first: async () => { throw new Error('D1_ERROR: budget table'); } }) } : base.prepare(sql)), batch: (l) => base.batch(l), raw: base.raw };
+  const logs = [];
+  const origErr = console.error;
+  console.error = (...a) => logs.push(a.join(' '));
+  let r;
+  try { r = await run(); } finally { console.error = origErr; env.DB = base; }
+  assert.equal(r.stopped, 'error');
+  assert.equal(sent.length, 0);
+  assert.equal(rows('SELECT 1 FROM newsletter_deliveries').length, 0, 'the claim was released');
+  assert.ok(logs.some((l) => l.includes('local error before sending') && l.includes('budget table')), logs.join('\n'));
+  await run();
+  assert.equal(postMails().length, 1);
+});
+
+test('a queued post that leaves the list is not sent; after 7 days it is closed, and when it reappears nothing is sent', async () => {
+  await seeded();
+  sendOn();
+  addSub('a@example.com', { confirmed: Date.now() - 3 * 86400000 });
+  const D = 86400000;
+  // queued two hours ago, nothing sent yet (as if the budget ran out), then unpublished
+  env.DB.raw.prepare("INSERT INTO newsletter_sent(slug, title, queued_at, sent_at, seeded) VALUES('gone-post', 'x', ?, NULL, 0)").run(Date.now() - 2 * 3600000);
+  searchList = OLD_LIST;
+  await run({ now: Date.now() + 6 * D });
+  assert.equal(sent.length, 0);
+  assert.equal(rows("SELECT sent_at FROM newsletter_sent WHERE slug = 'gone-post'")[0].sent_at, null, 'still open at +6 days');
+  await run({ now: Date.now() + 8 * D });
+  assert.ok(rows("SELECT sent_at FROM newsletter_sent WHERE slug = 'gone-post'")[0].sent_at > 0, 'closed at +8 days');
+  searchList = [...OLD_LIST, entry('gone-post', dayOf(0))];
+  const r = await run();
+  assert.equal(sent.length, 0, 'reappearing sends nothing');
+  assert.deepEqual(r.posts, []);
+});
+
+test('sendMail with suppressionChecked skips its own suppressed query (the caller checked it in the claim)', async () => {
+  let suppressedQueries = 0;
+  const base = env.DB;
+  const db = { prepare: (sql) => { if (sql.includes('FROM suppressed')) suppressedQueries++; return base.prepare(sql); } };
+  const { sendMail } = await import('../../worker/src/mail.js');
+  const r = await sendMail({ ...env, DB: db }, null, { kind: 'news', to: 'x@example.com', subject: 's', html: 'h', text: 't', key: 'k1', suppressionChecked: true });
+  assert.equal(r.ok, true);
+  assert.equal(suppressedQueries, 0);
+  await sendMail({ ...env, DB: db }, null, { kind: 'news', to: 'x@example.com', subject: 's', html: 'h', text: 't', key: 'k2' });
+  assert.equal(suppressedQueries, 1);
+});
+
+test('a low ceiling is honoured inside a page too: every run stays under it and the rest go out in later runs', async () => {
+  await seeded();
+  sendOn();
+  for (let i = 1; i <= 12; i++) addSub(`l${i}@example.com`);
+  searchList = [...OLD_LIST, entry('fresh-post', dayOf(0))];
+  for (let runs = 0; runs < 20; runs++) {
+    const { db, c, base } = limitedDB(20);
+    env.DB = db;
+    const r = await run({ subrequestLimit: 20 });
+    env.DB = base; onFetch = null;
+    assert.equal(c.over, false, `went over 20 (${c.n})`);
+    noUnsentClaims();
+    if (r.stopped !== 'subrequests') break;
+  }
+  assert.equal(postMails().length, 12);
+  assert.equal(new Set(postMails().map(to)).size, 12);
+});
+
+test('an address suppressed after the page was read is not claimed or sent', async () => {
+  await seeded();
+  sendOn();
+  addSub('first@example.com');
+  const id = addSub('bounced-now@example.com');
+  searchList = [...OLD_LIST, entry('fresh-post', dayOf(0))];
+  sleepHook = () => { env.DB.raw.exec("INSERT OR IGNORE INTO suppressed(email, reason, created) VALUES('bounced-now@example.com', 'bounce', 1)"); };
+  await run();
+  assert.deepEqual(postMails().map(to), ['first@example.com']);
+  assert.equal(rows('SELECT 1 FROM newsletter_deliveries WHERE subscriber_id = ?', id).length, 0);
+  await run();
+  assert.equal(postMails().length, 1, 'never sent later either');
 });
