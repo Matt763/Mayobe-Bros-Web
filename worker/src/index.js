@@ -248,10 +248,10 @@ async function slugKnown(env, slug) {
   return true;
 }
 
-// Title and address of one of OUR articles, from the site's own list; '' and a plain /post/<slug>/ address if it is not listed.
+// Title and address of one of OUR articles, from the site's own list; '' and the post list address (/post/) if it is not listed (real article URLs include the category, so a made-up one would 404).
 // Never taken from visitor input: this is what goes into emails to addresses nobody has verified.
 async function postMeta(env, slug) {
-  const fallback = { title: '', path: `/post/${slug}/`, found: false };
+  const fallback = { title: '', path: '/post/', found: false };
   try {
     const r = await fetch(`${siteOrigin(env)}/data/search.json`, { cf: { cacheTtl: 300, cacheEverything: true } });
     if (!r.ok) return fallback;
@@ -330,6 +330,8 @@ async function mailReplyNotice(env, ctx, r) {
 
 // Alerts to the owner (full content; the template escapes it).
 async function mailOwner(env, ctx, kind, c, reason) {
+  // Comment alerts get 3 of the 10 daily owner units (contact notices get 7), so questions cannot silence the contact form. The comment is saved either way; `node scripts/comments.mjs list` shows everything.
+  if (!(await hit(env, ctx, `oaday:${utcDay()}`, 3, DAY_TTL))) return;
   const meta = await postMeta(env, c.slug);
   const m = ownerAlertEmail({ kind, postUrl: `${siteOrigin(env)}${meta.path}`, postSlug: c.slug, commentId: c.id, name: c.name, body: c.body, reason }, siteOf(env));
   await sendMail(env, ctx, { kind: 'owner', to: env.OWNER_EMAIL || 'info@mayobebros.com', ...m, key: `alert-${c.id}-${kind}` });

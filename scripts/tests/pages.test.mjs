@@ -79,13 +79,18 @@ test('the comment form has the email-me checkbox, hidden until an email is typed
     if (!html.includes('data-comments')) continue;
     const rel = path.relative(ROOT, file);
     assert.match(html, /<input[^>]*type="checkbox"[^>]*name="notify"|<input[^>]*name="notify"[^>]*type="checkbox"/, `${rel}: no notify checkbox`);
-    assert.ok(html.includes('Email me a link to edit or delete this comment, and tell me when the team replies'), `${rel}: checkbox label text`);
+    assert.ok(html.includes('Email me a link to edit or delete this comment, and tell me when someone replies'), `${rel}: checkbox label text`);
     assert.match(html, /data-notify-row[^>]*\bhidden\b/, `${rel}: the checkbox row must start hidden`);
     assert.match(html, /only for this[^<]*never shown/i, `${rel}: hint that the address is used only for this`);
     assert.doesNotMatch(html.match(/<input[^>]*name="notify"[^>]*>/)[0], /\bchecked\b/, `${rel}: checkbox must be unchecked by default`);
     checked++;
   }
   assert.ok(checked > 0, 'no built post page has comments');
+});
+
+test('/manage/ does not load the analytics beacon, other pages do', () => {
+  assert.doesNotMatch(fs.readFileSync(path.join(ROOT, 'manage', 'index.html'), 'utf8'), /cloudflareinsights/, 'manage page must not load the beacon');
+  assert.match(fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8'), /cloudflareinsights/, 'home page still loads it');
 });
 
 test('/manage/ is noindex, no-referrer, has one button, and calls the API only from a click', () => {

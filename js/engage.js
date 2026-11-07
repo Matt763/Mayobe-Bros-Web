@@ -485,7 +485,7 @@
       var payload = { name: name, email: email, body: body, parent: f.parent.value || null, cid: cid(), website: f.website.value, ts: pageLoaded };
       var wantsMail = !!(notifyRow && !notifyRow.hidden && f.notify.checked && EMAIL_RE.test(email));
       if (wantsMail) payload.notify = true;
-      var mailNote = wantsMail ? ' If the address is right, you will get an email shortly. Check your spam folder too.' : '';
+      var mailNote = wantsMail ? ' If the address is right and our email service is working, you will get an email shortly. Check your spam folder too.' : '';
       if (TURNSTILE && window.turnstile && widget) payload.tt = window.turnstile.getResponse(widget);
       submit.disabled = true;
       setStatus('', 'Sending…');

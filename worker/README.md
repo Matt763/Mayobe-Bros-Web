@@ -113,6 +113,7 @@ The free Resend plan allows 100 emails a day and 3,000 a month. The Worker keeps
 owner 10, commenter 25, contact 10, news 35. A full slice never borrows from another. Contact-form notices to the owner are capped at 7 a day
 inside the owner slice (`ctday:` in `hits`), so a flood of contact messages leaves 3 owner emails for held-comment and question alerts; past 7
 the form answers with the "please email us" message. Each visitor confirmation (the `contact` slice) is sent once a day per address.
+Comment alerts to the owner (held comments and questions) are capped at 3 a day (`oaday:` in `hits`), which with the 7 contact notices makes the 10 owner units. After 3 alerts the comments are still saved; you can see every one with `node scripts/comments.mjs list`.
 
 ## Bounces and complaints (Resend webhook)
 
@@ -155,9 +156,10 @@ Nothing below has been run. Do the steps in order; each one is a single command 
 3. In Resend: Webhooks, Add endpoint `<worker URL>/v1/webhooks/resend`, events `email.bounced` and `email.complained`; copy the signing secret (`whsec_...`) for `RESEND_WEBHOOK_SECRET`; keep open and click tracking OFF for the domain. The endpoint can be created before the Worker is deployed; it only starts working after step 5.
 4. Set the secrets (you paste the value when asked; never type it in a command line or share it): `npx wrangler secret put RESEND_API_KEY` and `npx wrangler secret put RESEND_WEBHOOK_SECRET`. The webhook secret is the one you copied in step 3. Secrets take effect without a new deploy.
 5. Deploy: `npx wrangler deploy`
-6. Live check on a test comment: edit it once and hide it once with `node scripts/comments.mjs spam <id>` (D1 `RETURNING` and `changes()` inside a batch were only proven on the local SQLite stand-in, so watch for errors), post a comment with the email box ticked and open the emailed link, and send the contact form once.
-7. Send each template to your own Gmail (look at it on a phone), an Outlook and a Yahoo address: `read -rs RESEND_API_KEY; export RESEND_API_KEY` (paste the key, nothing is shown), then `node scripts/mail-test.mjs <template> <address> --yes`, and `unset RESEND_API_KEY` afterwards (`--list` shows the names; without `--yes` it refuses). This also confirms Resend's `reply_to` field (use `contact-owner`) The first live send confirms the exact error body and the `reply_to` field.
-8. Rebuild with `node scripts/build.mjs`, stage files BY NAME (not `git add -A`: the stray `css/Mayobe AI` file and `.superpowers/` must not go in), commit, and push only when you decide to.
+6. Live check on a test comment, before the push: edit it once and hide it once with `node scripts/comments.mjs spam <id>` (D1 `RETURNING` and `changes()` inside a batch were only proven on the local SQLite stand-in, so watch for errors). The live site does not have the email checkbox, the `/manage/` page or the new contact form until step 8.
+7. Send each template to your own Gmail (look at it on a phone), an Outlook and a Yahoo address: `read -rs RESEND_API_KEY; export RESEND_API_KEY` (paste the key, nothing is shown), then `node scripts/mail-test.mjs <template> <address> --yes`, and `unset RESEND_API_KEY` afterwards (`--list` shows the names; without `--yes` it refuses). For the `contact-owner` test email, press Reply in your mail app and confirm the reply goes to `sample@example.com`: that proves Resend honoured `reply_to`. The first live send also shows Resend's real error body in the Worker log if something is rejected.
+8. Rebuild with `node scripts/build.mjs`, stage files BY NAME (not `git add -A`: the stray `css/Mayobe AI` file and `.superpowers/` must not go in), commit, and push only when you decide to. Wait for the site to go live.
+9. After the push, test the real site: post a comment with the email box ticked, open the emailed link, press the button on the `/manage/` page, and send the contact form once.
 
 ### Known limits
 
@@ -169,4 +171,5 @@ Nothing below has been run. Do the steps in order; each one is a single command 
 - Admin "spam" on a comment removes its emailed and browser links; a restored comment does not get them back.
 - Rate-limit records are deleted lazily, so they may outlive their expiry by a while.
 - A retry of the contact form with an edited message but the same form-fill id can get a Resend 409 and then shows the email fallback.
+- Someone rotating IPs can fill the 25 a day commenter slice with manage-link emails, which also stops reply notices for that day. Accepted: the per-address and per-IP limits are the backstop.
 - The newsletter (Phase 3) is not built: the newsletter templates exist but nothing sends them.

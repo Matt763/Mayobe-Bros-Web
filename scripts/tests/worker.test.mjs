@@ -1329,6 +1329,31 @@ test('owner alerts: held comment with reasons, question, and nothing for an ordi
   assert.equal(sent.length, 0);
 });
 
+test('owner alerts: at most 3 a day; the 4th comment is still saved and listed; contact notices still get their 7', async () => {
+  for (let i = 0; i < 4; i++) {
+    const r = await post(comment({ body: `Is question number ${i} answered?`, cid: `visitorid-alert-${i}-123456` }), `7.7.7.${i}`);
+    assert.equal(r.status, 201);
+  }
+  await flushMail();
+  assert.equal(sent.filter((s) => /question/i.test(s.body.subject)).length, 3, 'only 3 alerts');
+  const list = await call('GET', '/v1/admin/comments', { auth: env.ADMIN_TOKEN, origin: null });
+  assert.equal(list.status, 200);
+  assert.equal(env.DB.raw.prepare("SELECT COUNT(*) AS n FROM comments WHERE body LIKE 'Is question number%'").get().n, 4, 'all 4 saved');
+  const before = sent.length;
+  for (let i = 0; i < 7; i++) assert.equal((await contact({ email: `after${i}@example.com` })).status, 200, `contact ${i + 1}`);
+  await flushMail();
+  assert.ok(sent.length >= before + 7, 'contact notices still sent');
+});
+
+test('postMeta fallback: an unlisted article gives the post list address, never a made-up article URL', async () => {
+  env.DB.raw.exec("INSERT OR IGNORE INTO posts(slug, created) VALUES('unlisted-post', 1)");
+  const r = await call('POST', '/v1/posts/unlisted-post/comments', { body: comment({ body: 'Is this one listed?', email: MAILBOX, notify: true }), ip: '8.8.8.8' });
+  await flushMail();
+  const all = sent.map((s) => s.body.text).join('\n');
+  assert.ok(all.includes('https://mayobebros.com/post/'), 'has the post list link');
+  assert.equal(all.includes('/post/unlisted-post/'), false, 'no invented article URL');
+});
+
 test('owner alerts go to info@mayobebros.com when OWNER_EMAIL is not set', async () => {
   await post(comment({ body: 'Is this free?' }));
   await flushMail();
