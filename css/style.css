@@ -1534,3 +1534,17 @@ main.is-switching .hero-listing + .section > .wrap > * { animation: none !import
 /* /manage/ is a task page: keep the picture short so the button is on the first screen */
 .page-manage .hero { min-height: 17rem; }
 @media (max-width: 480px) { .notify-row { padding: 0.75rem; column-gap: 0.6rem; } .notify-row label { font-size: 0.9375rem; } .notify-row .notify-hint { grid-column: 1 / -1; font-size: 0.875rem; } }
+
+/* Motion for in-place page changes (js/motion.js, window.MBMotion). Only opacity and transform move; nothing touches html or body
+   except html.mo-gliding, which only turns off native smooth scrolling and scroll anchoring while the custom glide runs.
+   mo-wait: a slow load dims the old cards; mo-leave: they fade out (from where the dim left them); mo-enter: new items rise in,
+   35 ms apart, the 7th and later together. Animations, not transitions, so they beat the reveal system's declarations. */
+html.mo-gliding { scroll-behavior: auto !important; overflow-anchor: none; }
+.mo-wait > * { animation: mo-dim 0.3s ease 0.15s both; }
+.mo-leave > * { animation: mo-out 0.16s ease-in both; }
+.mo-enter { animation: mo-in 0.4s var(--ease) both; animation-delay: calc(var(--mo-i, 0) * 35ms); }
+@keyframes mo-dim { to { opacity: 0.5; } }
+@keyframes mo-out { from { opacity: var(--mo-from, 1); } to { opacity: 0; transform: translateY(-10px); } }
+@keyframes mo-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+.page-num.is-pressed, .page-btn.is-pressed { transform: scale(0.96); }
+@media (prefers-reduced-motion: reduce) { .mo-wait > *, .mo-leave > *, .mo-enter { animation: none !important; } }
