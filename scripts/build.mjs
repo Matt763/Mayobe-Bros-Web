@@ -10,7 +10,8 @@
 // Sources:  site.config.json · content/categories.json · content/posts/*.md · content/pages/*.html
 // Output:   index.html, post/, category/, label/, popular/, search/, author/, <page>/, 404.html,
 //           sitemap.xml, feed.xml, robots.txt, manifest.json, data/search.json, assets/share/*.jpg (link-preview pictures,
-//           see scripts/lib/share.mjs; needs Chromium and ffmpeg, otherwise it only warns)
+//           see scripts/lib/share.mjs) and assets/email/* (email pictures, see scripts/lib/email-images.mjs); both need Chromium
+//           and ffmpeg, otherwise the build only warns
 // Every generated file is recorded in .build-manifest.json so removed posts are cleaned up.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,6 +22,7 @@ import { markdown, addHeadingIds, plainText, slugify } from './lib/markdown.mjs'
 import { createRenderer, newsletterOn, newsletterSetting } from './lib/render.mjs';
 import { lintPost } from './lib/lint.mjs';
 import { makeShareCards } from './lib/share.mjs';
+import { makeEmailImages } from './lib/email-images.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
@@ -312,10 +314,20 @@ for (const p of posts) shareSpecs.push({ id: `post-${p.slug}`, source: localCove
 const share = makeShareCards(shareSpecs.filter((s) => s.source), { root: ROOT, host: new URL(config.siteUrl).host, dryRun: CHECK_ONLY });
 for (const m of share.warnings) warn('share pictures', m);
 
+// Email pictures (the welcome and new-article emails): post-, thumb- and video-<slug>.jpg and logo.png in assets/email/, see
+// scripts/lib/email-images.mjs. A post with a video gets a video- picture drawn from its own poster or cover, never a video frame.
+const emailSpecs = posts.map((p) => {
+  const source = localCover(p.image, p.category.image, config.heroImage);
+  const videoSource = p.videos.length ? localCover(p.videos[0].poster, p.image, p.category.image, config.heroImage) : '';
+  return { slug: p.slug, source, focus: p.imageFocus, ...(videoSource ? { videoSource } : {}) };
+});
+const email = makeEmailImages(emailSpecs, { root: ROOT, dryRun: CHECK_ONLY });
+for (const m of email.warnings) warn('email pictures', m);
+
 // Questions readers asked that the team answered, saved by `node scripts/qa-sync.mjs` so search engines can read them in the page
 let qa = {};
 try { qa = JSON.parse(fs.readFileSync(path.join(ROOT, 'content/qa.json'), 'utf8')).posts || {}; } catch { /* none saved yet */ }
-const R = createRenderer({ config, categories, posts, pages, authors, versions, heroSets, shareCards: share.cards, qa });
+const R = createRenderer({ config, categories, posts, pages, authors, versions, heroSets, shareCards: share.cards, emailImages: email.images, qa });
 
 const out = new Map();
 const emit = (relPath, content) => out.set(relPath, content);

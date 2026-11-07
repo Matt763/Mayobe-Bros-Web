@@ -1,5 +1,6 @@
 // HTML templates for every page type. Pure functions: data in, HTML string out.
 import { escapeHtml as e, addHeadingIds } from './markdown.mjs';
+import { emailAlt } from './email-images.mjs';
 
 /* ------------------------------------------------------------------ icons */
 const ICONS = {
@@ -95,7 +96,7 @@ export function newsletterSetting(action, flag = false) {
 export const newsletterOn = (config) => !!(config.commentsApi || '').trim() && config.newsletterAction === 'api';
 
 export function createRenderer(ctx) {
-  const { config, categories, posts, pages, authors, versions, heroSets = {}, shareCards = new Map(), qa = {} } = ctx;
+  const { config, categories, posts, pages, authors, versions, heroSets = {}, shareCards = new Map(), emailImages = new Map(), qa = {} } = ctx;
   const base = (config.basePath || '').replace(/\/$/, '');
   const siteUrl = config.siteUrl.replace(/\/$/, '');
   const api = (config.commentsApi || '').replace(/\/$/, '');
@@ -1606,7 +1607,12 @@ ${items.map((p) => `  <item>
   function searchIndex() {
     return (
       JSON.stringify(
-        posts.map((p) => ({ t: p.title, u: u(p.path), s: p.slug, e: p.excerpt, c: p.category.name, l: p.label?.name || '', g: p.tags, d: p.date.toISOString().slice(0, 10), i: fallbackImage(p) || '', x: p.text.slice(0, 700) })),
+        posts.map((p) => {
+          // m / w: version of the email pictures (assets/email/post-, thumb-, video-<slug>), only when the files exist; a: the cover's alt text
+          const em = emailImages.get(p.slug) || {};
+          const a = emailAlt(p.imageAlt);
+          return { t: p.title, u: u(p.path), s: p.slug, e: p.excerpt, c: p.category.name, l: p.label?.name || '', g: p.tags, d: p.date.toISOString().slice(0, 10), i: fallbackImage(p) || '', x: p.text.slice(0, 700), ...(em.m ? { m: em.m } : {}), ...(em.w ? { w: em.w } : {}), ...(a ? { a } : {}) };
+        }),
       ) + '\n'
     );
   }

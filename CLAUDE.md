@@ -156,7 +156,7 @@ Do not add XSLT or scripts to the feed. Do not link third-party reader services 
 ## Do not hand-edit generated files
 Generated on every build: `index.html`, `404.html`, `post/`, `category/`, `label/`, `tag/` (every tag page and the `/tag/` index of all topics), `data/tags.json` (read by the sidebar's "More topics" button), `popular/`, `search/`, `author/`,
 every page folder from `content/pages/`, `sitemap.xml`, `*-sitemap<N>.xml`, `sitemap.xsl`, `feed.xml`, `feed.css`, `rss/`, `newsletter/` (only when the newsletter is on), `sitemap/`, `robots.txt`, `manifest.json`, `data/search.json`,
-`assets/share/*.jpg` (link-preview pictures), `.share-cards.json`, `.build-manifest.json`. Change the sources and rebuild:
+`assets/share/*.jpg` (link-preview pictures), `.share-cards.json`, `assets/email/*` (email pictures: `post-`, `thumb-`, `video-<slug>.jpg` and `logo.png`, drawn like the share cards by `scripts/lib/email-images.mjs` from `scripts/tools/email-card.html`; a post with a video gets its play-button picture from its own poster or cover, never a video frame; their versions go into `data/search.json` as `m`/`w`, the cover's alt as `a`), `.email-images.json`, `.build-manifest.json`. Change the sources and rebuild:
 
 | To change | Edit |
 | --- | --- |

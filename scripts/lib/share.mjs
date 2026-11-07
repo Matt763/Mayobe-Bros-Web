@@ -25,14 +25,14 @@ const VERSION = 1; // raise to redraw every card after a change that the file ha
 const MANIFEST = '.share-cards.json';
 const TEMPLATE = 'scripts/tools/share-card.html';
 const LOGO = 'assets/img/logo.png';
-const QUALITIES = [2, 3, 4, 5, 6, 7, 9, 11, 14]; // ffmpeg -q:v: 2 is best, higher is smaller; the first one that fits the budget wins
+export const QUALITIES = [2, 3, 4, 5, 6, 7, 9, 11, 14]; // ffmpeg -q:v: 2 is best, higher is smaller; the first one that fits the budget wins
 
 export const shareRel = (id) => `${SHARE_DIR}/${id}.jpg`;
 
 const sha = (buf) => crypto.createHash('sha1').update(buf).digest('hex');
 const fileSha = (abs) => (fs.existsSync(abs) ? sha(fs.readFileSync(abs)) : '');
 
-function runs(cmd, args) {
+export function runs(cmd, args) {
   try {
     execFileSync(cmd, args, { stdio: 'ignore', timeout: 15000 });
     return true;
@@ -64,6 +64,40 @@ function pngSize(file) {
 }
 
 /**
+ * Draw one page to a PNG of exactly w x h with headless Chromium. Throws with a readable message when a step fails.
+ * transparent: keep the page background see-through (for the email logo).
+ */
+export function renderPng({ chrome, url, w, h, png, transparent = false }) {
+  try {
+    // --no-sandbox: the browser only opens our own template and the site's own pictures from disk, and its sandbox needs privileges
+    // that are not always there (containers, some Linux setups)
+    const extra = transparent ? ['--default-background-color=00000000'] : [];
+    execFileSync(chrome, ['--headless', '--no-sandbox', '--disable-gpu', '--hide-scrollbars', '--force-device-scale-factor=1', `--window-size=${w},${h}`, '--virtual-time-budget=6000', ...extra, `--screenshot=${png}`, url], { stdio: 'pipe', timeout: 60000 });
+  } catch (err) {
+    throw new Error(`Chromium could not draw the picture (${String(err.stderr || err.message).split('\n')[0].slice(0, 160)})`);
+  }
+  const size = fs.existsSync(png) ? pngSize(png) : null;
+  if (!size) throw new Error('Chromium wrote no picture');
+  if (size.w !== w || size.h !== h) throw new Error(`picture came out ${size.w}x${size.h}, expected ${w}x${h}`);
+}
+
+/**
+ * Save a PNG as a baseline JPEG (4:2:0, optimised Huffman tables: the most widely understood kind), trying the QUALITIES ladder
+ * until the file fits the budget. vf: an optional ffmpeg filter run first, such as "crop=900:675,scale=224:168".
+ * Returns { bytes, quality } of the last try (which may still be over budget at the lowest quality).
+ */
+export function encodeJpeg(png, out, budget, vf = '') {
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  let best = null;
+  for (const quality of QUALITIES) {
+    execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', png, ...(vf ? ['-vf', vf] : []), '-q:v', String(quality), '-pix_fmt', 'yuvj420p', '-huffman', 'optimal', '-frames:v', '1', out], { stdio: 'pipe', timeout: 30000 });
+    best = { bytes: fs.statSync(out).size, quality };
+    if (best.bytes <= budget) break;
+  }
+  return best;
+}
+
+/**
  * Draw one card. Returns { bytes, quality }. Throws with a readable message when a step fails.
  * spec: { id, source (path relative to root), chip, focus (0-100, how far down the cover to look) }
  */
@@ -74,25 +108,8 @@ function drawCard({ root, chrome, spec, host, tmp }) {
   if (Number.isFinite(spec.focus)) q.set('fy', String(spec.focus));
   const url = `${pathToFileURL(path.join(root, TEMPLATE)).href}?${q}`;
   try {
-    // --no-sandbox: the browser only opens our own template and the site's own pictures from disk, and its sandbox needs privileges
-    // that are not always there (containers, some Linux setups)
-    execFileSync(chrome, ['--headless', '--no-sandbox', '--disable-gpu', '--hide-scrollbars', '--force-device-scale-factor=1', `--window-size=${SHARE_W},${SHARE_H}`, '--virtual-time-budget=6000', `--screenshot=${png}`, url], { stdio: 'pipe', timeout: 60000 });
-  } catch (err) {
-    throw new Error(`Chromium could not draw the card (${String(err.stderr || err.message).split('\n')[0].slice(0, 160)})`);
-  }
-  try {
-    const size = fs.existsSync(png) ? pngSize(png) : null;
-    if (!size) throw new Error('Chromium wrote no picture');
-    if (size.w !== SHARE_W || size.h !== SHARE_H) throw new Error(`card came out ${size.w}x${size.h}, expected ${SHARE_W}x${SHARE_H}`);
-    fs.mkdirSync(path.dirname(out), { recursive: true });
-    let best = null;
-    for (const quality of QUALITIES) {
-      // baseline JPEG, 4:2:0, optimised Huffman tables: the most widely understood kind
-      execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', png, '-q:v', String(quality), '-pix_fmt', 'yuvj420p', '-huffman', 'optimal', '-frames:v', '1', out], { stdio: 'pipe', timeout: 30000 });
-      best = { bytes: fs.statSync(out).size, quality };
-      if (best.bytes <= SHARE_BUDGET) break;
-    }
-    return best;
+    renderPng({ chrome, url, w: SHARE_W, h: SHARE_H, png });
+    return encodeJpeg(png, out, SHARE_BUDGET);
   } finally {
     fs.rmSync(png, { force: true });
   }

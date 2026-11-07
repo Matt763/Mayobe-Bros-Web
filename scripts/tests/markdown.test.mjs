@@ -83,7 +83,7 @@ test('front matter', () => {
 
 test('video lines become Plyr-ready markup', () => {
   const v = markdown('::video[A clip](assets/video/a.mp4){poster=assets/posts/a.webp captions=assets/video/a.vtt}');
-  assert.match(v, /<figure class="video-figure">\n<video controls playsinline preload="none" poster="\/assets\/posts\/a\.webp"/);
+  assert.match(v, /<figure class="video-figure" id="video-1">\n<video controls playsinline preload="none" poster="\/assets\/posts\/a\.webp"/);
   assert.match(v, /<source src="\/assets\/video\/a\.mp4" type="video\/mp4">/);
   assert.match(v, /<track kind="captions" srclang="en" label="English" src="\/assets\/video\/a\.vtt" default>/);
   assert.match(v, /<figcaption>A clip<\/figcaption>/);
@@ -93,4 +93,14 @@ test('video lines become Plyr-ready markup', () => {
   assert.match(y, /<p>Before<\/p>/);
   assert.match(y, /<p>After<\/p>/);
   assert.match(markdown('::youtube[x](nonsense)'), /video link not understood/);
+});
+
+test('video figures get id video-1 and video-2 in body order', () => {
+  const html = markdown('Intro\n\n::youtube[First](https://youtu.be/dQw4w9WgXcQ)\n\nMiddle\n\n::video[Second](assets/video/b.mp4)\n\nEnd');
+  const ids = [...html.matchAll(/<figure class="video-figure[^"]*" id="(video-\d+)"/g)].map((m) => m[1]);
+  assert.deepEqual(ids, ['video-1', 'video-2']);
+  assert.ok(html.indexOf('First') < html.indexOf('Second'), 'body order kept');
+  // the count starts again for every document
+  assert.match(markdown('::video[Only](assets/video/c.mp4)'), /id="video-1"/);
+  assert.doesNotMatch(markdown('::video[Only](assets/video/c.mp4)'), /id="video-2"/);
 });

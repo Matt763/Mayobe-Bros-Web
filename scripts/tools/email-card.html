@@ -1,0 +1,64 @@
+<!doctype html>
+<!--
+  Template of the pictures in Mayobe Bros emails. It is NOT a page of the site. scripts/lib/email-images.mjs opens it in headless
+  Chromium and saves the result in assets/email/ (post-, thumb- and video-<slug>.jpg, and logo.png).
+  Query: ?img=<picture file URL>&fy=<0-100: how far down the cover to look>&w=<width>&h=<height>&play=0|1&logo=0|1
+    play=1  adds a play button (white disc, dark triangle) and a soft dark vignette: the picture for a post that has a video.
+            It is always drawn on our own cover, never on a frame of someone else's video.
+    logo=1  draws the wordmark on an opaque white rounded plate instead (transparent corners). The plate is part of the picture so
+            the logo stays readable when a mail app inverts colours for dark mode.
+  There is no text in any picture: titles, kickers and buttons are live text in the email, so they still show when pictures are blocked.
+  Open it in a browser as ?img=../../assets/posts/<file>.webp&play=1 to see one.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<title>Email picture template</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  [hidden] { display: none !important; }
+  html, body { width: var(--w, 1200px); height: var(--h, 675px); overflow: hidden; background: #0b1220; }
+  .pic { position: relative; width: 100%; height: 100%; overflow: hidden; }
+  .pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% var(--fy, 40%); display: block; }
+  .vignette { position: absolute; inset: 0; background: radial-gradient(75% 85% at 50% 50%, rgba(11, 18, 32, .10) 0, rgba(11, 18, 32, .22) 55%, rgba(11, 18, 32, .52) 100%); }
+  .play { position: absolute; left: 50%; top: 50%; width: 128px; height: 128px; margin: -64px 0 0 -64px; border-radius: 50%; background: #fff;
+    box-shadow: 0 10px 34px rgba(0, 0, 0, .42), 0 0 0 10px rgba(255, 255, 255, .22); }
+  .play svg { position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -20px; display: block; }
+  /* logo mode */
+  html.logo, html.logo body { background: transparent; }
+  .plate { width: 100%; height: 100%; background: #fff; border-radius: 16px; display: flex; align-items: center; justify-content: center; }
+  .plate img { height: 72px; width: auto; display: block; }
+</style>
+</head>
+<body>
+<div class="pic" id="pic" hidden>
+  <img id="img" alt="">
+  <div class="vignette" id="vignette" hidden></div>
+  <div class="play" id="play" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="4 2 22 12 4 22" fill="#0b1220"/></svg></div>
+</div>
+<div class="plate" id="plate" hidden><img src="../../assets/img/logo.png" alt=""></div>
+<script>
+  (function () {
+    var q = new URLSearchParams(location.search);
+    var root = document.documentElement;
+    var w = parseInt(q.get('w'), 10), h = parseInt(q.get('h'), 10);
+    if (w > 0 && w <= 4000) root.style.setProperty('--w', w + 'px');
+    if (h > 0 && h <= 4000) root.style.setProperty('--h', h + 'px');
+    if (q.get('logo') === '1') {
+      root.className = 'logo';
+      document.getElementById('plate').hidden = false;
+      return;
+    }
+    document.getElementById('pic').hidden = false;
+    document.getElementById('img').src = q.get('img') || '../../assets/img/hero.webp';
+    var fy = parseFloat(q.get('fy'));
+    if (fy >= 0 && fy <= 100) root.style.setProperty('--fy', fy + '%');
+    if (q.get('play') === '1') {
+      document.getElementById('vignette').hidden = false;
+      document.getElementById('play').hidden = false;
+    }
+  })();
+</script>
+</body>
+</html>
