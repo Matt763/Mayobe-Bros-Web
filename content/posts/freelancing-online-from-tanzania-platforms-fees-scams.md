@@ -9,6 +9,8 @@ metaTitle: Freelancing Online from Tanzania: Fees, Payments, Scams
 excerpt: How freelance platforms work, what they charge, how Tanzanians can receive payment, and how to spot scams, without any income promises.
 image: assets/posts/e1503bfa79d9.webp
 imageAlt: Illustration of a woman typing on a laptop in a shared office, with floating dollar signs and platform logos around her
+emailImage: assets/img/topics/online-learning-1280.webp
+emailImageAlt: Open laptop, orange headphones, pencils and a small clock on a white desk by a bright window
 tags: [freelancing, remote work, payoneer, upwork, scams]
 ---
 

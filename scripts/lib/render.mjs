@@ -1611,7 +1611,7 @@ ${items.map((p) => `  <item>
         posts.map((p) => {
           // m / w: version of the email pictures (assets/email/post-, thumb-, video-<slug>), only when the files exist; a: the cover's alt text
           const em = emailImages.get(p.slug) || {};
-          const a = emailAlt(p.imageAlt);
+          const a = emailAlt(p.emailImage ? p.emailImageAlt : p.imageAlt); // with emailImage the email shows that picture, not the cover
           return { t: p.title, u: u(p.path), s: p.slug, e: p.excerpt, c: p.category.name, l: p.label?.name || '', g: p.tags, d: p.date.toISOString().slice(0, 10), i: fallbackImage(p) || '', x: p.text.slice(0, 700), ...(em.m ? { m: em.m } : {}), ...(em.w ? { w: em.w } : {}), ...(a ? { a } : {}) };
         }),
       ) + '\n'

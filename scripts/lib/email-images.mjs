@@ -18,7 +18,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { findChrome, runs, renderPng, encodeJpeg } from './share.mjs';
+import { findChrome, runs, renderPng, encodeJpeg, QUALITIES } from './share.mjs';
 
 export const EMAIL_DIR = 'assets/email';
 export const EMAIL_SIZES = { post: [1200, 675], video: [1200, 675], thumb: [224, 168], logo: [424, 96] };
@@ -30,9 +30,28 @@ const MANIFEST = '.email-images.json';
 const TEMPLATE = 'scripts/tools/email-card.html';
 const LOGO = 'assets/img/logo.png';
 const THUMB_VF = 'crop=900:675,scale=224:168:flags=lanczos'; // the middle 4:3 of the 16:9 shot
+// part of every hash: changing a size, a budget, the quality ladder or the thumbnail crop redraws everything once
+const SETTINGS = JSON.stringify([EMAIL_SIZES, EMAIL_BUDGETS, QUALITIES, THUMB_VF]);
 
 /** Path of an email picture relative to the site root: emailRel('logo') or emailRel('post' | 'thumb' | 'video', slug). */
 export const emailRel = (kind, slug) => (kind === 'logo' ? `${EMAIL_DIR}/logo.png` : `${EMAIL_DIR}/${kind}-${slug}.jpg`);
+
+/** The first local picture path of a list (no URLs, no data:), without a leading slash; '' when there is none. */
+export const localPath = (...c) => (c.find((x) => x && !/^(https?:)?\/\//i.test(x) && !String(x).startsWith('data:')) || '').replace(/^\//, '');
+
+/**
+ * What the email pictures of one post are drawn from (used by scripts/build.mjs and the tests).
+ *   source:      emailImage when set (a cover that cannot be used in email, e.g. one showing real logos), else the cover,
+ *                else the category picture, else the home picture.
+ *   videoSource: only for a post with a video: the same emailImage when set, else the declared poster (local files only; a remote
+ *                poster such as a YouTube thumbnail is skipped), else the cover. Never a frame of someone else's video.
+ *   focus:       imageFocus, which belongs to the cover, so it is dropped when emailImage is used.
+ */
+export function emailSpec({ slug, image = '', emailImage = '', focus, videos = [], categoryImage = '', heroImage = '' }) {
+  const source = emailImage ? localPath(emailImage, categoryImage, heroImage) : localPath(image, categoryImage, heroImage);
+  const videoSource = videos.length ? (emailImage ? source : localPath(videos[0].poster, image, categoryImage, heroImage)) : '';
+  return { slug, source, ...(!emailImage && Number.isFinite(focus) ? { focus } : {}), ...(videoSource ? { videoSource } : {}) };
+}
 
 /** imageAlt as one line of at most 150 characters (cut at a word, marked with an ellipsis), for data/search.json `a`. */
 export function emailAlt(alt) {
@@ -86,11 +105,12 @@ function drawLogo({ root, chrome, tmp }) {
 /**
  * Make sure every published post has up-to-date email pictures, and the logo exists.
  *   specs: [{ slug, source, focus?, videoSource? }]   source / videoSource: paths relative to root; videoSource only for a post with a video
- *   opts:  { root, dryRun, force }                     dryRun: draw nothing, delete nothing, write no manifest
+ *   opts:  { root, dryRun, force, chrome }             dryRun: draw nothing, delete nothing, write no manifest;
+ *                                                      chrome: browser path ('' = none; tests), default findChrome()
  * Returns { images: Map(slug -> { m?, w? }), warnings, made, pruned }. `m` is set when post- and thumb- exist on disk, `w` when
  * video- exists (even if stale, so an email can always point at a real file).
  */
-export function makeEmailImages(specs, { root, dryRun = false, force = false }) {
+export function makeEmailImages(specs, { root, dryRun = false, force = false, chrome: chromeBin }) {
   const warnings = [];
   const images = new Map();
   const manifestPath = path.join(root, MANIFEST);
@@ -99,7 +119,7 @@ export function makeEmailImages(specs, { root, dryRun = false, force = false }) 
     previous = JSON.parse(fs.readFileSync(manifestPath, 'utf8')).images || {};
   } catch { /* first run */ }
   const next = {};
-  const base = sha(`${VERSION}|${fileSha(path.join(root, TEMPLATE))}`);
+  const base = sha(`${VERSION}|${SETTINGS}|${fileSha(path.join(root, TEMPLATE))}`);
   const exists = (rel) => fs.existsSync(path.join(root, rel));
   const todo = []; // { key, kind: 'post' | 'video' | 'logo', slug?, source?, focus?, hash }
 
@@ -123,6 +143,7 @@ export function makeEmailImages(specs, { root, dryRun = false, force = false }) 
       const hash = sha(`${base}|${kind}|${fileSha(srcAbs)}|${spec.focus ?? ''}`);
       if (have && !force && previous[key]?.hash === hash) next[key] = previous[key];
       else todo.push({ key, kind, slug: spec.slug, source, focus: spec.focus, hash, have, field });
+      if (next[key]) next[key] = { ...next[key], source }; // what it was drawn from, so a test can prove a blocked cover is not used
       if (have) entry[field] = (previous[key]?.hash || hash).slice(0, 8);
     }
     images.set(spec.slug, entry);
@@ -130,7 +151,7 @@ export function makeEmailImages(specs, { root, dryRun = false, force = false }) 
 
   let made = 0;
   if (todo.length) {
-    const chrome = dryRun ? '' : findChrome();
+    const chrome = dryRun ? '' : chromeBin ?? findChrome();
     const haveFfmpeg = dryRun ? false : runs('ffmpeg', ['-version']);
     if (dryRun || !chrome || !haveFfmpeg) {
       const why = dryRun ? '--check writes nothing' : !chrome ? 'no Chromium or Chrome was found (set CHROME_BIN, or install one with Playwright)' : 'ffmpeg was not found';
@@ -150,7 +171,7 @@ export function makeEmailImages(specs, { root, dryRun = false, force = false }) 
             if (r.bytes > EMAIL_BUDGETS.logo) warnings.push(`email logo is ${kb(r.bytes)} (limit ${kb(EMAIL_BUDGETS.logo)})`);
           } else {
             const r = drawPost({ root, chrome, tmp, slug: t.slug, source: t.source, focus: t.focus, play: t.kind === 'video' });
-            next[t.key] = { hash: t.hash, bytes: r.main.bytes, quality: r.main.quality, ...(r.thumb ? { thumbBytes: r.thumb.bytes, thumbQuality: r.thumb.quality } : {}) };
+            next[t.key] = { hash: t.hash, source: t.source, bytes: r.main.bytes, quality: r.main.quality, ...(r.thumb ? { thumbBytes: r.thumb.bytes, thumbQuality: r.thumb.quality } : {}) };
             images.get(t.slug)[t.field] = t.hash.slice(0, 8);
             if (r.main.bytes > EMAIL_BUDGETS[t.kind]) warnings.push(`email picture "${name}" is ${kb(r.main.bytes)} even at the lowest quality (limit ${kb(EMAIL_BUDGETS[t.kind])}): try a simpler cover`);
             if (r.thumb && r.thumb.bytes > EMAIL_BUDGETS.thumb) warnings.push(`email picture "thumb-${t.slug}" is ${kb(r.thumb.bytes)} (limit ${kb(EMAIL_BUDGETS.thumb)})`);

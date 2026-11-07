@@ -22,7 +22,7 @@ import { markdown, addHeadingIds, plainText, slugify } from './lib/markdown.mjs'
 import { createRenderer, newsletterOn, newsletterSetting } from './lib/render.mjs';
 import { lintPost } from './lib/lint.mjs';
 import { makeShareCards } from './lib/share.mjs';
-import { makeEmailImages } from './lib/email-images.mjs';
+import { makeEmailImages, emailSpec } from './lib/email-images.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
@@ -203,6 +203,12 @@ for (const file of postFiles) {
   } else if (excerpt.length > 190) warn(where, `excerpt is ${excerpt.length} characters; search engines cut it near 160`);
   if (!data.image) warn(where, 'no "image"; the category picture is shown instead');
   else if (/^\/?assets\//.test(String(data.image)) && !fs.existsSync(path.join(ROOT, String(data.image).replace(/^\//, '')))) fail(where, `image file not found: ${data.image}`);
+  // emailImage: only when the cover cannot be used in email (for example it shows real company logos); a local file like image:
+  if (data.emailImage) {
+    if (!/^\/?assets\//.test(String(data.emailImage))) fail(where, `emailImage must be a picture in assets/ (got ${data.emailImage})`);
+    else if (!fs.existsSync(path.join(ROOT, String(data.emailImage).replace(/^\//, '')))) fail(where, `emailImage file not found: ${data.emailImage}`);
+    if (!data.emailImageAlt) warn(where, 'emailImage has no "emailImageAlt"; emails show the picture without a description');
+  }
   if (!cat || !date) continue;
   const tags = Array.isArray(data.tags) ? data.tags : data.tags ? String(data.tags).split(',').map((t) => t.trim()).filter(Boolean) : [];
   const size = imageSize(data.image ? String(data.image) : '');
@@ -221,6 +227,8 @@ for (const file of postFiles) {
     date, updated, category: cat, label, excerpt,
     image: data.image ? String(data.image) : '',
     imageAlt: data.imageAlt ? String(data.imageAlt) : '',
+    emailImage: data.emailImage ? String(data.emailImage) : '',
+    emailImageAlt: data.emailImage && data.emailImageAlt ? String(data.emailImageAlt) : '',
     imageCredit: data.imageCredit ? String(data.imageCredit) : '',
     imageSource: /^https?:\/\//.test(String(data.imageSource || '')) ? String(data.imageSource) : '',
     imageW: size?.w, imageH: size?.h, imageFocus,
@@ -315,12 +323,9 @@ const share = makeShareCards(shareSpecs.filter((s) => s.source), { root: ROOT, h
 for (const m of share.warnings) warn('share pictures', m);
 
 // Email pictures (the welcome and new-article emails): post-, thumb- and video-<slug>.jpg and logo.png in assets/email/, see
-// scripts/lib/email-images.mjs. A post with a video gets a video- picture drawn from its own poster or cover, never a video frame.
-const emailSpecs = posts.map((p) => {
-  const source = localCover(p.image, p.category.image, config.heroImage);
-  const videoSource = p.videos.length ? localCover(p.videos[0].poster, p.image, p.category.image, config.heroImage) : '';
-  return { slug: p.slug, source, focus: p.imageFocus, ...(videoSource ? { videoSource } : {}) };
-});
+// scripts/lib/email-images.mjs. A post with a video gets a video- picture drawn from its own poster or cover, never a video frame;
+// emailImage: in the front matter replaces the cover in email (see emailSpec).
+const emailSpecs = posts.map((p) => emailSpec({ slug: p.slug, image: p.image, emailImage: p.emailImage, focus: p.imageFocus, videos: p.videos, categoryImage: p.category.image, heroImage: config.heroImage }));
 const email = makeEmailImages(emailSpecs, { root: ROOT, dryRun: CHECK_ONLY });
 for (const m of email.warnings) warn('email pictures', m);
 

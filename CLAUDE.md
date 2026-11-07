@@ -31,6 +31,7 @@ excerpt: 120-160 characters saying what the reader will learn. No hype.
 image: assets/posts/<file>.webp
 imageAlt: Literal description of the picture
 imageFocus: 40             # optional, 0 to 100: how far down the cover the link-preview picture looks (0 top, 100 bottom)
+emailImage: assets/img/topics/<file>.webp   # only when the cover cannot be used in email (e.g. it shows real logos); emailImageAlt: describes it
 tags: [three, to, five]
 featured: false            # true = "Editor's picks" and first on /popular/
 aliases: [old-slug]        # only after renaming a post, so the old URL still works
