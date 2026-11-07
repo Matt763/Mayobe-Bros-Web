@@ -84,11 +84,22 @@ const LABEL_HEADINGS = (label, cat) => [
 const BOT_RULES = ['GPTBot', 'CCBot', 'anthropic-ai', 'ClaudeBot', 'Google-Extended', 'Applebot-Extended', 'Bytespider', 'meta-externalagent', 'cohere-ai', 'Diffbot', 'omgilibot', 'ImagesiftBot'];
 const NO_AD_PAGES = new Set(['legal', 'search', 'notfound']);
 
+// The newsletter switch. "newsletterAction" in site.config.json is "" (off: the footer shows the RSS button) or "api" (the footer form
+// posts to the comments API); `node scripts/build.mjs --newsletter` turns it on for one build. Any other value is a build error.
+export function newsletterSetting(action, flag = false) {
+  const a = action === undefined || action === null ? '' : action;
+  if (a !== '' && a !== 'api') return { error: '"newsletterAction" must be "" (off) or "api" (the footer form posts to the comments API)' };
+  return { action: flag ? 'api' : a };
+}
+// On only when there is a comments API to post to.
+export const newsletterOn = (config) => !!(config.commentsApi || '').trim() && config.newsletterAction === 'api';
+
 export function createRenderer(ctx) {
   const { config, categories, posts, pages, authors, versions, heroSets = {}, shareCards = new Map(), qa = {} } = ctx;
   const base = (config.basePath || '').replace(/\/$/, '');
   const siteUrl = config.siteUrl.replace(/\/$/, '');
   const api = (config.commentsApi || '').replace(/\/$/, '');
+  const newsletter = newsletterOn(config);
   const adsenseId = (config.adsense?.client || '').trim();
   const cfToken = /^[a-f0-9]{32}$/.test(config.analytics?.cloudflareToken || '') ? config.analytics.cloudflareToken : ''; // Cloudflare Web Analytics: no cookies, so it loads for every visitor
   const gtmId = /^GTM-[A-Z0-9]{4,12}$/.test(config.analytics?.gtmId || '') ? config.analytics.gtmId : '';
@@ -266,12 +277,16 @@ export function createRenderer(ctx) {
     const li = (href, label) => `<li><a class="foot-link" href="${href}">${e(label)}</a></li>`;
     const legal = pages.filter((p) => p.kind === 'legal');
     const company = [['About us', '/about/'], ['Contact', '/contact/'], ['Work with us', '/advertise/'], ...authors.map((a) => [`${a.name} (author)`, `/author/${a.slug}/`])];
-    const cta = config.newsletterAction
-      ? `<form class="foot-form" action="${e(config.newsletterAction)}" method="post" data-newsletter>
+    // the newsletter form (js/subscribe.js sends it); without JavaScript it opens /newsletter/, which explains the emails
+    const cta = newsletter
+      ? `<form class="foot-form" action="${u('/newsletter/')}" method="get" data-newsletter data-endpoint="${e(api)}/v1/newsletter/subscribe" novalidate>
           <label class="sr-only" for="foot-email">Email address</label>
-          <input id="foot-email" type="email" name="email" required placeholder="Your email address" autocomplete="email">
+          <input id="foot-email" type="email" name="email" required maxlength="254" placeholder="Your email address" autocomplete="email" aria-describedby="foot-note">
+          <div class="hp" aria-hidden="true"><label>Leave this field empty <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
           <button class="btn btn-primary" type="submit">Subscribe ${icon('arrowRight', 16)}</button>
           <p class="foot-status" role="status"></p>
+          <p class="foot-form-note" id="foot-note">One email when we publish a new article. Stop any time. See our <a href="${u('/privacy-policy/')}">Privacy Policy</a>.</p>
+          <noscript><p class="foot-form-note">The sign-up form needs JavaScript. You can <a href="${u('/rss/')}">follow with RSS</a> instead.</p></noscript>
         </form>`
       : `<a class="btn btn-primary btn-lg" href="${u('/rss/')}">${icon('rss', 18)} Follow with RSS</a>`;
     return `<footer class="site-footer">
@@ -323,7 +338,7 @@ ${body}
 </main>
 ${footer()}
 ${SEARCH_MODAL()}
-<script src="${assetUrl('js/site.js')}" defer></script>${meta.listen ? `\n<script src="${assetUrl('js/listen.js')}" defer></script>` : ''}${body.includes('class="pagination"') || body.includes('hero-listing') ? `\n<script src="${assetUrl('js/pager.js')}" defer></script>` : ''}${api ? `\n<script src="${assetUrl('js/engage.js')}" defer></script>` : ''}${api && meta.contact ? `\n<script src="${assetUrl('js/contact.js')}" defer></script>` : ''}${api && meta.manage ? `\n<script src="${assetUrl('js/manage.js')}" defer></script>` : ''}${cfToken && !meta.manage ? `\n<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${cfToken}"}'></script>` : ''}
+<script src="${assetUrl('js/site.js')}" defer></script>${meta.listen ? `\n<script src="${assetUrl('js/listen.js')}" defer></script>` : ''}${body.includes('class="pagination"') || body.includes('hero-listing') ? `\n<script src="${assetUrl('js/pager.js')}" defer></script>` : ''}${api ? `\n<script src="${assetUrl('js/engage.js')}" defer></script>` : ''}${api && meta.contact ? `\n<script src="${assetUrl('js/contact.js')}" defer></script>` : ''}${api && meta.manage ? `\n<script src="${assetUrl('js/manage.js')}" defer></script>` : ''}${newsletter ? `\n<script src="${assetUrl('js/subscribe.js')}" defer></script>` : ''}${newsletter && meta.newsletterPage ? `\n<script src="${assetUrl('js/newsletter.js')}" defer></script>` : ''}${cfToken && !meta.manage && !meta.newsletterPage ?`\n<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${cfToken}"}'></script>` : ''}
 </body>
 </html>
 `;
@@ -912,6 +927,9 @@ ${discover()}`;
       h
         .replace(/\{\{#comments\}\}([\s\S]*?)\{\{\/comments\}\}/g, (_m, t) => (api ? t : ''))
         .replace(/\{\{\^comments\}\}([\s\S]*?)\{\{\/comments\}\}/g, (_m, t) => (api ? '' : t))
+        // {{#newsletter}}...{{/newsletter}} only when the newsletter is on (newsletterAction "api" with a comments API); {{^newsletter}} when it is not
+        .replace(/\{\{#newsletter\}\}([\s\S]*?)\{\{\/newsletter\}\}/g, (_m, t) => (newsletter ? t : ''))
+        .replace(/\{\{\^newsletter\}\}([\s\S]*?)\{\{\/newsletter\}\}/g, (_m, t) => (newsletter ? '' : t))
         .replace(/\{\{#cfanalytics\}\}([\s\S]*?)\{\{\/cfanalytics\}\}/g, (_m, t) => (cfToken ? t : ''))
         .replace(/\{\{\^cfanalytics\}\}([\s\S]*?)\{\{\/cfanalytics\}\}/g, (_m, t) => (cfToken ? '' : t))
         .replace(/\{\{#analytics\}\}([\s\S]*?)\{\{\/analytics\}\}/g, (_m, t) => (gtmId ? t : ''))
@@ -942,7 +960,7 @@ ${withIds.html}
     const body = `${hero({ image: heroFor(pg.slug, pg.hero), title: e(pg.heading || pg.title), sub: pg.subtitle })}
 <section class="section">${inner}</section>`;
     return layout(
-      { title: pg.title, description: pg.description, path: `/${pg.slug}/`, noindex: true, noReferrer: pg.slug === 'manage', bodyClass: pg.slug === 'manage' ? 'page-manage' : '', manage: pg.slug === 'manage', contact: pg.slug === 'contact', adKind: isDoc ? 'legal' : 'page', preload: heroFor(pg.slug, pg.hero), jsonLd: [{ '@context': 'https://schema.org', '@type': pg.slug === 'about' ? 'AboutPage' : pg.slug === 'contact' ? 'ContactPage' : 'WebPage', name: pg.title, description: pg.description, url: abs(`/${pg.slug}/`) }] },
+      { title: pg.title, description: pg.description, path: `/${pg.slug}/`, noindex: true, noReferrer: pg.slug === 'manage' || pg.slug === 'newsletter', bodyClass: pg.slug === 'manage' || pg.slug === 'newsletter' ? 'page-manage' : '', manage: pg.slug === 'manage', newsletterPage: pg.slug === 'newsletter', contact: pg.slug === 'contact', adKind: isDoc ? 'legal' : 'page', preload: heroFor(pg.slug, pg.hero), jsonLd: [{ '@context': 'https://schema.org', '@type': pg.slug === 'about' ? 'AboutPage' : pg.slug === 'contact' ? 'ContactPage' : 'WebPage', name: pg.title, description: pg.description, url: abs(`/${pg.slug}/`) }] },
       { page: pg.slug },
       body,
     );

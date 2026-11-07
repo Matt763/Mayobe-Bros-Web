@@ -113,3 +113,92 @@ test('/manage/ is noindex, no-referrer, has one button, and calls the API only f
   const footer = html.split('<footer')[1] || '';
   assert.doesNotMatch(footer, /href="[^"]*\/manage\/"/, 'not linked from the footer');
 });
+
+// The newsletter: the footer form, the /newsletter/ page and every newsletter sentence exist only when it is switched on
+// ("newsletterAction": "api" with a comments API, or the --newsletter build flag). These checks render pages directly, so they do
+// not depend on how the tree was last built.
+import { createRenderer, newsletterOn, newsletterSetting } from '../lib/render.mjs';
+import { parseFrontMatter } from '../lib/frontmatter.mjs';
+
+function renderWith(over = {}) {
+  const config = { ...JSON.parse(fs.readFileSync(path.join(ROOT, 'site.config.json'), 'utf8')), ...over };
+  const on = newsletterOn(config);
+  const dir = path.join(ROOT, 'content', 'pages');
+  const pages = fs.readdirSync(dir).filter((f) => f.endsWith('.html')).map((f) => {
+    const { data, body } = parseFrontMatter(fs.readFileSync(path.join(dir, f), 'utf8'));
+    return { slug: f.replace(/\.html$/, ''), title: String(data.title), heading: data.heading || '', subtitle: data.subtitle || '', description: String(data.description || ''), kind: data.kind || 'legal', menu: false, order: Number(data.order ?? 50), hero: data.hero || '', updated: null, html: body };
+  }).filter((p) => p.slug !== 'newsletter' || on);
+  const R = createRenderer({ config, categories: [], posts: [], pages, authors: [], versions: {} });
+  return { R, pages, on, page: (slug) => { const pg = pages.find((p) => p.slug === slug); return pg ? R.staticPage(pg) : null; } };
+}
+const footerOf = (html) => html.slice(html.indexOf('<footer'), html.indexOf('</footer>'));
+
+test('newsletterAction must be "" or "api"; the --newsletter flag turns it on', () => {
+  assert.deepEqual(newsletterSetting('', false), { action: '' });
+  assert.deepEqual(newsletterSetting(undefined, false), { action: '' });
+  assert.deepEqual(newsletterSetting('api', false), { action: 'api' });
+  assert.deepEqual(newsletterSetting('', true), { action: 'api' });
+  for (const bad of ['https://example.com/subscribe', 'API', true, 'on']) assert.match(newsletterSetting(bad, false).error, /newsletterAction/);
+  assert.equal(newsletterOn({ commentsApi: 'https://api.test', newsletterAction: 'api' }), true);
+  assert.equal(newsletterOn({ commentsApi: '', newsletterAction: 'api' }), false, 'no API, no newsletter');
+  assert.equal(newsletterOn({ commentsApi: 'https://api.test', newsletterAction: '' }), false);
+});
+
+test('no newsletter page, no subscribe script and no newsletter wording in the footer or privacy policy', () => {
+  const committed = JSON.parse(fs.readFileSync(path.join(ROOT, 'site.config.json'), 'utf8'));
+  assert.equal(committed.newsletterAction, '', 'git keeps the newsletter off until the owner switches it on');
+  const { page, on, pages } = renderWith();
+  assert.equal(on, false);
+  assert.equal(pages.some((p) => p.slug === 'newsletter'), false, 'the page is not built');
+  const privacy = page('privacy-policy');
+  const footer = footerOf(privacy);
+  assert.doesNotMatch(privacy, /subscribe\.js|newsletter\.js/);
+  assert.doesNotMatch(footer, /newsletter|data-endpoint|foot-form/i);
+  assert.match(footer, /Follow with RSS/);
+  assert.doesNotMatch(privacy.slice(privacy.indexOf('<main'), privacy.indexOf('</main>')), /newsletter/i);
+});
+
+test('with the newsletter on: footer form, honeypot, privacy link, and a noindex, no-referrer, beacon-free /newsletter/ page', () => {
+  const { page, on } = renderWith({ newsletterAction: 'api', commentsApi: 'https://api.test/', analytics: { cloudflareToken: 'a'.repeat(32) } });
+  assert.equal(on, true);
+  const about = page('about');
+  const footer = footerOf(about);
+  const form = footer.match(/<form[^>]*>/)[0];
+  assert.match(form, /class="foot-form"/);
+  assert.match(form, /action="\/newsletter\/"/);
+  assert.match(form, /method="get"/);
+  assert.match(form, /data-newsletter/);
+  assert.match(form, /data-endpoint="https:\/\/api\.test\/v1\/newsletter\/subscribe"/);
+  assert.match(footer, /<input[^>]*type="email"[^>]*name="email"[^>]*required/);
+  assert.match(footer, /<div[^>]*aria-hidden="true"[^>]*>[\s\S]*?<input[^>]*name="website"[^>]*tabindex="-1"[^>]*autocomplete="off"/);
+  assert.match(footer, /<p class="foot-status" role="status"/);
+  assert.match(footer, /One email when we publish a new article\. Stop any time\. See our <a href="\/privacy-policy\/[^"]*">Privacy Policy<\/a>\./);
+  assert.doesNotMatch(footer, /Follow with RSS<\/a>\s*<\/div>/, 'the RSS button is replaced by the form');
+  assert.match(about, /js\/subscribe\.js/, 'subscribe.js on every page');
+  assert.doesNotMatch(about, /js\/newsletter\.js/);
+  assert.match(about, /cloudflareinsights/, 'other pages keep the beacon');
+
+  const nl = page('newsletter');
+  assert.ok(nl, 'the newsletter page is built');
+  assert.match(nl, /<meta name="robots" content="noindex/);
+  assert.match(nl, /<meta name="referrer" content="no-referrer">/);
+  assert.doesNotMatch(nl, /cloudflareinsights/, 'no analytics beacon');
+  assert.match(nl, /js\/newsletter\.js/);
+  assert.match(nl, /data-newsletter-page/);
+  assert.match(nl, /<button[^>]*data-nl-go[^>]*hidden/);
+  assert.doesNotMatch(nl, /<script(?![^>]*\bsrc=)[^>]*>[^<]*fetch\(/, 'no inline fetch');
+  assert.doesNotMatch(nl, /\{\{[#^/]?newsletter\}\}/, 'no template tags left');
+});
+
+test('{{#newsletter}} and {{^newsletter}} work in content pages', () => {
+  const pg = { slug: 'x-test', title: 'X', heading: '', subtitle: '', description: 'x', kind: 'wide', menu: false, order: 1, hero: '', updated: null, html: '<p>{{#newsletter}}NL-ON{{/newsletter}}{{^newsletter}}NL-OFF{{/newsletter}}</p>' };
+  const on = renderWith({ newsletterAction: 'api' }).R.staticPage(pg);
+  const off = renderWith().R.staticPage(pg);
+  assert.ok(on.includes('NL-ON') && !on.includes('NL-OFF'));
+  assert.ok(off.includes('NL-OFF') && !off.includes('NL-ON'));
+});
+
+test('the newsletter page and both scripts are never in a sitemap', () => {
+  const { R } = renderWith({ newsletterAction: 'api' });
+  for (const [, xml] of R.sitemaps()) assert.doesNotMatch(xml, /\/newsletter\//);
+});

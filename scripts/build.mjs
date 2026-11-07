@@ -5,6 +5,7 @@
 //   node scripts/build.mjs --check       validate content only, write nothing
 //   node scripts/build.mjs --no-samples  leave out posts marked `sample: true`
 //   node scripts/build.mjs --api <url>   override commentsApi (for local testing only)
+//   node scripts/build.mjs --newsletter  turn the newsletter form and /newsletter/ on for this build (with --api, for local testing)
 //
 // Sources:  site.config.json · content/categories.json · content/posts/*.md · content/pages/*.html
 // Output:   index.html, post/, category/, label/, popular/, search/, author/, <page>/, 404.html,
@@ -17,7 +18,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { parseFrontMatter } from './lib/frontmatter.mjs';
 import { markdown, addHeadingIds, plainText, slugify } from './lib/markdown.mjs';
-import { createRenderer } from './lib/render.mjs';
+import { createRenderer, newsletterOn, newsletterSetting } from './lib/render.mjs';
 import { lintPost } from './lib/lint.mjs';
 import { makeShareCards } from './lib/share.mjs';
 
@@ -27,6 +28,7 @@ const args = new Set(argv);
 const CHECK_ONLY = args.has('--check');
 const NO_SAMPLES = args.has('--no-samples');
 const API_OVERRIDE = argv.includes('--api') ? argv[argv.indexOf('--api') + 1] : null;
+const NEWSLETTER_FLAG = args.has('--newsletter');
 
 const RESERVED_TOP = new Set(['post', 'category', 'label', 'popular', 'search', 'data', 'assets', 'css', 'js', 'content', 'scripts', 'worker', 'vendor', 'tag', 'author', '404', 'index', 'feed', 'sitemap']);
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -96,6 +98,13 @@ if (API_OVERRIDE !== null) config.commentsApi = API_OVERRIDE;
 if (!config.siteUrl || !/^https?:\/\//.test(config.siteUrl)) fail('site.config.json', '"siteUrl" must be a full URL such as https://mayobebros.com');
 if (config.basePath && !/^\/[^/].*[^/]$|^\/[^/]$/.test(config.basePath)) fail('site.config.json', '"basePath" must be empty or look like "/repo-name" (leading slash, no trailing slash)');
 if (config.commentsApi && !/^https?:\/\//.test(config.commentsApi)) fail('site.config.json', '"commentsApi" must be a full URL or empty');
+{
+  const nl = newsletterSetting(config.newsletterAction, NEWSLETTER_FLAG);
+  if (nl.error) fail('site.config.json', nl.error);
+  else config.newsletterAction = nl.action;
+  if (nl.action === 'api' && !config.commentsApi) warn('site.config.json', `the newsletter needs "commentsApi"${NEWSLETTER_FLAG ? ' (or --api)' : ''}; the footer keeps the RSS button until it is set`);
+}
+const NEWSLETTER_ON = !errors.length && newsletterOn(config);
 if (config.adsense.sidebarSlot && !/^\d{6,20}$/.test(String(config.adsense.sidebarSlot).trim())) warn('site.config.json', '"adsense.sidebarSlot" should be only the numbers of the ad unit (data-ad-slot), for example "1234567890"; the sidebar ad is left out until it is');
 const authors = (config.authors || []).map((a) => ({ ...a, slug: a.slug || slugify(a.name) }));
 
@@ -250,6 +259,7 @@ for (const file of pageFiles) {
   const slug = String(data.slug || file.replace(/\.[^.]+$/, ''));
   if (!SLUG_RE.test(slug)) fail(where, `page slug "${slug}" is not valid`);
   if (RESERVED_TOP.has(slug)) fail(where, `page slug "${slug}" collides with a reserved folder`);
+  if (slug === 'newsletter' && !NEWSLETTER_ON) continue; // the confirm / unsubscribe page exists only while the newsletter is on
   if (!data.title) fail(where, 'missing "title"');
   if (!data.description) warn(where, 'missing "description"');
   pages.push({
@@ -279,7 +289,7 @@ if (errors.length) {
 
 /* ------------------------------------------------------------------ build */
 const hashFile = (f) => (fs.existsSync(path.join(ROOT, f)) ? crypto.createHash('sha1').update(fs.readFileSync(path.join(ROOT, f))).digest('hex').slice(0, 8) : '');
-const versions = { 'css/style.css': hashFile('css/style.css'), 'js/site.js': hashFile('js/site.js'), 'js/engage.js': hashFile('js/engage.js'), 'js/manage.js': hashFile('js/manage.js'), 'js/listen.js': hashFile('js/listen.js'), 'js/pager.js': hashFile('js/pager.js') };
+const versions = { 'css/style.css': hashFile('css/style.css'), 'js/site.js': hashFile('js/site.js'), 'js/engage.js': hashFile('js/engage.js'), 'js/manage.js': hashFile('js/manage.js'), 'js/listen.js': hashFile('js/listen.js'), 'js/pager.js': hashFile('js/pager.js'), 'js/subscribe.js': hashFile('js/subscribe.js'), 'js/newsletter.js': hashFile('js/newsletter.js') };
 // Topic photographs: assets/img/topics/<name>-<width>.webp -> { name: [1280, 2560, 3840] }
 const heroSets = {};
 const topicsDir = path.join(ROOT, 'assets/img/topics');

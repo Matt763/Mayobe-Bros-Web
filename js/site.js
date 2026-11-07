@@ -916,12 +916,7 @@
       location.href = 'mailto:' + to + '?subject=' + encodeURIComponent(f.subject.value.trim()) + '&body=' + encodeURIComponent(body);
     });
   }
-  $$('[data-newsletter]').forEach(function (form) {
-    form.addEventListener('submit', function (e) {
-      e.preventDefault();
-      postForm(form, $('.foot-status', form), 'You are subscribed. Thank you!');
-    });
-  });
+  // the footer newsletter form is sent by js/subscribe.js (loaded only while the newsletter is on)
 })();
 
 

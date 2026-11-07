@@ -522,7 +522,7 @@ body.no-scroll { overflow: hidden; }
 .engage-note:empty { display: none; }
 .engage-note { margin-top: 0.75rem; font-size: 1rem; color: var(--text-2); }
 .comment-form { display: grid; gap: 1rem; margin-bottom: 1rem; }
-.comment-form .hp, .form .hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+.comment-form .hp, .form .hp, .foot-form .hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
 .comment-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 .opt { font-weight: 500; color: var(--text-3); font-size: 0.9375rem; }
 .comment-list { display: grid; gap: 1.1rem; }
@@ -657,6 +657,18 @@ body.no-scroll { overflow: hidden; }
 .foot-form input::placeholder { color: #e2eaff; opacity: 1; }
 .foot-form input:focus { outline: none; background: #fff; color: #0b1220; }
 .foot-status { flex-basis: 100%; font-size: 1rem; font-weight: 700; }
+/* newsletter form (js/subscribe.js): 44 px targets, a white focus ring that shows on the blue band, white status text (at least 4.5:1 on every part of the gradient) */
+.foot-form { max-width: 36rem; }
+.foot-form input[type="email"] { flex: 1 1 16rem; min-height: 2.75rem; }
+.foot-form .btn { min-height: 2.75rem; }
+.foot-form input:focus-visible, .foot-form .btn:focus-visible, .foot-form a:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+.foot-form input[aria-invalid="true"] { border-color: #fff; border-style: dashed; }
+.foot-cta .foot-status { margin: 0; color: #fff; }
+.foot-cta .foot-status:empty { display: none; }
+.foot-cta .foot-status.is-err { padding-left: 0.75rem; border-left: 4px solid #ffd0d0; }
+.foot-cta .foot-status.is-ok { padding-left: 0.75rem; border-left: 4px solid #b9f5cf; }
+.foot-cta .foot-form-note { flex-basis: 100%; margin: 0; font-size: 0.95rem; color: #e8efff; }
+.foot-cta .foot-form a { color: #fff; text-decoration: underline; text-underline-offset: 2px; }
 .foot-grid { display: grid; gap: 2.5rem; grid-template-columns: minmax(0, 1fr); padding-block: clamp(2.5rem, 5vw, 4.5rem); }
 @media (min-width: 640px) { .foot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 1100px) { .foot-grid { grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 1fr)); gap: clamp(2rem, 4vw, 5rem); } }
