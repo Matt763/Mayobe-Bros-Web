@@ -75,6 +75,7 @@ test('count and dry-run work; seed writes, dry-run does not', async () => {
   const c = await cli(['count']);
   assert.equal(c.code, 0);
   assert.match(c.stdout, /active 2, waiting to confirm 1/);
+  assert.match(c.stdout, /of 35 \(article emails stop at 25/);
   const d = await cli(['dry-run']);
   assert.equal(d.code, 0);
   assert.match(d.stdout, /seeded: old-one/);

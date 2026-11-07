@@ -150,17 +150,18 @@ Cloudflare account needed.
 Code: `src/newsletter.js` (routes, the daily sender, the admin API), tables in `migrations/0007_newsletter.sql`, owner tool `scripts/newsletter.mjs`.
 The footer form and the `/newsletter/` page exist only when `newsletterAction` in `site.config.json` is `"api"` (git keeps `""`).
 
-Routes (all under `/v1/newsletter/`): `subscribe` (always answers 200 for a valid address), `confirm` and `unsubscribe` (the buttons on the
+Routes (all under `/v1/newsletter/`): `subscribe` (answers 200 for every valid address whatever its state; 400 for an address that does not
+look right, 429 after 3 sign-ups in an hour from one IP, 503 while `RESEND_API_KEY` is not set), `confirm` and `unsubscribe` (the buttons on the
 `/newsletter/` page; links in emails use `#c=<token>` and `#u=<token>` so nothing happens until a person presses a button), `one-click`
 (POST for the `List-Unsubscribe` header, GET only redirects to the page and changes nothing). Admin routes are under `/v1/admin/newsletter*`.
 
 Sending: one Cron Trigger expression, `0,10,20,30,40,50 4 * * *` (six runs each morning, 04:00 to 04:50 UTC, which is 07:00 to 07:50 in
 Tanzania). Why six: on Workers Free every D1 query and every fetch is a subrequest and a run may make 50, so a run stops at 45 and sends
-about 9 emails. Six runs reach the 35-a-day news budget. If the cron were cut to one run, the limit would be about 9 emails a day.
+about 9 emails. Six runs reach the 25 article emails a day (see Known limits). If the cron were cut to one run, the limit would be about 9 emails a day.
 
 Rules the sender follows:
 - Variables in `wrangler.jsonc`: `NEWSLETTER_SEND` is `"false"` in git; article emails go out only when it is exactly `"true"`. `API_ORIGIN` is this Worker's own https address (used only in the `List-Unsubscribe` header); if it is missing or not https, nothing is sent.
-- First run seeding: when the table of handled articles is empty, every article in the live `data/search.json` is recorded as handled and nothing is sent, even if sending is on. `node scripts/newsletter.mjs seed` does this by hand. If that list was incomplete on the first run, articles from the last 7 days that were missing are sent on the next good run.
+- First run seeding: when the table of handled articles is empty, every article in the live `data/search.json` is recorded as handled and nothing is sent, even if sending is on. `node scripts/newsletter.mjs seed` records every listed article that is not recorded yet, also those from the last 7 days and also while sending is off, so none of them is ever emailed; run it (then `dry-run`) right before switching sending on. If that list was incomplete on the first run, articles from the last 7 days that were missing are sent on the next good run.
 - Age guard: an article not seen before whose date is more than 7 days old is recorded and never emailed (a renamed old post cannot be mass-mailed). So do not rename a post in its first week after publishing, or subscribers get it twice (the new slug looks like a new article). Posts renamed later are safe.
 - At most once: each (article, subscriber) pair is claimed in the database before Resend is called, so overlapping runs, retries and crashes never send an article twice. A failed send is not retried. A subscriber who unsubscribes during a run gets nothing more.
 - Clean-up runs every day, also while sending is off: unconfirmed sign-ups older than 7 days, expired confirm links, subscribers unsubscribed more than 30 days (with their tokens and send records) and old send records.
@@ -169,9 +170,9 @@ Rules the sender follows:
 Owner commands (need the admin token; they change nothing unless said):
 ```
 node scripts/newsletter.mjs list [active|pending|unsubscribed|all] [--csv]
-node scripts/newsletter.mjs count      # totals, today's news units, articles still being sent
+node scripts/newsletter.mjs count      # totals, today's news units (articles stop at 25 of 35), articles still being sent
 node scripts/newsletter.mjs dry-run    # what the next run would do; no writes, no mail
-node scripts/newsletter.mjs seed       # mark the articles now listed as handled; sends nothing
+node scripts/newsletter.mjs seed       # record every listed article not yet recorded (also this week's) as handled; sends nothing
 node scripts/newsletter.mjs remove <email> --yes   # deletes one address with its tokens and send record
 ```
 Local preview: `node --no-warnings scripts/dev-api.mjs` and `node scripts/build.mjs --api http://127.0.0.1:8787 --newsletter` (the dev API prints mail headers and has `POST /__dev/cron`).
@@ -197,11 +198,11 @@ Nothing below has been run. Do the steps in order; each one is a single command 
 Nothing below has been run. Order matters; the newsletter sends nothing until the last step.
 
 10. Apply migration 0007 BEFORE deploying: `npx wrangler d1 migrations apply mayobe-engage --remote` (check with `migrations list`).
-11. Confirm `API_ORIGIN` in `wrangler.jsonc` equals the deployed Worker address and `NEWSLETTER_SEND` is `"false"`, then `npx wrangler deploy`. This also registers the cron: check Workers > mayobe-engage > Settings > Triggers shows `0,10,20,30,40,50 4 * * *`.
-12. Run `node scripts/newsletter.mjs seed`, then `node scripts/newsletter.mjs dry-run` and read the report: no old article may be listed to send.
+11. Confirm `API_ORIGIN` in `wrangler.jsonc` equals the deployed Worker address and `NEWSLETTER_SEND` is `"false"`, then `npx wrangler deploy`. This also registers the cron: check Workers > mayobe-engage > Settings > Triggers shows `0,10,20,30,40,50 4 * * *`. Sign-ups work from now on, even before the footer form exists: confirmation, welcome and goodbye emails go out once the Worker is deployed, while `NEWSLETTER_SEND` is `"false"`. Only article emails wait for step 15.
+12. Run `node scripts/newsletter.mjs seed`, then `node scripts/newsletter.mjs dry-run` and read the report: no old article may be listed to send. Check that the `seeded` line of the first seed lists every article on the site (127 on 2026-11-07; count them in `data/search.json`). If it does not, do not switch sending on before 2026-11-12 (110 articles are dated 2026-11-04 and count as new until then).
 13. Set `"newsletterAction": "api"` in `site.config.json`, run `node scripts/build.mjs`, stage files by name, commit, and push when you decide.
 14. Test with your own Gmail: subscribe from the live footer, confirm, check the welcome mail, use Gmail's own Unsubscribe link, and check `node scripts/newsletter.mjs list all` shows the row as `unsubscribed`. Then subscribe again. (`node scripts/mail-test.mjs` shows the four newsletter templates on a phone.)
-15. Last: set `NEWSLETTER_SEND` to `"true"` in `wrangler.jsonc` and run `npx wrangler deploy` (a change made only in the Cloudflare dashboard is overwritten by the next deploy). The next morning's runs send the first article. To pause, set it back to `"false"` and deploy.
+15. Last: right before, run `node scripts/newsletter.mjs seed` and `node scripts/newsletter.mjs dry-run` again (articles published since step 12 are then recorded as handled; the dry run must list no article to send). Then set `NEWSLETTER_SEND` to `"true"` in `wrangler.jsonc` and run `npx wrangler deploy` (a change made only in the Cloudflare dashboard is overwritten by the next deploy). The next morning's runs send the first article published after that. To pause, set it back to `"false"` and deploy.
 
 ### Known limits
 
@@ -214,6 +215,7 @@ Nothing below has been run. Order matters; the newsletter sends nothing until th
 - Rate-limit records are deleted lazily, so they may outlive their expiry by a while.
 - A retry of the contact form with an edited message but the same form-fill id can get a Resend 409 and then shows the email fallback.
 - Someone rotating IPs can fill the 25 a day commenter slice with manage-link emails, which also stops reply notices for that day. Accepted: the per-address and per-IP limits are the backstop.
-- The news slice is 35 a day, so one article reaches at most about 27 to 35 subscribers a day (confirmations, welcomes and goodbyes use the same slice); a larger list takes several days or a paid Resend plan. (The design spec's "about 80 subscribers" was wrong; 35 is the number.) A list of 60 gets a new article within 2 days.
-- On the Free plan each cron run can make 50 subrequests (every D1 query and every fetch counts), so a run sends about 9 emails. The six morning runs together can reach the 35.
+- The news slice is 35 a day. Article emails stop at 25 so that 10 stay for confirmations, welcomes and goodbyes (the cron runs at the start of the UTC day, so otherwise a backlog would use the whole slice each morning). So about 25 subscribers get an article per day: 25 divided by the articles published that day, per subscriber (two articles the same day reach about 12 subscribers a day each). A list of 60 gets one article within 3 days; a larger list takes longer or needs a paid Resend plan. If subscribers times articles per day stays above 25, the queue keeps growing: watch `node scripts/newsletter.mjs count`. (The design spec's "about 80 subscribers" was wrong.)
+- Sign-up limits: 3 sign-ups an hour from one IP (the 4th gets a 429 "try again later"), one confirmation email per address per UTC day, and at most 8 confirmation emails a day in total. A confirmation that hits a limit, the do-not-email list or a full news slice is not sent and not retried; the person can sign up again the next day.
+- On the Free plan each cron run can make 50 subrequests (every D1 query and every fetch counts), so a run sends about 9 emails. The six morning runs together can reach the 25. The owner `dry-run` makes one count per queued article (at most a week of articles) and also stops at the ceiling.
 - The Free plan allows 10 ms of CPU per cron run. Building up to 9 emails per run may come close; I/O waits do not count. Watch the first live runs (see Newsletter).

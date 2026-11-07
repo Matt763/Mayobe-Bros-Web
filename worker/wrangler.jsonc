@@ -20,7 +20,7 @@
   },
   // Newsletter runs (runNewsletter) every 10 minutes from 04:00 to 04:50 UTC (07:00-07:50 in Tanzania). One expression = one of the
   // Free plan's 5 Cron Triggers. Each run stays under the Free plan's 50 subrequests (about 9 sends), so six runs can reach the
-  // 35-a-day news budget, which still bounds the day.
+  // 25 article emails a day (the 35-a-day news slice minus 10 kept for confirmations, welcomes and goodbyes).
   "triggers": { "crons": ["0,10,20,30,40,50 4 * * *"] },
   "d1_databases": [
     {

@@ -526,7 +526,7 @@ test('a post dated tomorrow is ignored; an unknown post dated 8 days ago (a rena
   assert.equal(postMails().length, 1);
 });
 
-test('40 subscribers: today sends what is left of the 35 news units and stops with budget; the next UTC day sends the rest exactly once', async () => {
+test('40 subscribers: today sends what is left of the 25 article units (35 minus a reserve of 10) and stops with budget; the next UTC day sends the rest exactly once', async () => {
   await seeded();
   sendOn();
   env.MAIL_TEST_DAY = '2030-01-01';
@@ -535,16 +535,17 @@ test('40 subscribers: today sends what is left of the 35 news units and stops wi
   searchList = [...OLD_LIST, entry('fresh-post', dayOf(0))];
   const r1 = await runAll();
   assert.equal(r1.stopped, 'budget');
-  assert.equal(postMails().length, 32);
+  assert.equal(postMails().length, 22);
   assert.equal(rows("SELECT sent_at FROM newsletter_sent WHERE slug = 'fresh-post'")[0].sent_at, null, 'not finished yet');
   assert.equal(rows("SELECT 1 FROM newsletter_deliveries WHERE status = 'claimed'").length, 0, 'the claim of the refused send was released');
   const again = await run(); // the same day: nothing left in the slice
   assert.equal(again.stopped, 'budget');
-  assert.equal(postMails().length, 32);
+  assert.equal(postMails().length, 22);
   env.MAIL_TEST_DAY = '2030-01-02';
   const r2 = await runAll();
   assert.equal(r2.stopped, null);
   assert.equal(postMails().length, 40);
+  assert.equal(rows("SELECT n FROM mail_budget WHERE day = '2030-01-02' AND kind = 'news'")[0].n, 18);
   assert.equal(new Set(postMails().map(to)).size, 40, 'each subscriber once');
   assert.ok(rows("SELECT sent_at FROM newsletter_sent WHERE slug = 'fresh-post'")[0].sent_at > 0);
 });
@@ -644,10 +645,10 @@ test('NEWSLETTER_SEND missing or "false": no post emails and no queued rows; API
   assert.equal(sent.length, 0, 'seed mode never sends');
   assert.equal(r.stopped, null);
   await run();
-  assert.equal(postMails().length, 1);
+  assert.equal(postMails().length, 0, 'seed recorded the recent post as handled');
 });
 
-test('sleep(200) is awaited between sends and a run makes at most 35 Resend calls', async () => {
+test('sleep(200) is awaited between sends and a run makes at most 25 Resend calls (the article share of the news slice)', async () => {
   await seeded();
   sendOn();
   for (let i = 1; i <= 50; i++) addSub(`z${i}@example.com`);
@@ -657,10 +658,10 @@ test('sleep(200) is awaited between sends and a run makes at most 35 Resend call
   sleepHook = async () => { inSleep = true; await new Promise((r) => setTimeout(r, 3)); inSleep = false; };
   resendFn = () => { if (inSleep) overlap++; return new Response('{}', { status: 500 }); }; // 500 gives the budget unit back, so only the call cap stops it
   const r = await run({ subrequestLimit: 10000 }); // lift the platform ceiling to reach the per-run call cap
-  assert.equal(sent.length, 35);
+  assert.equal(sent.length, 25);
   assert.equal(r.stopped, 'budget');
   assert.equal(overlap, 0, 'no send while a sleep is still running');
-  assert.deepEqual(sleeps, Array(34).fill(200));
+  assert.deepEqual(sleeps, Array(24).fill(200));
 });
 
 test('clean-up removes old pending, expired confirm tokens and month-old unsubscribed rows with their tokens and deliveries', async () => {
@@ -773,11 +774,14 @@ test('under a D1 + fetch wrapper that throws past 50 calls, each run stops clean
     assert.ok(r.stopped === 'subrequests' || r.stopped === 'budget' || r.stopped === null, String(r.stopped));
     if (r.stopped === 'subrequests') assert.ok(r.posts.reduce((n, p) => n + p.sent, 0) >= 9, `a full run sends at least 9 (run ${runs}: ${JSON.stringify(r.posts)})`);
   } while (r.stopped === 'subrequests' && runs < 20);
-  assert.equal(r.stopped, 'budget', 'the 35-a-day budget ends the day');
-  assert.ok(runs >= 4 && runs <= 6, `35 sends took ${runs} runs (the cron fires 6 times)`);
-  assert.equal(postMails().length, 35);
-  assert.equal(new Set(postMails().map((m) => m.headers['Idempotency-Key'])).size, 35, 'nobody gets the same post twice');
+  assert.equal(r.stopped, 'budget', 'the 25 article units end the day');
+  assert.ok(runs >= 3 && runs <= 6, `25 sends took ${runs} runs (the cron fires 6 times)`);
+  assert.equal(postMails().length, 25);
+  assert.equal(new Set(postMails().map((m) => m.headers['Idempotency-Key'])).size, 25, 'nobody gets the same post twice');
   env.MAIL_TEST_DAY = dayOf(1);
+  await runAll();
+  assert.equal(postMails().length, 50);
+  env.MAIL_TEST_DAY = dayOf(2);
   await runAll();
   assert.equal(postMails().length, 60);
   assert.equal(new Set(postMails().map((m) => m.headers['Idempotency-Key'])).size, 60);
@@ -962,7 +966,7 @@ test("count reports the queue and today's news units", async () => {
   for (let i = 1; i <= 3; i++) addSub(`q${i}@example.com`);
   addSub('p@example.com', { status: 'pending' });
   let c = (await admin('/v1/admin/newsletter/count')).json;
-  assert.deepEqual({ pending: c.pending, active: c.active, unsubscribed: c.unsubscribed, newsToday: c.newsToday, newsCap: c.newsCap, paused: c.paused, queue: c.queue }, { pending: 1, active: 3, unsubscribed: 0, newsToday: 0, newsCap: 35, paused: false, queue: [] });
+  assert.deepEqual({ pending: c.pending, active: c.active, unsubscribed: c.unsubscribed, newsToday: c.newsToday, newsCap: c.newsCap, articleCap: c.articleCap, paused: c.paused, queue: c.queue }, { pending: 1, active: 3, unsubscribed: 0, newsToday: 0, newsCap: 35, articleCap: 25, paused: false, queue: [] });
   searchList = [...OLD_LIST, entry('fresh-post', dayOf(0))];
   await run({ subrequestLimit: 14 }); // a short run: at least one sent, not all
   c = (await admin('/v1/admin/newsletter/count')).json;
@@ -992,4 +996,49 @@ test('run dry changes no row and calls Resend never; run seed on an empty table 
   assert.equal(count('newsletter_sent'), 2);
   assert.equal(sent.length, 0);
   assert.equal((await admin('/v1/admin/newsletter/run', { method: 'POST', body: { mode: 'send' } })).status, 400);
+});
+
+// ---- final review fixes ----
+test('article sends leave 10 news units for confirmations, welcomes and goodbyes; a confirmation can still use the full slice', async () => {
+  await seeded();
+  sendOn();
+  env.MAIL_TEST_DAY = '2030-02-01';
+  for (let i = 1; i <= 30; i++) addSub(`r${i}@example.com`);
+  searchList = [...OLD_LIST, entry('fresh-post', dayOf(0))];
+  const r = await runAll();
+  assert.equal(r.stopped, 'budget');
+  assert.equal(postMails().length, 25);
+  assert.equal(rows("SELECT n FROM mail_budget WHERE day = '2030-02-01' AND kind = 'news'")[0].n, 25);
+  for (let i = 0; i < 9; i++) assert.equal(await takeBudget(env, 'news'), true, `reserve unit ${i + 1}`);
+  sent = [];
+  await sub('late-signup@example.com', {}, { ip: '9.9.9.9' }); // the 35th unit
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].body.subject, 'Please confirm your Mayobe Bros subscription');
+  assert.equal(await takeBudget(env, 'news'), false, 'the slice is full at 35');
+});
+
+test('seed records every listed post not yet recorded, also those from the last 7 days and while paused', async () => {
+  await seeded();
+  addSub('a@example.com');
+  env.NEWSLETTER_SEND = 'false';
+  searchList = [...OLD_LIST, entry('yesterday-post', dayOf(-1)), entry('today-post', dayOf(0)), entry('old-renamed', dayOf(-20)), entry('tomorrow-post', dayOf(1))];
+  const r = await run({ mode: 'seed' });
+  assert.deepEqual([...r.seeded].sort(), ['today-post', 'yesterday-post']);
+  assert.deepEqual(r.tooOld, ['old-renamed']);
+  const got = Object.fromEntries(rows('SELECT slug, seeded, sent_at FROM newsletter_sent').map((x) => [x.slug, x.seeded === 1 && x.sent_at > 0]));
+  assert.deepEqual(got, { 'first-post': true, 'second-post': true, 'yesterday-post': true, 'today-post': true, 'old-renamed': true });
+  sendOn();
+  const after = await run();
+  assert.equal(sent.length, 0, 'switching sending on after seed sends no earlier article');
+  assert.deepEqual(after.posts, []);
+});
+
+test('dry run checks the subrequest ceiling before each count', async () => {
+  await seeded();
+  sendOn();
+  addSub('a@example.com');
+  searchList = [...OLD_LIST, entry('p-one', dayOf(0)), entry('p-two', dayOf(-1)), entry('p-three', dayOf(-2))];
+  const r = await run({ mode: 'dry', subrequestLimit: 4 }); // list fetch + state read + 2 counts
+  assert.equal(r.stopped, 'subrequests');
+  assert.equal(r.posts.length, 2);
 });

@@ -16,8 +16,10 @@ const today = (env) => env.MAIL_TEST_DAY || new Date().toISOString().slice(0, 10
 
 // One atomic statement: the row is created or raised by one only while n < cap, and RETURNING gives a row only
 // when a unit was taken. No read-then-write, so parallel sends cannot pass the cap.
-export async function takeBudget(env, kind, day = today(env)) {
-  const cap = CAPS[kind];
+// `limit` (optional) stops lower than the slice: the newsletter's article emails pass CAPS.news - 10 so the rest stays for
+// confirmations, welcomes and goodbyes. It can only lower the cap, never raise it.
+export async function takeBudget(env, kind, day = today(env), limit) {
+  const cap = Number.isInteger(limit) && limit >= 0 ? Math.min(limit, CAPS[kind] || 0) : CAPS[kind];
   if (!cap) return false;
   const row = await env.DB.prepare('INSERT INTO mail_budget(day, kind, n) VALUES(?, ?, 1) ON CONFLICT(day, kind) DO UPDATE SET n = n + 1 WHERE n < ? RETURNING n')
     .bind(day, kind, cap).first();
@@ -52,7 +54,7 @@ export async function sendMail(env, ctx, msg) {
     if (typeof msg.key !== 'string' || !msg.key.trim()) { logFail('message has no idempotency key; not sent'); return { ok: false, skipped: 'no-key' }; }
 
     const day = today(env);
-    if (!(await takeBudget(env, msg.kind, day))) return { ok: false, skipped: 'budget' };
+    if (!(await takeBudget(env, msg.kind, day, msg.budgetLimit))) return { ok: false, skipped: 'budget' };
 
     const from = msg.from === 'support' ? (env.MAIL_FROM_SUPPORT || DEFAULT_FROM_SUPPORT) : oneLine(msg.from) || env.MAIL_FROM || DEFAULT_FROM;
     const body = { from, to: [to], subject: oneLine(msg.subject), html: msg.html, text: msg.text };

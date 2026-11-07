@@ -5,9 +5,11 @@
 //   node scripts/newsletter.mjs count                                          totals, today's news units, posts still being sent
 //   node scripts/newsletter.mjs remove <email> --yes                           delete one address with its tokens and send log (cannot be undone; refused without --yes)
 //   node scripts/newsletter.mjs dry-run                                        what the next run would do; changes nothing, sends nothing
-//   node scripts/newsletter.mjs seed                                           record the posts now listed as already handled (sends nothing)
+//   node scripts/newsletter.mjs seed                                           record every post now listed and not yet recorded (also this week's) as
+//                                                                              already handled, so it is never emailed; sends nothing. Run seed, then
+//                                                                              dry-run, right before setting NEWSLETTER_SEND to "true".
 //
-// Sending is done only by the daily Cron Trigger. The admin token is read as in scripts/comments.mjs
+// Sending is done only by the Cron Trigger (six runs each morning). The admin token is read as in scripts/comments.mjs
 // (ADMIN_TOKEN, or the git-ignored file ".admin-token").
 import fs from 'node:fs';
 import path from 'node:path';
@@ -65,7 +67,7 @@ try {
   } else if (cmd === 'count') {
     const c = await call('GET', '/admin/newsletter/count');
     console.log(`active ${safe(c.active)}, waiting to confirm ${safe(c.pending)}, unsubscribed ${safe(c.unsubscribed)}`);
-    console.log(`news mail units used today (UTC): ${safe(c.newsToday)} of ${safe(c.newsCap)}`);
+    console.log(`news mail units used today (UTC): ${safe(c.newsToday)} of ${safe(c.newsCap)} (article emails stop at ${safe(c.articleCap)}; the rest is kept for confirmations, welcomes and goodbyes)`);
     console.log(c.paused ? 'sending of new-article emails is paused (NEWSLETTER_SEND is not "true")' : 'sending of new-article emails is on');
     if (!c.queue.length) console.log('no article is being sent now');
     for (const q of c.queue) console.log(`being sent: ${safe(q.slug)}  sent ${safe(q.sent)}, still to send ${safe(q.left)}`);

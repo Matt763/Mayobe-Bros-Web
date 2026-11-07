@@ -226,8 +226,14 @@ function postMail(env, p, unsubscribeUrl) {
 // (developers.cloudflare.com/workers/platform/limits/ and /d1/platform/limits/, checked 2026-11-07). The run counts its own and stops
 // at this ceiling, leaving room to spare. A send costs at most SEND_COST: claim+token batch, takeBudget, the Resend fetch, giveBack
 // (only after a 429/5xx/timeout), mark or release, and the post's closing update. About 9 sends fit in one run, so the cron fires six
-// times in the sending window (wrangler.jsonc) and the daily news budget (CAPS.news) still bounds the day.
+// times in the sending window (wrangler.jsonc) and ARTICLE_CAP (25 of the 35-a-day news slice) still bounds the day: about 25
+// subscribers per article per day.
 const SUBREQUEST_CEILING = 45;
+// Article emails stop when the day's news slice reaches CAPS.news - NEWS_RESERVE (25 of 35). The cron runs at the start of the UTC
+// budget day, so without a reserve a backlog would use the whole slice every morning and no confirmation, welcome or goodbye could go
+// out for the rest of the day. Those still use the full slice.
+export const NEWS_RESERVE = 10;
+export const ARTICLE_CAP = CAPS.news - NEWS_RESERVE;
 const SEND_COST = 6;
 
 // env.DB with a counter: each first/all/run and each batch adds one.
@@ -324,6 +330,11 @@ async function sendRun(env, ctx, report, list, { t, dry, mode, sleep, meter }) {
   const fresh = unknown.filter((p) => p.d >= freshFrom);
   const bySlug = new Map(list.map((p) => [p.s, p]));
   const writes = old.map((p) => insertSent(DB, p, t, true));
+  // seed (the owner, right before switching sending on): every listed post not yet recorded counts as handled, also last week's
+  if (mode === 'seed') {
+    for (const p of fresh) writes.push(insertSent(DB, p, t, true));
+    report.seeded = fresh.map((p) => p.s);
+  }
   // (4)
   const sending = mode !== 'seed' && (!report.paused || dry); // dry reports what it would send even while paused
   if (sending && !dry) {
@@ -349,12 +360,16 @@ async function sendRun(env, ctx, report, list, { t, dry, mode, sleep, meter }) {
 
   const eligible = "FROM newsletter_subscribers s WHERE s.status = 'active' AND s.confirmed <= ? AND NOT EXISTS (SELECT 1 FROM newsletter_deliveries d WHERE d.slug = ? AND d.subscriber_id = s.id)";
   const room = (cost) => meter.n + cost <= meter.limit;
-  let calls = 0; // Resend calls in this run: at most CAPS.news, whatever happens to the budget (a 429 or 5xx gives its unit back)
+  let calls = 0; // Resend calls in this run: at most ARTICLE_CAP, whatever happens to the budget (a 429 or 5xx gives its unit back)
   for (const row of todo) {
     const p = bySlug.get(row.slug);
     const stat = { slug: p.s, recipients: 0, sent: 0, skipped: 0, failed: 0 };
     report.posts.push(stat);
-    if (dry) { stat.recipients = (await DB.prepare(`SELECT COUNT(*) AS n ${eligible}`).bind(row.queued_at, p.s).first())?.n || 0; continue; }
+    if (dry) {
+      if (!room(1)) { report.posts.pop(); report.stopped = 'subrequests'; return; } // a week of posts at most, but keep the run under the limit
+      stat.recipients = (await DB.prepare(`SELECT COUNT(*) AS n ${eligible}`).bind(row.queued_at, p.s).first())?.n || 0;
+      continue;
+    }
     let after = 0;
     for (;;) {
       if (!room(1 + SEND_COST)) { report.stopped = 'subrequests'; return; }
@@ -369,7 +384,7 @@ async function sendRun(env, ctx, report, list, { t, dry, mode, sleep, meter }) {
           stat.recipients++; stat.skipped++;
           continue;
         }
-        if (calls >= CAPS.news) { report.stopped = 'budget'; return; }
+        if (calls >= ARTICLE_CAP) { report.stopped = 'budget'; return; }
         if (!room(SEND_COST)) { report.stopped = 'subrequests'; return; }
         after = s.id;
         if (calls > 0) await sleep(GAP_MS);
@@ -389,7 +404,7 @@ async function sendRun(env, ctx, report, list, { t, dry, mode, sleep, meter }) {
         try {
           const m = postMail(env, p, kit.pageUrl);
           meter.n++; // the Resend fetch
-          res = await sendMail(env, ctx, { kind: 'news', to: s.email, ...m, headers: kit.headers, key: `nl-post-${p.s}-${s.id}`, suppressionChecked: true });
+          res = await sendMail(env, ctx, { kind: 'news', to: s.email, ...m, headers: kit.headers, key: `nl-post-${p.s}-${s.id}`, suppressionChecked: true, budgetLimit: ARTICLE_CAP });
         } catch (err) {
           await release(); // nothing reached Resend
           throw err;
@@ -439,7 +454,7 @@ export async function newsletterAdmin(request, env, ctx, path, url, cors) {
     const c = Object.fromEntries((byStatus.results || []).map((r) => [r.status, r.n]));
     return reply({
       pending: c.pending || 0, active: c.active || 0, unsubscribed: c.unsubscribed || 0,
-      newsToday: budget.results?.[0]?.n || 0, newsCap: CAPS.news, paused: env.NEWSLETTER_SEND !== 'true',
+      newsToday: budget.results?.[0]?.n || 0, newsCap: CAPS.news, articleCap: ARTICLE_CAP, paused: env.NEWSLETTER_SEND !== 'true',
       queue: (queue.results || []).map((r) => ({ slug: r.slug, sent: r.sent, left: r.left })),
     }, 200, cors);
   }
