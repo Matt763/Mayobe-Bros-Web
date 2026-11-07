@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import worker from '../../worker/src/index.js';
 import { makeD1 } from '../lib/d1-shim.mjs';
-import { takeBudget } from '../../worker/src/mail.js';
+import { takeBudget, sendMail } from '../../worker/src/mail.js';
 
 const ORIGIN = 'https://mayobebros.com';
 const CID = 'abcdefabcdefabcdef12';
@@ -1767,4 +1767,181 @@ test('contact: 3,000 characters of quotes and line breaks arrive whole, escaped,
   assert.ok(own.body.html.includes('&quot;'), 'quotes escaped');
   assert.ok(own.body.html.includes('&lt;b&gt;x&lt;/b&gt;'), 'tags escaped');
   assert.equal(own.body.html.includes('<b>x</b>'), false);
+});
+
+// ---- Resend webhook (Svix signature) ----
+import { createHmac } from 'node:crypto';
+const WH_KEY = Buffer.from('test-signing-key-0123456789abcdef');
+const WH_SECRET = `whsec_${WH_KEY.toString('base64')}`;
+const nowSec = () => Math.floor(Date.now() / 1000);
+// Independent of the production code: the signature is computed here with Node's crypto.
+const svixSig = (id, ts, raw, key = WH_KEY) => `v1,${createHmac('sha256', key).update(`${id}.${ts}.${raw}`).digest('base64')}`;
+async function hook(payload, { id = 'msg_1', ts = String(nowSec()), sig, raw, headers = {}, method = 'POST', origin = null } = {}) {
+  const text = raw ?? (typeof payload === 'string' ? payload : JSON.stringify(payload));
+  const h = { 'CF-Connecting-IP': '9.9.9.9', ...headers };
+  if (id !== null) h['svix-id'] = id;
+  if (ts !== null) h['svix-timestamp'] = ts;
+  const s = sig === undefined ? svixSig(id, ts, text) : sig;
+  if (s !== null) h['svix-signature'] = s;
+  if (origin) h.Origin = origin;
+  const res = await worker.fetch(new Request('https://api.test/v1/webhooks/resend', { method, headers: h, body: method === 'POST' ? text : undefined }), env, { waitUntil: (p) => { pendingMail.push(p); } });
+  const out = await res.text();
+  return { status: res.status, json: out ? JSON.parse(out) : null };
+}
+const suppressedRows = () => env.DB.raw.prepare('SELECT email, reason FROM suppressed ORDER BY email').all().map((r) => ({ ...r }));
+const bounce = (to, bt = { type: 'Permanent', subType: 'Suppressed' }) => ({ type: 'email.bounced', data: { to, ...(bt ? { bounce: bt } : {}) } });
+const BAD = { error: 'Invalid webhook.' };
+
+test('webhook: a signed permanent bounce suppresses the address and later mail to it is skipped', async () => {
+  env.RESEND_WEBHOOK_SECRET = WH_SECRET;
+  const r = await hook(bounce(['Gone@Example.com']));
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.json, { ok: true });
+  assert.deepEqual(suppressedRows(), [{ email: 'gone@example.com', reason: 'bounce' }]);
+  const m = await sendMail(env, { waitUntil() {} }, { kind: 'commenter', to: 'gone@example.com', subject: 's', html: '<p>x</p>', text: 'x', key: 'k1' });
+  assert.equal(m.skipped, 'suppressed');
+  assert.equal(sent.length, 0);
+});
+
+test('webhook: a complaint suppresses; a single string recipient works; several recipients all count; bad ones are ignored', async () => {
+  env.RESEND_WEBHOOK_SECRET = WH_SECRET;
+  assert.equal((await hook({ type: 'email.complained', data: { to: 'Spam@Example.com' } })).status, 200);
+  assert.equal((await hook(bounce(['a@example.com', 'b@example.com', 'not an address', 'x\ny@example.com', 42, null, '']))).status, 200);
+  assert.deepEqual(suppressedRows(), [
+    { email: 'a@example.com', reason: 'bounce' },
+    { email: 'b@example.com', reason: 'bounce' },
+    { email: 'spam@example.com', reason: 'complaint' },
+  ]);
+});
+
+test('webhook: suppresses exactly the reported address, not its canonical form', async () => {
+  env.RESEND_WEBHOOK_SECRET = WH_SECRET;
+  await hook(bounce(['first.last+tag@gmail.com']));
+  assert.deepEqual(suppressedRows(), [{ email: 'first.last+tag@gmail.com', reason: 'bounce' }]);
+});
+
+test('webhook: at most 50 recipients per event', async () => {
+  env.RESEND_WEBHOOK_SECRET = WH_SECRET;
+  await hook(bounce(Array.from({ length: 80 }, (_, i) => `u${i}@example.com`)));
+  assert.equal(suppressedRows().length, 50);
+});
+
+test('webhook: temporary and undetermined bounces do not suppress; a payload without bounce.type does', async () => {
+  env.RESEND_WEBHOOK_SECRET = WH_SECRET;
+  assert.equal((await hook(bounce(['t@example.com'], { type: 'Temporary', subType: 'MailboxFull' }))).status, 200);
+  assert.equal((await hook(bounce(['u@example.com'], { type: 'Undetermined' }))).status, 200);
+  assert.deepEqual(suppressedRows(), []);
+  assert.equal((await hook(bounce(['n@example.com'], null))).status, 200);
+  assert.deepEqual(suppressedRows(), [{ email: 'n@example.com', reason: 'bounce' }]);
+});
+
+test('webhook: other events are acknowledged and change nothing', async () => {
+  env.RESEND_WEBHOOK_SECRET = WH_SECRET;
+  const r = await hook({ type: 'email.delivered', data: { to: ['d@example.com'] } });
+  assert.deepEqual([r.status, r.json], [200, { ok: true }]);
+  assert.deepEqual(suppressedRows(), []);
+});
+
+test('webhook: the same event twice is harmless', async () => {
+  env.RESEND_WEBHOOK_SECRET = WH_SECRET;
+  const p = bounce(['dup@example.com']);
+  assert.equal((await hook(p)).status, 200);
+  assert.equal((await hook(p)).status, 200);
+  assert.equal(suppressedRows().length, 1);
+});
+
+test('webhook: wrong signature, wrong secret, tampered body: 400 and nothing stored', async () => {
+  env.RESEND_WEBHOOK_SECRET = WH_SECRET;
+  const p = bounce(['x@example.com']);
+  const raw = JSON.stringify(p);
+  const ts = String(nowSec());
+  for (const o of [
+    { sig: 'v1,AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=' },
+    { sig: svixSig('msg_1', ts, raw, Buffer.from('another-key-entirely')), ts },
+    { sig: svixSig('msg_1', ts, raw), raw: raw.replace('x@', 'y@'), ts },
+    { sig: svixSig('msg_OTHER', ts, raw), ts },
+    { sig: `v1,${createHmac('sha256', WH_KEY).update(`msg_1.${ts}.${raw}`).digest('base64')}x`, ts },
+  ]) {
+    const r = await hook(p, o);
+    assert.deepEqual([r.status, r.json], [400, BAD]);
+  }
+  assert.deepEqual(suppressedRows(), []);
+});
+
+test('webhook: old, future, non-integer and missing timestamps and other missing headers: 400', async () => {
+  env.RESEND_WEBHOOK_SECRET = WH_SECRET;
+  const p = bounce(['x@example.com']);
+  for (const o of [
+    { ts: String(nowSec() - 301) },
+    { ts: String(nowSec() + 301) },
+    { ts: '12abc' },
+    { ts: '1.5' },
+    { ts: '' },
+    { ts: null, sig: 'v1,x' },
+    { id: null, sig: 'v1,x' },
+    { sig: null },
+    { sig: '' },
+  ]) {
+    const r = await hook(p, o);
+    assert.deepEqual([r.status, r.json], [400, BAD], JSON.stringify(o));
+  }
+  assert.equal((await hook(p, { ts: String(nowSec() - 200) })).status, 200, 'inside the window');
+});
+
+test('webhook: a missing, empty or malformed secret fails closed', async () => {
+  const p = bounce(['x@example.com']);
+  const raw = JSON.stringify(p);
+  for (const secret of [undefined, '', 'whsec_', 'whsec_!!!not-base64!!!', Buffer.from('k').toString('base64'), `whsec_${WH_KEY.toString('base64')}x`]) {
+    env.RESEND_WEBHOOK_SECRET = secret;
+    const r = await hook(p);
+    assert.deepEqual([r.status, r.json], [400, BAD], String(secret));
+  }
+  // Even a signature made with an empty key does not pass when the secret is empty.
+  env.RESEND_WEBHOOK_SECRET = 'whsec_';
+  const ts = String(nowSec());
+  const sig = `v1,${createHmac('sha256', Buffer.alloc(0)).update(`msg_1.${ts}.${raw}`).digest('base64')}`;
+  assert.equal((await hook(p, { ts, sig })).status, 400);
+  assert.deepEqual(suppressedRows(), []);
+});
+
+test('webhook: several signatures where one is valid pass; v2 only, or a v1 lookalike, is refused', async () => {
+  env.RESEND_WEBHOOK_SECRET = WH_SECRET;
+  const p = bounce(['multi@example.com']);
+  const raw = JSON.stringify(p);
+  const ts = String(nowSec());
+  const good = svixSig('msg_1', ts, raw);
+  const junk = 'v1,AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+  assert.equal((await hook(p, { ts, sig: `${junk} ${good}` })).status, 200);
+  assert.equal((await hook(p, { ts, sig: `v2,abc ${good} ${junk}` })).status, 200);
+  assert.deepEqual(suppressedRows().length, 1);
+  env.DB.raw.prepare('DELETE FROM suppressed').run();
+  const v2 = `v2,${good.slice(3)}`;
+  assert.equal((await hook(p, { ts, sig: v2 })).status, 400);
+  assert.equal((await hook(p, { ts, sig: good.slice(3) })).status, 400, 'no version prefix');
+  assert.equal((await hook(p, { ts, sig: `v1a,${good.slice(3)}` })).status, 400);
+  assert.deepEqual(suppressedRows(), []);
+});
+
+test('webhook: oversize body is refused; malformed JSON with a valid signature is 400', async () => {
+  env.RESEND_WEBHOOK_SECRET = WH_SECRET;
+  const big = JSON.stringify({ type: 'email.delivered', pad: 'y'.repeat(70000) });
+  assert.equal((await hook(big)).status, 413);
+  assert.deepEqual((await hook('{nope')).json, BAD);
+});
+
+test('webhook: no Origin is needed, a foreign Origin does not help or hurt, only the signature counts', async () => {
+  env.RESEND_WEBHOOK_SECRET = WH_SECRET;
+  assert.equal((await hook(bounce(['o1@example.com']), { origin: 'https://evil.example' })).status, 200);
+  assert.equal((await hook(bounce(['o2@example.com']), { origin: ORIGIN })).status, 200);
+  assert.equal((await hook(bounce(['o3@example.com']), { origin: ORIGIN, sig: 'v1,bad' })).status, 400);
+  assert.equal(suppressedRows().length, 2);
+});
+
+test('webhook: GET is not the webhook; OPTIONS answers 204 without side effects; other POST routes still need an Origin', async () => {
+  env.RESEND_WEBHOOK_SECRET = WH_SECRET;
+  assert.equal((await hook(bounce(['g@example.com']), { method: 'GET' })).status, 404);
+  const res = await worker.fetch(new Request('https://api.test/v1/webhooks/resend', { method: 'OPTIONS' }), env, { waitUntil() {} });
+  assert.equal(res.status, 204);
+  assert.equal((await call('POST', '/v1/posts/hello-post/react', { body: { cid: CID, type: 'like' }, origin: null })).status, 403);
+  assert.deepEqual(suppressedRows(), []);
 });

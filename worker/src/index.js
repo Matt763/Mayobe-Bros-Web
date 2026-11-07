@@ -14,6 +14,7 @@
 //   POST /v1/admin/reply                    { parent, body, name? }  a published reply from the team (shows a Team badge)
 //   POST /v1/manage/exchange                { link }              swap the token from an emailed manage link (kept in the page's #l= fragment) for a device token -> { ok, id, slug, path?, token }
 //   POST /v1/notify/unsubscribe             { token }             stop reply emails for the comment that owns this (#u=) token
+//   POST /v1/webhooks/resend                Resend bounce/complaint events (Svix-signed; no Origin check, the signature is the proof). Adds the addresses to `suppressed`.
 //
 // Email (worker/src/mail.js, mail-templates.js): the create route also takes `notify: true` with an email address. That sends one
 // "manage link" mail (fixed text and our own article title only: the address is unverified). Opening its link confirms the address, and
@@ -153,6 +154,62 @@ async function readJson(request, max = MAX_BODY) {
   }
 }
 
+// Resend webhooks are signed with Svix: HMAC-SHA256 over `${svix-id}.${svix-timestamp}.${rawBody}`, keyed with the base64-decoded part of
+// RESEND_WEBHOOK_SECRET ("whsec_<base64>"). The header holds space-separated "v1,<base64>" entries; any one may match. Every failure
+// (also a missing or broken secret: fail closed) returns the same answer, so nothing says which check failed.
+const WEBHOOK_MAX = 64 * 1024;
+async function svixValid(request, env, raw) {
+  const secret = String(env.RESEND_WEBHOOK_SECRET || '');
+  if (!secret.startsWith('whsec_')) return false;
+  const id = request.headers.get('svix-id') || '';
+  const ts = request.headers.get('svix-timestamp') || '';
+  const sigs = request.headers.get('svix-signature') || '';
+  if (!id || id.length > 256 || !/^\d{1,12}$/.test(ts) || !sigs) return false;
+  if (Math.abs(Date.now() / 1000 - Number(ts)) > 300) return false;
+  let keyBytes;
+  try {
+    keyBytes = Uint8Array.from(atob(secret.slice(6)), (c) => c.charCodeAt(0));
+  } catch {
+    return false;
+  }
+  if (!keyBytes.length) return false;
+  const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const mac = new Uint8Array(await crypto.subtle.sign('HMAC', key, enc.encode(`${id}.${ts}.${raw}`)));
+  let bin = '';
+  for (const b of mac) bin += String.fromCharCode(b);
+  const expected = btoa(bin);
+  let ok = false;
+  for (const entry of sigs.split(' ')) if (entry.startsWith('v1,') && same(entry.slice(3), expected)) ok = true;
+  return ok;
+}
+async function resendWebhook(request, env, cors) {
+  const bad = () => fail('Invalid webhook.', 400, cors);
+  const raw = await request.text();
+  if (raw.length > WEBHOOK_MAX) return fail('Request is too large.', 413, cors);
+  if (!(await svixValid(request, env, raw))) return bad();
+  let ev;
+  try {
+    ev = JSON.parse(raw);
+  } catch {
+    return bad();
+  }
+  const reason = ev?.type === 'email.bounced' ? 'bounce' : ev?.type === 'email.complained' ? 'complaint' : null;
+  if (!reason) return reply({ ok: true }, 200, cors);
+  // Only a permanent bounce suppresses (Resend: data.bounce.type "Permanent"); Temporary/Undetermined do not. A payload without the field suppresses.
+  const bt = ev.data?.bounce?.type;
+  if (reason === 'bounce' && bt !== undefined && bt !== null && String(bt).toLowerCase() !== 'permanent') return reply({ ok: true }, 200, cors);
+  const to = ev.data?.to;
+  const list = (Array.isArray(to) ? to : [to]).filter((a) => typeof a === 'string').slice(0, 50);
+  let n = 0;
+  for (const a of list) {
+    if (!validEmail(a)) continue;
+    await env.DB.prepare('INSERT OR IGNORE INTO suppressed(email, reason, created) VALUES(?, ?, ?)').bind(a.trim().toLowerCase(), reason, now()).run();
+    n++;
+  }
+  console.log(`resend webhook: ${reason}, ${n} address(es)`);
+  return reply({ ok: true }, 200, cors);
+}
+
 // Counts how often a key was used; returns false once the limit for the window is passed.
 async function hit(env, ctx, key, limit, ttlSec) {
   const row = await env.DB.prepare('INSERT INTO hits(k, n, expires) VALUES(?, 1, ?) ON CONFLICT(k) DO UPDATE SET n = n + 1 RETURNING n').bind(key, now() + ttlSec * 1000).first();
@@ -284,6 +341,8 @@ async function handle(request, env, ctx) {
 
   if (method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
   if (path === '/' || path === '/v1') return reply({ ok: true, service: 'mayobe-bros-engage' }, 200, cors, 'public, max-age=300');
+
+  if (method === 'POST' && path === '/v1/webhooks/resend') return resendWebhook(request, env, cors);
 
   // Browsers always send Origin on cross-site POSTs. Refuse any that is not our site.
   if (method === 'POST' && !path.startsWith('/v1/admin/')) {

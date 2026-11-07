@@ -114,6 +114,17 @@ owner 10, commenter 25, contact 10, news 35. A full slice never borrows from ano
 inside the owner slice (`ctday:` in `hits`), so a flood of contact messages leaves 3 owner emails for held-comment and question alerts; past 7
 the form answers with the "please email us" message. Each visitor confirmation (the `contact` slice) is sent once a day per address.
 
+## Bounces and complaints (Resend webhook)
+
+Resend tells the Worker when an address bounces or marks a mail as spam, and the Worker stops mailing it (table `suppressed`).
+1. Resend dashboard -> Webhooks -> Add endpoint: `<worker URL>/v1/webhooks/resend`, events `email.bounced` and `email.complained`.
+2. Copy the signing secret (`whsec_...`) and run `npx wrangler secret put RESEND_WEBHOOK_SECRET`.
+
+Every request is checked with the Svix signature (headers `svix-id`, `svix-timestamp`, `svix-signature`, 5-minute window). Without the secret
+the endpoint refuses everything. Only permanent bounces and complaints suppress; temporary bounces do not.
+Keep **click and open tracking OFF** for this domain in Resend: manage links carry their token in the URL fragment (`#l=`, `#u=`) and
+tracking wrappers can break or leak them.
+
 ## Backups
 
 ```bash
