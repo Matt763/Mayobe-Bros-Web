@@ -57,7 +57,13 @@ export async function hit(env, ctx, key, limit, ttlSec) {
 }
 
 export const siteOrigin = (env) => String(env.SITE_ORIGIN || 'https://mayobebros.com').replace(/\/$/, '');
-export const siteOf = (env) => ({ origin: siteOrigin(env), logoUrl: `${siteOrigin(env)}/assets/img/icon-192.png` });
+// What the email templates need: where links point, where pictures come from (always https: a loopback SITE_ORIGIN
+// used for local testing still shows the published pictures) and the wordmark picture (assets/email/logo.png).
+export const siteOf = (env) => {
+  const origin = siteOrigin(env);
+  const assetOrigin = /^https:\/\//.test(origin) ? origin : 'https://mayobebros.com';
+  return { origin, assetOrigin, logoUrl: `${assetOrigin}/assets/email/logo.png` };
+};
 // One inbox, however it is spelled: NFKC, lower case, no trailing dot on the domain, no +tag, and for Gmail no dots and
 // googlemail.com = gmail.com. Used ONLY for rate-limit keys; mail still goes to the address as typed.
 export function canonicalEmail(raw) {

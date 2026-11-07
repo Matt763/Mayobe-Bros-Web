@@ -4,10 +4,18 @@
 // short data, so the rules hold as copy gets longer or shorter.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { contrast, PAIRS, DECORATIVE, TOKEN_HEX, LIGHT, DARK } from '../../worker/src/mail-tokens.js';
+import * as K from '../../worker/src/mail-tokens.js';
 import * as T from '../../worker/src/mail-templates.js';
 
-const SITE = { origin: 'https://mayobebros.com', logoUrl: 'https://mayobebros.com/assets/img/icon-192.png' };
+const SITE = { origin: 'https://mayobebros.com', assetOrigin: 'https://mayobebros.com', logoUrl: 'https://mayobebros.com/assets/email/logo.png' };
+const ASSET = 'https://mayobebros.com';
+const LOGO = `${ASSET}/assets/email/logo.png`;
+// Pictures allowed per email: the logo everywhere; welcome adds a lead picture and two thumbnails, new article a hero.
+const MAX_IMG = { welcomeEmail: 4, newPostEmail: 2 };
+// Classes that only carry layout (padding, width, stacking): everything else must be restyled by the dark block.
+const LAYOUT_CLASSES = new Set(['mb-wrap', 'mb-outer', 'mb-foot', 'mb-footband', 'mb-dt', 'mb-dd', 'mb-h1']);
 
 // Hostile pieces: markup, both quote kinds, an ampersand and a header-injection attempt.
 const EVIL = `<script>alert(1)</script> "quoted" 'single' & <b>bold</b>\r\nBcc: x@y.z`;
@@ -24,7 +32,7 @@ const LONG = {
   contactVisitorEmail: { name: NAME, subject: EVIL + ' ' + 'subject '.repeat(30), type: 'general' },
   confirmSubscriptionEmail: { confirmUrl: U('newsletter/') + '#confirm' },
   welcomeEmail: { unsubscribeUrl: U('v1/newsletter/unsubscribe'), latestPosts: POSTS },
-  newPostEmail: { post: { title: EVIL + ' ' + 'Long title '.repeat(12), url: U('post/x/y/'), excerpt: MSG.slice(0, 400), image: 'https://mayobebros.com/assets/share/post-y.jpg', imageAlt: EVIL, category: 'Educational' }, unsubscribeUrl: U('v1/newsletter/unsubscribe') },
+  newPostEmail: { post: { title: EVIL + ' ' + 'Long title '.repeat(12), url: U('post/x/y/'), excerpt: MSG.slice(0, 400), image: 'https://mayobebros.com/assets/email/post-y.jpg?v=0123abcd', imageAlt: EVIL, category: 'Educational' }, unsubscribeUrl: U('v1/newsletter/unsubscribe') },
   farewellEmail: { resubscribeUrl: U('newsletter/') },
 };
 const SHORT = {
@@ -48,7 +56,7 @@ function dataUrls(v, key = '', out = []) {
   return out;
 }
 
-function lint(out, data, { checkUrls = true } = {}) {
+function lint(out, data, { checkUrls = true, name = '' } = {}) {
   const errs = [];
   const { subject, html, text } = out;
   const n = (re) => (html.match(re) || []).length;
@@ -57,17 +65,39 @@ function lint(out, data, { checkUrls = true } = {}) {
   if (!/<html lang="en"/.test(html)) errs.push('no html lang');
   if (!/<title>[^<]+<\/title>/.test(html)) errs.push('no title');
   for (const t of html.match(/<table\b[^>]*>/g) || []) if (!/role="presentation"/.test(t)) errs.push('table without role: ' + t);
-  for (const t of html.match(/<img\b[^>]*>/g) || []) if (!/\salt="/.test(t) || !/\swidth="\d+"/.test(t) || !/\sheight="\d+"/.test(t)) errs.push('img attrs: ' + t);
+  // pictures: our own JPEG/PNG under /assets/email/ on the https asset origin, sized, block-level, no border, scalable
+  const imgs = html.match(/<img\b[^>]*>/g) || [];
+  for (const t of imgs) {
+    if (!/\salt="/.test(t) || !/\swidth="\d+"/.test(t) || !/\sheight="\d+"/.test(t)) errs.push('img attrs: ' + t);
+    const src = decode((t.match(/\ssrc="([^"]*)"/) || [, ''])[1]);
+    if (!src || T.ownImage(src, ASSET) !== src) errs.push('img src not ownImage: ' + src);
+    if (!/^https:\/\/[^/]+\/assets\/email\/[a-z0-9-]+\.(jpg|png)(\?v=[0-9a-f]{8})?$/.test(src)) errs.push('img src shape: ' + src);
+    const st = (t.match(/\sstyle="([^"]*)"/) || [, ''])[1];
+    for (const rule of ['display:block', 'border:0', 'height:auto']) if (!st.includes(rule)) errs.push(`img without ${rule}: ${t}`);
+    const w = Number((t.match(/\swidth="(\d+)"/) || [, 0])[1]);
+    if (w > 200 && (!st.includes('width:100%') || !st.includes(`max-width:${w}px`))) errs.push(`img wider than 200 without width:100%;max-width:${w}px: ${t}`);
+  }
+  if (imgs.length > (MAX_IMG[name] || 1)) errs.push(`img count ${imgs.length} > ${MAX_IMG[name] || 1}`);
+  // the first picture is the wordmark logo, once
+  if (!imgs.length || !/\salt="Mayobe Bros"/.test(imgs[0]) || !imgs[0].includes(`src="${LOGO}`)) errs.push('first img is not the logo');
+  if (n(/<img\b[^>]*\salt="Mayobe Bros"/g) !== 1) errs.push('logo count ' + n(/<img\b[^>]*\salt="Mayobe Bros"/g));
   if (!html.includes('<meta name="color-scheme" content="light dark">')) errs.push('color-scheme meta');
   if (!html.includes('<meta name="supported-color-schemes" content="light dark">')) errs.push('supported-color-schemes meta');
   if (!/@media \(prefers-color-scheme: dark\)/.test(html)) errs.push('no dark block');
   if (n(/<style[\s>]/g) !== 1) errs.push('style blocks ' + n(/<style[\s>]/g));
   // forbidden
   const low = html.toLowerCase();
-  for (const bad of ['rgba(', 'gradient', 'box-shadow', 'background-image', '<svg', '@import', '@font-face', '<script']) if (low.includes(bad)) errs.push('forbidden ' + bad);
+  for (const bad of ['rgba(', 'gradient', 'box-shadow', 'background-image', '<svg', '@import', '@font-face', '<script',
+    'position:', 'filter:', '<video', '<iframe', 'georgia', 'times new roman']) if (low.includes(bad)) errs.push('forbidden ' + bad);
   const styleAttrs = [...html.matchAll(/\sstyle="([^"]*)"/g)].map((m) => m[1]);
   const styleBlock = (html.match(/<style[^>]*>([\s\S]*?)<\/style>/) || [, ''])[1];
   for (const s of [...styleAttrs, styleBlock]) if (/url\(/i.test(s)) errs.push('url( in style');
+  // fonts: system sans (or the monospace for owner commands); "serif" only as part of "sans-serif"
+  for (const m of html.matchAll(/font-family:([^;"]*)/g)) if (/serif/i.test(m[1].replace(/sans-serif/gi, ''))) errs.push('serif font: ' + m[1]);
+  // dark mode: every class that carries colour is restyled in the dark block
+  const darkBlock = styleBlock.slice(Math.max(0, styleBlock.indexOf('@media (prefers-color-scheme: dark)')));
+  const classes = new Set([...html.matchAll(/\sclass="([^"]*)"/g)].flatMap((m) => m[1].split(/\s+/)).filter(Boolean));
+  for (const c of classes) if (!LAYOUT_CLASSES.has(c) && !new RegExp(`\\.${c}(?![\\w-])`).test(darkBlock)) errs.push('class not in the dark block: ' + c);
   // sizes
   for (const m of html.matchAll(/font-size:\s*([\d.]+)([a-z%]*)/g)) if (m[2] !== 'px' || Number(m[1]) < 12) errs.push('font-size ' + m[0]);
   const bytes = Buffer.byteLength(html);
@@ -142,7 +172,7 @@ for (const name of BUILDERS) {
     for (const w of WEIRD) {
       let out;
       assert.doesNotThrow(() => { out = T[name](weirdData(name, w), SITE); }, `${name} threw on ${typeof w === 'string' ? JSON.stringify(w.slice(0, 20)) : String(w)}`);
-      assert.deepEqual(lint(out, {}, { checkUrls: false }), [], `${name} with ${typeof w === 'string' ? JSON.stringify(w.slice(0, 20)) : String(w)}`);
+      assert.deepEqual(lint(out, {}, { checkUrls: false, name }), [], `${name} with ${typeof w === 'string' ? JSON.stringify(w.slice(0, 20)) : String(w)}`);
     }
     assert.doesNotThrow(() => T[name](undefined, SITE));
     assert.doesNotThrow(() => T[name](null));
@@ -157,7 +187,7 @@ test('throwing getters and Proxies as data never make a builder throw', () => {
     for (const data of [trap(), getterData]) {
       let out;
       assert.doesNotThrow(() => { out = T[name](data, SITE); }, name);
-      assert.deepEqual(lint(out, {}, { checkUrls: false }), [], name);
+      assert.deepEqual(lint(out, {}, { checkUrls: false, name }), [], name);
     }
     assert.doesNotThrow(() => T[name](SHORT[name], badSite), name + ' with a throwing site');
     assert.doesNotThrow(() => T[name](SHORT[name], trap()), name + ' with a Proxy site');
@@ -294,13 +324,14 @@ test('every contrast pair in PAIRS meets its minimum, in light and dark', () => 
     assert.ok(r >= min, `${label}: ${fg} on ${bg} = ${r.toFixed(2)} < ${min}`);
   }
   const labels = PAIRS.map((p) => p[3]).join(' | ');
-  for (const mode of ['light', 'dark']) for (const role of ['heading', 'body', 'muted', 'gold', 'link', 'button']) {
+  for (const mode of ['light', 'dark']) for (const role of ['heading', 'body', 'muted', 'kicker', 'link', 'button', 'logo alt', 'image alt']) {
     assert.ok(PAIRS.some((p) => p[3].startsWith(mode) && p[3].includes(role)), `missing ${mode} ${role} pair in: ${labels}`);
   }
   for (const role of ['footer text', 'footer link', 'wordmark']) assert.ok(PAIRS.some((p) => p[3].includes(role)), 'missing ' + role);
   assert.ok(DECORATIVE.length > 0 && DECORATIVE.every((d) => d.length === 3), 'decorative colours are listed with a reason');
-  assert.equal(LIGHT.page, '#f4f1ea');
-  assert.equal(DARK.card, '#172131');
+  for (const mode of ['light', 'dark']) assert.ok(PAIRS.some((p) => p[3].startsWith(mode) && p[3].includes('link on quote')), `missing ${mode} link on quote pair`);
+  assert.equal(LIGHT.page, '#f3f6fb');
+  assert.equal(DARK.card, '#101a2e');
 });
 
 test('the body paragraph helper emits 16 px text at line-height 1.6', () => {
@@ -314,7 +345,7 @@ for (const name of BUILDERS) {
     test(`${name} (${label} data) passes the email lint`, () => {
       const out = T[name](data, SITE);
       assert.deepEqual(Object.keys(out).sort(), ['html', 'subject', 'text']);
-      assert.deepEqual(lint(out, data), []);
+      assert.deepEqual(lint(out, data, { name }), []);
     });
   }
 }
@@ -386,7 +417,8 @@ test('owner alert subjects differ by kind and the visitor body is escaped', () =
 
 test('a missing site argument falls back to the live origin and logo', () => {
   const out = T.farewellEmail(SHORT.farewellEmail);
-  assert.match(out.html, /https:\/\/mayobebros\.com\/assets\/img\/icon-192\.png/);
+  assert.ok(out.html.includes('src="https://mayobebros.com/assets/email/logo.png"'));
+  assert.ok(out.html.includes('href="https://mayobebros.com/"'));
 });
 
 test('reply notice greets by the first word of the name, so a long name is never cut mid-word', () => {
@@ -405,4 +437,165 @@ test('emails to the owner carry no team sign-off; reader emails do; owner comman
   assert.ok(held.text.includes('\n\n    node scripts/comments.mjs list'));
   const reader = T.farewellEmail(SHORT.farewellEmail, SITE);
   assert.ok(reader.html.includes('>The Mayobe Bros team</p>') && reader.text.includes('The Mayobe Bros team'));
+});
+
+/* ------------------------------------------------------------------ site look (email redesign, Task 2) */
+
+// The first `<selector> {` block in css/style.css, as { '--name': '#value' } (lower case).
+function cssVars(css, selector) {
+  const m = css.match(new RegExp(`^${selector.replace('.', '\\.')} \\{([\\s\\S]*?)^\\}`, 'm'));
+  assert.ok(m, `no ${selector} block in css/style.css`);
+  return Object.fromEntries([...m[1].matchAll(/(--[a-z0-9-]+):\s*([^;]+);/g)].map(([, k, v]) => [k, v.trim().toLowerCase()]));
+}
+test('email tokens follow css/style.css', () => {
+  const css = fs.readFileSync(new URL('../../css/style.css', import.meta.url), 'utf8');
+  const light = cssVars(css, ':root');
+  const dark = cssVars(css, ':root.dark');
+  for (const [v, k] of [['--btn-bg', 'button'], ['--link', 'link'], ['--text', 'heading'], ['--text-2', 'body'], ['--text-3', 'muted'], ['--line-soft', 'border'], ['--bg-alt', 'page'], ['--surface-2', 'imageBg']]) {
+    assert.equal(LIGHT[k], light[v], `LIGHT.${k} should be ${v} (${light[v]})`);
+  }
+  for (const [v, k] of [['--btn-bg', 'button'], ['--btn-text', 'buttonText'], ['--link', 'link'], ['--surface', 'card'], ['--bg', 'page'], ['--text', 'heading'], ['--text-2', 'body'], ['--text-3', 'muted']]) {
+    assert.equal(DARK[k], dark[v], `DARK.${k} should be ${v} (${dark[v]})`);
+  }
+  assert.equal('FONT_SERIF' in K, false, 'FONT_SERIF is gone');
+  assert.equal(K.FONT_SANS, "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif");
+});
+
+test('resolveSite: https origins pass; http only for 127.0.0.1 or localhost with an optional port; pictures and logo always https', () => {
+  const DEF = 'https://mayobebros.com';
+  for (const bad of ['http://mayobebros.com', 'http://127.0.0.1.evil.example:8000', 'http://localhost.evil.example', 'http://127.0.0.2:8000', 'http://[::1]:8000',
+    'http://0.0.0.0:8000', 'http://127.0.0.1:8000/path', 'http://127.0.0.1:999999', 'http://user@127.0.0.1:8000', 'javascript:alert(1)', 'ftp://127.0.0.1', '', null, 42]) {
+    const r = T.resolveSite({ origin: bad });
+    assert.equal(r.origin, DEF, `${bad} was accepted`);
+    assert.equal(r.assetOrigin, DEF);
+    assert.equal(r.logoUrl, `${DEF}/assets/email/logo.png`);
+  }
+  for (const good of ['http://127.0.0.1:8000', 'http://localhost', 'http://127.0.0.1:8000/', 'http://localhost:5173']) {
+    const r = T.resolveSite({ origin: good });
+    assert.equal(r.origin, good.replace(/\/$/, ''), `${good} was refused`);
+    assert.ok(r.assetOrigin.startsWith('https://mayobebros.com'), 'pictures stay on https');
+    assert.ok(r.logoUrl.startsWith('https://mayobebros.com/'), 'the logo stays on https');
+  }
+  const prod = T.resolveSite({ origin: 'https://example.org/' });
+  assert.deepEqual(prod, { origin: 'https://example.org', assetOrigin: 'https://example.org', logoUrl: 'https://example.org/assets/email/logo.png' });
+  assert.equal(T.resolveSite({ origin: 'http://127.0.0.1:8000', assetOrigin: 'https://cdn.example' }).assetOrigin, 'https://cdn.example');
+  assert.equal(T.resolveSite({ origin: 'http://127.0.0.1:8000', assetOrigin: 'http://cdn.example' }).assetOrigin, DEF);
+  // logoUrl: only one that ownImage accepts on the asset origin
+  assert.equal(T.resolveSite({ ...SITE, logoUrl: `${DEF}/assets/email/logo.png?v=0123abcd` }).logoUrl, `${DEF}/assets/email/logo.png?v=0123abcd`);
+  for (const bad of [`${DEF}/assets/img/icon-192.png`, 'https://evil.example/assets/email/logo.png', `http://mayobebros.com/assets/email/logo.png`, `${DEF}/assets/email/logo.svg`]) {
+    assert.equal(T.resolveSite({ ...SITE, logoUrl: bad }).logoUrl, `${DEF}/assets/email/logo.png`, bad);
+  }
+  // never throws; idempotent
+  assert.doesNotThrow(() => T.resolveSite(new Proxy({}, { get() { throw new Error('trap'); } })));
+  assert.deepEqual(T.resolveSite(undefined), { origin: DEF, assetOrigin: DEF, logoUrl: `${DEF}/assets/email/logo.png` });
+  const loop = T.resolveSite({ origin: 'http://localhost:8000' });
+  assert.deepEqual(T.resolveSite(loop), loop);
+  // with a loopback site every picture in a real email is still https on the asset origin
+  const o = T.farewellEmail(SHORT.farewellEmail, { origin: 'http://127.0.0.1:8000' });
+  for (const src of [...o.html.matchAll(/<img\b[^>]*\ssrc="([^"]*)"/g)].map((m) => m[1])) assert.ok(src.startsWith('https://mayobebros.com/assets/email/'), src);
+});
+
+test('ownImage accepts only our https /assets/email/ JPEG or PNG with an optional v=<8 hex>', () => {
+  const ok = ['https://mayobebros.com/assets/email/post-a.jpg', 'https://mayobebros.com/assets/email/thumb-a-b.jpg?v=0123abcd', 'https://mayobebros.com/assets/email/logo.png', 'HTTPS://MAYOBEBROS.COM/assets/email/post-a.jpg'];
+  for (const u of ok) assert.equal(T.ownImage(u, ASSET), u.replace('HTTPS://MAYOBEBROS.COM', 'https://mayobebros.com'), u);
+  const bad = ['http://mayobebros.com/assets/email/post-a.jpg', 'https://evil.example/assets/email/post-a.jpg', 'https://mayobebros.com/assets/email/post-a.webp',
+    'https://mayobebros.com/assets/email/post-a.svg', 'https://mayobebros.com/assets/email/post-a.gif', 'data:image/jpeg;base64,AA', '//evil.example/x.jpg',
+    'https://mayobebros.com/assets/share/post-a.jpg', 'https://mayobebros.com/assets/email/post-a.jpg?v=1234567g', 'https://mayobebros.com/assets/email/post-a.jpg?t=abc',
+    'https://mayobebros.com/assets/email/post-a.jpg?v=0123abcd&t=1', 'https://mayobebros.com/assets/email/post-a.jpg#x', 'https://u:p@mayobebros.com/assets/email/post-a.jpg',
+    'https://mayobebros.com/assets/email/Post-A.JPG', 'https://mayobebros.com/assets/email/sub/post-a.jpg', 'https://mayobebros.com/assets/email/post a.jpg',
+    'https://mayobebros.com\\@evil.example/assets/email/post-a.jpg', 'https://mayobebros。com/assets/email/post-a.jpg', `https://mayobebros.com/assets/email/${'a'.repeat(500)}.jpg`, '', null, 7, {}];
+  for (const u of bad) assert.equal(T.ownImage(u, ASSET), '', String(u).slice(0, 80));
+  assert.equal(T.ownImage('http://127.0.0.1:8000/assets/email/post-a.jpg', 'http://127.0.0.1:8000'), '', 'never an http asset origin');
+});
+
+test('a loopback site gets loopback links; a production site never emits an http link', () => {
+  const url = 'http://127.0.0.1:8000/newsletter/#c=x';
+  const loop = T.confirmSubscriptionEmail({ confirmUrl: url }, { origin: 'http://127.0.0.1:8000' });
+  assert.ok(loop.html.includes(`href="${url}"`) && loop.text.includes(url), 'loopback link kept');
+  assert.deepEqual(lint(loop, {}, { checkUrls: false, name: 'confirmSubscriptionEmail' }), []);
+  const prod = T.confirmSubscriptionEmail({ confirmUrl: url }, SITE);
+  assert.ok(!prod.html.includes('127.0.0.1') && !prod.text.includes('127.0.0.1'), 'loopback link reached a production email');
+  for (const name of BUILDERS) for (const data of [LONG[name], SHORT[name], { ...SHORT[name], confirmUrl: url, manageUrl: url, postUrl: url, unsubscribeUrl: url, resubscribeUrl: url }]) {
+    const o = T[name](data, SITE);
+    assert.ok(!/(href|src)="http:/i.test(o.html), `${name}: http link in html`);
+    assert.ok(!/http:\/\//i.test(o.text), `${name}: http link in text`);
+  }
+});
+
+test('the header shows the wordmark logo with styled alt text and a link home; no serif font anywhere', () => {
+  const o = T.farewellEmail(SHORT.farewellEmail, SITE);
+  const m = o.html.match(/<a\b[^>]*href="https:\/\/mayobebros\.com\/"[^>]*>\s*(<img\b[^>]*>)\s*<\/a>/);
+  assert.ok(m, 'the logo is linked to the home page');
+  const img = m[1];
+  for (const a of ['width="212"', 'height="48"', 'alt="Mayobe Bros"', `src="${LOGO}"`]) assert.ok(img.includes(a), `${a} in ${img}`);
+  for (const s of ['font-size:20px', 'font-weight:bold', `color:${LIGHT.logoAlt}`, 'display:block', 'border:0', 'height:auto', 'width:100%', 'max-width:212px']) assert.ok(img.includes(s), `${s} in ${img}`);
+  assert.match(img, /class="[^"]*\bmb-logo\b/);
+  assert.ok(o.html.includes(`.mb-logo{color:${DARK.logoAlt}!important}`), 'logo alt colour in dark mode');
+  // the header row is white, the bar under it two equal cells, green then blue
+  assert.match(o.html, new RegExp(`class="mb-head"[^>]*style="[^"]*background:${LIGHT.header}`));
+  assert.match(o.html, new RegExp(`<td[^>]*width="50%"[^>]*bgcolor="${LIGHT.barGreen}"[^>]*>[^<]*</td>\\s*<td[^>]*width="50%"[^>]*bgcolor="${LIGHT.barBlue}"`));
+  for (const name of BUILDERS) {
+    const h = T[name](LONG[name], SITE).html;
+    assert.ok(!/georgia|times new roman/i.test(h), name);
+    for (const f of h.matchAll(/font-family:([^;"]*)/g)) assert.ok(!/serif/i.test(f[1].replace(/sans-serif/gi, '')), `${name}: ${f[1]}`);
+  }
+});
+
+test('the shell and components use the site look: card, kicker, sans heading, pill button, quote rule, dark footer', () => {
+  const o = T.replyNoticeEmail(LONG.replyNoticeEmail, SITE);
+  const h = o.html;
+  // card: white with a 1 px border and 14 px radius on the cool grey page
+  assert.match(h, new RegExp(`class="mb-frame"[^>]*style="[^"]*background:${LIGHT.card};border:1px solid ${LIGHT.border};border-radius:14px;`));
+  assert.match(h, new RegExp(`<body class="mb-page" style="[^"]*background:${LIGHT.page};`));
+  // kicker: 13 px, bold, capitals, letter-spaced, blue
+  const k = h.match(/<p class="mb-kicker" style="([^"]*)">([^<]*)<\/p>/);
+  assert.ok(k, 'kicker');
+  for (const s of ['font-size:13px', 'font-weight:bold', 'letter-spacing:1.5px', `color:${LIGHT.kicker}`]) assert.ok(k[1].includes(s), s);
+  assert.equal(k[2], k[2].toUpperCase());
+  assert.equal(typeof T.eyebrow, 'undefined', 'eyebrow was replaced by kicker');
+  assert.equal(T.kicker('New reply').includes('NEW REPLY'), true);
+  // heading: sans 28 / 1.25, 800, tight; 24 px on phones
+  const h1 = h.match(/<h1\b[^>]*style="([^"]*)"/)[1];
+  for (const s of ['font-size:28px', 'line-height:1.25', 'font-weight:800', 'letter-spacing:-0.3px', `color:${LIGHT.heading}`]) assert.ok(h1.includes(s), s);
+  assert.ok(h.includes('.mb-h1{font-size:24px!important}'));
+  // button: pill, site blue; light blue with dark text in dark mode
+  const btn = h.match(/<td class="mb-btn"[^>]*style="([^"]*)">\s*<a class="mb-btn-a"[^>]*style="([^"]*)"/);
+  assert.ok(btn, 'button');
+  assert.ok(btn[1].includes(`background:${LIGHT.button}`) && btn[1].includes('border-radius:24px') && btn[2].includes('border-radius:24px') && btn[2].includes(`color:${LIGHT.buttonText}`));
+  assert.ok(h.includes(`.mb-btn{background:${DARK.button}!important}`) && h.includes(`.mb-btn-a{color:${DARK.buttonText}!important}`));
+  // quote: tinted block with a 4 px blue rule on the left
+  assert.match(h, new RegExp(`class="mb-quote[^"]*"[^>]*style="[^"]*background:${LIGHT.quote};border-left:4px solid ${LIGHT.quoteRule};`));
+  assert.ok(h.includes(`border-left-color:${DARK.quoteRule}!important`));
+  // footer: near-black, bold sans name, slogan, why line, white underlined links
+  assert.match(h, new RegExp(`bgcolor="${LIGHT.footer}"`));
+  assert.match(h, new RegExp(`<p style="[^"]*font-weight:800;[^"]*color:${LIGHT.wordmark};">Mayobe`));
+  assert.match(h, /Clear, honest guides on education, jobs, money and technology for readers in Tanzania\./);
+  assert.match(h, new RegExp(`<a href="https://mayobebros\\.com/privacy-policy/" style="color:${LIGHT.footerLink};text-decoration:underline;">Privacy policy</a>`));
+  // dark block: page, card, border, header and text colours all switch
+  for (const s of [`.mb-page{background:${DARK.page}!important}`, `background:${DARK.card}!important`, `border-color:${DARK.border}!important`, `.mb-head{background:${DARK.header}!important}`,
+    `.mb-heading{color:${DARK.heading}!important}`, `.mb-body{color:${DARK.body}!important}`, `.mb-muted{color:${DARK.muted}!important}`, `.mb-kicker{color:${DARK.kicker}!important}`, `.mb-link{color:${DARK.link}!important}`]) {
+    assert.ok(h.includes(s), s);
+  }
+});
+
+test('the confirm email says the button opens a page with one more button and offers the copy-the-link fallback', () => {
+  const o = T.confirmSubscriptionEmail(SHORT.confirmSubscriptionEmail, SITE);
+  for (const s of ['The button opens a page on our website. Press Confirm my subscription there to finish.',
+    'If the page does not open, copy the link below into your browser. If it still does not work, reply to this email and tell us.']) {
+    assert.ok(o.html.includes(s), 'html: ' + s);
+    assert.ok(o.text.includes(s), 'text: ' + s);
+  }
+  // the link comes right after the copy-the-link sentence, in html and in text
+  assert.match(o.html, /reply to this email and tell us\.<br><a class="mb-link" href="https:\/\/mayobebros\.com\/newsletter\/#c"/);
+  assert.ok(o.text.indexOf('copy the link below') < o.text.indexOf('https://mayobebros.com/newsletter/#c'));
+  assert.equal(o.subject, 'Please confirm your Mayobe Bros subscription');
+});
+
+test('siteOf(env) gives the templates an https asset origin and the assets/email logo, also for a loopback SITE_ORIGIN', async () => {
+  const { siteOf } = await import('../../worker/src/util.js');
+  assert.deepEqual(siteOf({}), { origin: 'https://mayobebros.com', assetOrigin: 'https://mayobebros.com', logoUrl: 'https://mayobebros.com/assets/email/logo.png' });
+  assert.deepEqual(siteOf({ SITE_ORIGIN: 'https://example.org/' }), { origin: 'https://example.org', assetOrigin: 'https://example.org', logoUrl: 'https://example.org/assets/email/logo.png' });
+  assert.deepEqual(siteOf({ SITE_ORIGIN: 'http://127.0.0.1:8000' }), { origin: 'http://127.0.0.1:8000', assetOrigin: 'https://mayobebros.com', logoUrl: 'https://mayobebros.com/assets/email/logo.png' });
+  // and what the templates make of it
+  for (const env of [{}, { SITE_ORIGIN: 'http://127.0.0.1:8000' }, { SITE_ORIGIN: 'https://example.org' }]) assert.deepEqual(T.resolveSite(siteOf(env)), siteOf(env));
 });

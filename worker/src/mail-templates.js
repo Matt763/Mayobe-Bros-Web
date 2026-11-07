@@ -1,8 +1,12 @@
-// Every email the Worker sends, built from one small design system. Pure functions: each builder takes (data, site)
+// Every email the Worker sends, built from one small design system that copies the site (css/style.css): a white
+// header with the colour wordmark and a green/blue bar, a white card with a thin border and 14 px corners on the
+// site's cool grey, blue uppercase kickers, bold sans headings, royal blue pill buttons, a near-black footer, and the
+// site's dark palette for clients that honour prefers-color-scheme. Pure functions: each builder takes (data, site)
 // and returns { subject, html, text }. Rules (checked by scripts/tests/email-templates.test.mjs): 600 px table layout,
 // inline styles plus one <style> block (mobile padding and the dark-mode override only), hex colours from
-// mail-tokens.js only, body 16 px / 1.6, nothing under 12 px, one button per email with the same link as text, a
-// hidden 90-130 character preheader first in <body>, and every visitor value escaped. Subjects never carry CR/LF.
+// mail-tokens.js only, system sans only, body 16 px / 1.6, nothing under 12 px, one button per email with the same
+// link as text, a hidden 90-130 character preheader first in <body>, pictures only from our own /assets/email/ on
+// https, and every visitor value escaped. Subjects never carry CR/LF.
 // Every builder is total: any input (wrong types, lone surrogates, control characters, huge strings) gives valid
 // output and never throws.
 //
@@ -11,9 +15,10 @@
 // forms cannot be used to send someone else's words to a stranger. Reply notices go only to addresses confirmed by
 // opening the manage link, so they show the reply. Owner emails show everything, escaped.
 
-import { LIGHT as L, DARK as D, FONT_SERIF, FONT_SANS } from './mail-tokens.js';
+import { LIGHT as L, DARK as D, FONT_SANS } from './mail-tokens.js';
 
-const DEFAULT_SITE = { origin: 'https://mayobebros.com', logoUrl: 'https://mayobebros.com/assets/img/icon-192.png' };
+const DEFAULT_ORIGIN = 'https://mayobebros.com';
+const LOGO_PATH = '/assets/email/logo.png';
 const NAME = 'Mayobe Bros';
 // The site's own slogan, from site.config.json. Do not add claims here that the site does not make.
 const SLOGAN = 'Clear, honest guides on education, jobs, money and technology for readers in Tanzania.';
@@ -83,13 +88,54 @@ const ownUrl = (u, origin, fallback) => {
   if (x.origin !== originOf(origin) || x.username || x.password || x.href.length > 2000) return fallback;
   return x.href;
 };
-const siteOf = (site) => {
-  let o = '', logo = '';
-  try { o = str(site?.origin).trim().replace(/\/+$/, ''); logo = str(site?.logoUrl).trim(); } catch { /* a hostile site object: use the defaults */ }
-  const origin = /^https:\/\//i.test(o) && originOf(o) && o.length <= 200 && !/[\\\s\x00-\x1f\x7f]/.test(o) ? originOf(o) : DEFAULT_SITE.origin;
-  const logoUrl = /^https:\/\//i.test(logo) && originOf(logo) && logo.length <= 500 && !/[\\\s\x00-\x1f\x7f]/.test(logo) ? new URL(logo).href : DEFAULT_SITE.logoUrl;
-  return { origin, logoUrl };
+// An https origin as given (a path is dropped), or ''. Same pre-checks as ownUrl: length, no backslash, whitespace or
+// control character, ASCII host, no user:password.
+const httpsOrigin = (v) => {
+  const s = str(v).trim().replace(/\/+$/, '');
+  if (!/^https:\/\//i.test(s) || s.length > 200 || /[\\\s\x00-\x1f\x7f]/.test(s)) return '';
+  const host = s.slice(8).split(/[/?#]/)[0];
+  if (!host || /[^\x21-\x7e]/.test(host) || host.includes('@')) return '';
+  return originOf(s);
 };
+// Local testing only (scripts/dev-api.mjs): http is accepted for exactly 127.0.0.1 or localhost with an optional port
+// and nothing after it, so a loopback link can never come from a production setting by accident.
+const LOOPBACK = /^http:\/\/(127\.0\.0\.1|localhost)(:\d{1,5})?$/;
+const loopbackOrigin = (v) => {
+  const s = str(v).trim().replace(/\/+$/, '');
+  return LOOPBACK.test(s) ? originOf(s) : '';
+};
+
+// Our own email picture, or ''. Only https on the asset origin, a path /assets/email/<lower-case name>.jpg|png, no
+// query or only v=<8 lowercase hex> (the build's content hash, never a per-reader value), no fragment, no
+// user:password, at most 500 characters. Returned rebuilt from the parsed parts, so it is always in normal form.
+const IMAGE_PATH = /^\/assets\/email\/[a-z0-9-]+\.(jpg|png)$/;
+export function ownImage(u, assetOrigin) {
+  try {
+    const s = str(u).trim();
+    const base = httpsOrigin(assetOrigin);
+    if (!base || !s || s.length > 500 || /[\\\s\x00-\x1f\x7f]/.test(s) || !/^https:\/\//i.test(s)) return '';
+    const host = s.slice(8).split(/[/?#]/)[0];
+    if (!host || /[^\x21-\x7e]/.test(host)) return '';
+    const x = new URL(s);
+    if (x.protocol !== 'https:' || x.origin !== base || x.username || x.password || x.hash || s.includes('#')) return '';
+    if (!IMAGE_PATH.test(x.pathname) || !(x.search === '' || /^\?v=[0-9a-f]{8}$/.test(x.search))) return '';
+    return `${x.origin}${x.pathname}${x.search}`;
+  } catch { return ''; }
+}
+
+// Where links point (origin), where pictures come from (assetOrigin, always https) and the wordmark picture.
+// origin: an https origin, or a loopback http origin for local testing, else the live site. assetOrigin: site.assetOrigin
+// if https, else origin if https, else the live site, so a loopback run still shows the published pictures.
+export function resolveSite(site) {
+  let o = '', a = '', logo = '';
+  try { o = site?.origin; } catch { /* a hostile site object: use the defaults */ }
+  try { a = site?.assetOrigin; } catch { /* as above */ }
+  try { logo = site?.logoUrl; } catch { /* as above */ }
+  const origin = httpsOrigin(o) || loopbackOrigin(o) || DEFAULT_ORIGIN;
+  const assetOrigin = httpsOrigin(a) || httpsOrigin(origin) || DEFAULT_ORIGIN;
+  const logoUrl = ownImage(logo, assetOrigin) || `${assetOrigin}${LOGO_PATH}`;
+  return { origin, assetOrigin, logoUrl };
+}
 // Copies the fields a builder needs once, at the top. A field whose getter (or Proxy trap) throws becomes undefined,
 // so no later read can throw.
 function pick(d, keys) {
@@ -103,44 +149,46 @@ const asList = (v) => { try { return Array.isArray(v) ? Array.from(v).slice(0, 2
 
 /* ------------------------------------------------------------------ components */
 const SANS = `font-family:${FONT_SANS};`;
-const SERIF = `font-family:${FONT_SERIF};`;
 
 export function p(html, { muted = false, size = 16, mb = 16 } = {}) {
   const cls = muted ? 'mb-muted' : 'mb-body';
   return `<p class="${cls}" style="margin:0 0 ${mb}px;${SANS}font-size:${size}px;line-height:1.6;color:${muted ? L.muted : L.body};">${html}</p>`;
 }
+// The site's headings: system sans, extra bold, slightly tight. 24 px on phones (CSS below).
 export function h1(html) {
-  return `<h1 class="mb-h1 mb-heading" style="margin:0 0 24px;${SERIF}font-size:28px;line-height:1.3;font-weight:normal;color:${L.heading};">${html}</h1>`;
+  return `<h1 class="mb-h1 mb-heading" style="margin:0 0 20px;${SANS}font-size:28px;line-height:1.25;font-weight:800;letter-spacing:-0.3px;color:${L.heading};">${html}</h1>`;
 }
-// Small label above the heading. Typed in capitals here (no text-transform), letter-spaced, dark gold.
-export function eyebrow(text) {
-  return `<p class="mb-gold" style="margin:0 0 16px;${SANS}font-size:12px;line-height:1.5;font-weight:bold;letter-spacing:2px;color:${L.gold};">${esc(str(text).toUpperCase())}</p>`;
+// Small blue label above the heading, like the site's .kicker. Typed in capitals here (no text-transform), letter-spaced.
+export function kicker(text) {
+  return `<p class="mb-kicker" style="margin:0 0 12px;${SANS}font-size:13px;line-height:1.5;font-weight:bold;letter-spacing:1.5px;color:${L.kicker};">${esc(str(text).toUpperCase())}</p>`;
 }
 export function link(url, label, extra = '') {
   return `<a class="mb-link" href="${esc(url)}" style="color:${L.link};text-decoration:underline;${extra}">${label}</a>`;
 }
-// The one primary button: a bgcolor cell wrapping a padded link, 14 + 20 + 14 = 48 px tall. Outlook's Word engine
-// ignores padding on the inline <a>, so the cell carries the same padding as mso-padding-alt.
+// The one primary button, a royal blue pill like the site's .btn-primary: a bgcolor cell wrapping a padded link,
+// 14 + 20 + 14 = 48 px tall. Outlook's Word engine ignores padding on the inline <a> (and the radius), so the cell
+// carries the same padding as mso-padding-alt and Outlook shows a square button of the same size.
 export function button(url, label) {
-  return `<table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin:24px 0 16px;"><tr><td class="mb-btn" bgcolor="${L.button}" style="background:${L.button};border-radius:4px;mso-padding-alt:14px 32px;">`
-    + `<a class="mb-btn-a" href="${esc(url)}" style="display:inline-block;padding:14px 32px;${SANS}font-size:16px;line-height:20px;font-weight:bold;color:${L.buttonText};text-decoration:none;border-radius:4px;">${esc(label)}</a>`
+  return `<table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin:28px 0 16px;"><tr><td class="mb-btn" bgcolor="${L.button}" style="background:${L.button};border-radius:24px;mso-padding-alt:14px 32px;">`
+    + `<a class="mb-btn-a" href="${esc(url)}" style="display:inline-block;padding:14px 32px;${SANS}font-size:16px;line-height:20px;font-weight:bold;color:${L.buttonText};text-decoration:none;border-radius:24px;">${esc(label)}</a>`
     + '</td></tr></table>';
 }
-// The same address as a plain text link under the button, for clients that hide or break buttons.
-function fallback(url, shown) {
-  const lead = url.startsWith('mailto:') ? 'Or write to:' : 'If the button does not work, open this link:';
-  return p(`${lead}<br>${link(url, esc(shown || url), 'word-break:break-all;')}`, { muted: true, size: 14, mb: 24 });
+// The same address as a plain text link under the button, for clients that hide or break buttons. `lead` replaces
+// the default sentence (fixed text only, never visitor text).
+function fallback(url, shown, lead, mb = 24) {
+  const l = lead || (url.startsWith('mailto:') ? 'Or write to:' : 'If the button does not work, open this link:');
+  return p(`${esc(l)}<br>${link(url, esc(shown || url), 'word-break:break-all;')}`, { muted: true, size: 14, mb });
 }
-// Quoted visitor text (a reply, a message) with a thin gold rule on the left.
+// Quoted visitor text (a reply, a message): a tinted block with a 4 px blue rule on the left.
 export function quote(html, cite = '') {
-  return `<table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td class="mb-quote mb-body" bgcolor="${L.quote}" style="background:${L.quote};border-left:2px solid ${L.gold};padding:16px 24px;${SANS}font-size:16px;line-height:1.6;color:${L.body};word-break:break-word;">`
+  return `<table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td class="mb-quote mb-body" bgcolor="${L.quote}" style="background:${L.quote};border-left:4px solid ${L.quoteRule};border-radius:0 8px 8px 0;padding:16px 20px;${SANS}font-size:16px;line-height:1.6;color:${L.body};word-break:break-word;">`
     + (cite ? `<p class="mb-muted" style="margin:0 0 8px;${SANS}font-size:14px;line-height:1.5;font-weight:bold;color:${L.muted};">${cite}</p>` : '')
     + html + '</td></tr></table>';
 }
 // A command the owner types, set apart in a monospace face so it reads as something to copy, not as prose.
 const FONT_MONO = "Menlo,Consolas,'Courier New',monospace";
 export function code(text) {
-  return `<span class="mb-quote mb-heading" style="background:${L.quote};padding:4px 8px;font-family:${FONT_MONO};font-size:14px;color:${L.heading};white-space:nowrap;">${esc(text)}</span>`;
+  return `<span class="mb-quote mb-heading" style="background:${L.quote};padding:4px 8px;border-radius:6px;font-family:${FONT_MONO};font-size:14px;color:${L.heading};white-space:nowrap;">${esc(text)}</span>`;
 }
 export function hairline(mb = 24) {
   return `<table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="margin:0 0 ${mb}px;"><tr><td class="mb-rule" style="border-top:1px solid ${L.rule};height:1px;line-height:1px;">&nbsp;</td></tr></table>`;
@@ -154,23 +202,31 @@ function details(rows) {
 }
 const signoff = () => p('The Mayobe Bros team', { mb: 0 });
 
-// Quiet dark footer: wordmark, the site's slogan, why this email came, then each link on its own line.
+// The site's near-black footer: the name in bold sans ("Bros" in the light blue of the site's hero title), the
+// slogan, why this email came, then each link on its own line, white and underlined.
 export function footer(why, links) {
-  const ln = links.map(([label, url]) => `<p style="margin:0 0 8px;${SANS}font-size:14px;line-height:1.6;"><a href="${esc(url)}" style="color:${L.footerLink};text-decoration:underline;">${esc(label)}</a></p>`).join('');
-  return `<p style="margin:0 0 8px;${SERIF}font-size:18px;line-height:1.3;color:${L.wordmark};">${NAME}</p>`
-    + `<p style="margin:0 0 16px;${SANS}font-size:14px;line-height:1.6;color:${L.footerText};">${SLOGAN}</p>`
-    + `<table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="margin:0 0 16px;"><tr><td style="border-top:1px solid ${L.footerRule};height:1px;line-height:1px;">&nbsp;</td></tr></table>`
+  const ln = links.map(([label, url]) => `<p style="margin:0 0 10px;${SANS}font-size:14px;line-height:1.6;"><a href="${esc(url)}" style="color:${L.footerLink};text-decoration:underline;">${esc(label)}</a></p>`).join('');
+  return `<p style="margin:0 0 8px;${SANS}font-size:20px;line-height:1.3;font-weight:800;letter-spacing:-0.2px;color:${L.wordmark};">Mayobe <span style="color:${L.footerAccent};">Bros</span></p>`
+    + `<p style="margin:0 0 20px;${SANS}font-size:14px;line-height:1.6;color:${L.footerText};">${SLOGAN}</p>`
+    + `<table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="margin:0 0 20px;"><tr><td style="border-top:1px solid ${L.footerRule};height:1px;line-height:1px;">&nbsp;</td></tr></table>`
     + `<p style="margin:0 0 16px;${SANS}font-size:14px;line-height:1.6;color:${L.footerText};">${esc(why)}</p>` + ln;
 }
 
 const PREHEADER_FILL = '&#847;&zwnj;&nbsp;'.repeat(30);
 const CSS = `:root{color-scheme:light dark;supported-color-schemes:light dark}
 body{margin:0;padding:0;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
-@media (max-width:620px){.mb-wrap{width:100%!important}.mb-outer{padding:0!important}.mb-card{padding:32px 24px!important}.mb-head{padding:20px 24px!important}.mb-foot{padding:32px 24px!important}.mb-h1{font-size:26px!important}.mb-dt,.mb-dd{display:block!important;width:auto!important}.mb-dt{padding:12px 0 0!important}.mb-dd{border-top:0!important;padding:0 0 12px!important}}
-@media (prefers-color-scheme: dark){.mb-page{background:${D.page}!important}.mb-card{background:${D.card}!important}.mb-heading{color:${D.heading}!important}.mb-body{color:${D.body}!important}.mb-muted{color:${D.muted}!important}.mb-gold{color:${D.gold}!important}.mb-link{color:${D.link}!important}.mb-btn{background:${D.button}!important}.mb-btn-a{color:${D.buttonText}!important}.mb-quote{background:${D.quote}!important;border-left-color:${D.gold}!important}.mb-rule{border-color:${D.rule}!important}}`;
+@media (max-width:620px){.mb-wrap{width:100%!important}.mb-outer{padding:0 0 24px!important}.mb-frame{border-width:0 0 1px!important;border-radius:0!important}.mb-head,.mb-card{border-radius:0!important}.mb-footband{padding:0!important}.mb-head{padding:12px 28px 12px 8px!important}.mb-card{padding:28px 28px 32px!important}.mb-foot{padding:32px 28px 40px!important}.mb-h1{font-size:24px!important}.mb-dt,.mb-dd{display:block!important;width:auto!important}.mb-dt{padding:12px 0 0!important}.mb-dd{border-top:0!important;padding:0 0 12px!important}}
+@media (prefers-color-scheme: dark){.mb-page{background:${D.page}!important}.mb-frame{background:${D.card}!important;border-color:${D.border}!important}.mb-head{background:${D.header}!important}.mb-card{background:${D.card}!important}.mb-heading{color:${D.heading}!important}.mb-body{color:${D.body}!important}.mb-muted{color:${D.muted}!important}.mb-kicker{color:${D.kicker}!important}.mb-link{color:${D.link}!important}.mb-btn{background:${D.button}!important}.mb-btn-a{color:${D.buttonText}!important}.mb-quote{background:${D.quote}!important;border-left-color:${D.quoteRule}!important}.mb-rule{border-color:${D.rule}!important}.mb-logo{color:${D.logoAlt}!important}.mb-img{background:${D.imageBg}!important;color:${D.imageAlt}!important}}`;
 
+// Layout: the page colour, then one 600 px column holding the card (white header with the linked wordmark, the
+// green/blue bar, the body), then a full-width near-black footer band like the site's. On phones the card runs edge to
+// edge (the mail app adds its own margin) so lines stay long enough to read. The logo PNG carries a white plate with
+// about 21 px of white on each side at display size, so the header is padded 20 px less on the left: the letters of
+// the wordmark then line up with the text below. The header cell has no bgcolor attribute on purpose: a bgcolor cell
+// directly followed by <a> is the lint's button signature.
 export function shell({ title, preheader, bodyHtml, footerHtml, site }) {
-  const s = siteOf(site);
+  const s = resolveSite(site);
+  const bar = (c) => `<td width="50%" height="4" bgcolor="${c}" style="background:${c};height:4px;line-height:4px;mso-line-height-rule:exactly;">&nbsp;</td>`;
   return `<!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
 <head>
@@ -186,22 +242,30 @@ export function shell({ title, preheader, bodyHtml, footerHtml, site }) {
 </head>
 <body class="mb-page" style="margin:0;padding:0;background:${L.page};">
 <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;opacity:0;">${esc(preheader)}${PREHEADER_FILL}</div>
-<table role="presentation" class="mb-page" width="100%" border="0" cellpadding="0" cellspacing="0" bgcolor="${L.page}" style="background:${L.page};"><tr><td class="mb-outer" align="center" style="padding:32px 16px;">
+<table role="presentation" class="mb-page" width="100%" border="0" cellpadding="0" cellspacing="0" bgcolor="${L.page}" style="background:${L.page};">
+<tr><td class="mb-outer" align="center" style="padding:32px 16px 40px;">
 <table role="presentation" class="mb-wrap" width="600" border="0" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;">
-<tr><td class="mb-head" bgcolor="${L.header}" style="background:${L.header};padding:24px 40px;border-bottom:2px solid ${L.hairline};">
-<table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr>
-<td bgcolor="${L.tile}" width="44" height="44" align="center" valign="middle" style="background:${L.tile};width:44px;height:44px;border-radius:6px;"><img src="${esc(s.logoUrl)}" width="34" height="34" alt="" style="display:block;border:0;width:34px;height:34px;"></td>
-<td style="padding:0 0 0 16px;${SERIF}font-size:22px;line-height:1.2;letter-spacing:0.5px;color:${L.wordmark};">${NAME}</td>
-</tr></table>
+<tr><td class="mb-frame" bgcolor="${L.card}" style="background:${L.card};border:1px solid ${L.border};border-radius:14px;">
+<table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0">
+<tr><td class="mb-head" style="background:${L.header};border-radius:13px 13px 0 0;padding:24px 40px 20px 20px;">
+<a href="${esc(`${s.origin}/`)}" style="display:inline-block;text-decoration:none;"><img class="mb-logo" src="${esc(s.logoUrl)}" width="212" height="48" alt="${NAME}" style="display:block;border:0;width:100%;max-width:212px;height:auto;${SANS}font-size:20px;line-height:1.2;font-weight:bold;color:${L.logoAlt};"></a>
 </td></tr>
-<tr><td class="mb-card" bgcolor="${L.card}" style="background:${L.card};padding:40px;word-break:break-word;">
+<tr><td><table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0"><tr>${bar(L.barGreen)}${bar(L.barBlue)}</tr></table></td></tr>
+<tr><td class="mb-card" bgcolor="${L.card}" style="background:${L.card};border-radius:0 0 13px 13px;padding:40px;word-break:break-word;">
 ${bodyHtml}
 </td></tr>
-<tr><td class="mb-foot" bgcolor="${L.footer}" style="background:${L.footer};padding:32px 40px;">
+</table>
+</td></tr>
+</table>
+</td></tr>
+<tr><td class="mb-footband" bgcolor="${L.footer}" align="center" style="background:${L.footer};border-top:1px solid ${L.footerRule};padding:0 16px;">
+<table role="presentation" class="mb-wrap" width="600" border="0" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;">
+<tr><td class="mb-foot" style="padding:40px 40px 48px;">
 ${footerHtml}
 </td></tr>
 </table>
-</td></tr></table>
+</td></tr>
+</table>
 </body>
 </html>`;
 }
@@ -214,9 +278,10 @@ function textPart(lines, why, links, origin) {
 const quoteText = (s) => plain(s).trim().split('\n').map((l) => `> ${l}`).join('\n');
 
 // signoff: false for emails to the owner (a team signature on a note to ourselves reads oddly).
-function build({ site, subject, title, preheader, eyebrowText, heading, html, text, buttonUrl, buttonShown, buttonLabel, why, links, signoff: sign = true }) {
-  const s = siteOf(site);
-  const bodyHtml = eyebrow(eyebrowText) + h1(heading) + html.before + button(buttonUrl, buttonLabel) + fallback(buttonUrl, buttonShown) + (html.after || '') + (sign ? hairline() + signoff() : '');
+function build({ site, subject, title, preheader, kickerText, heading, html, text, buttonUrl, buttonShown, buttonLabel, fallbackLead, why, links, signoff: sign = true }) {
+  const s = resolveSite(site);
+  const last = !html.after && !sign; // nothing under the link: no extra space above the card's own bottom padding
+  const bodyHtml = kicker(kickerText) + h1(heading) + html.before + button(buttonUrl, buttonLabel) + fallback(buttonUrl, buttonShown, fallbackLead, last ? 0 : 24) + (html.after || '') + (sign ? hairline() + signoff() : '');
   const textLines = [heading.text, ...text.before, `${buttonLabel}:\n${buttonUrl}`, ...(text.after || []), sign ? 'The Mayobe Bros team' : null];
   return {
     subject: clip(subject, 140),
@@ -238,7 +303,7 @@ const mailto = (addr, subject) => `mailto:${oneLine(addr).replace(/[^A-Za-z0-9@.
 // data.commentExcerpt are accepted for compatibility and deliberately not shown.
 export function manageLinkEmail(data, site) {
   const d = pick(data, ['manageUrl', 'postUrl', 'postTitle', 'notifyWanted']);
-  const { origin } = siteOf(site);
+  const { origin } = resolveSite(site);
   const manageUrl = ownUrl(d.manageUrl, origin, `${origin}/`);
   const postUrl = ownUrl(d.postUrl, origin, `${origin}/`);
   const title = clip(d.postTitle, 160) || 'an article';
@@ -250,7 +315,7 @@ export function manageLinkEmail(data, site) {
   return build({
     site, subject: 'Your link to edit or delete your comment',
     preheader: 'Use the link inside to edit or delete the comment you left on Mayobe Bros. It works for 7 days on any device.',
-    eyebrowText: 'Your comment', heading: H('Edit or delete your comment', 'EDIT OR DELETE YOUR COMMENT'),
+    kickerText: 'Your comment', heading: H('Edit or delete your comment', 'EDIT OR DELETE YOUR COMMENT'),
     html: {
       before: p('Hello,') + p(`You asked for a link to manage a comment you left on ${link(postUrl, esc(title))}.`) + p(esc(how)),
       after: (notice ? p(esc(notice)) : '') + p(esc(ignore), { muted: true }),
@@ -265,7 +330,7 @@ export function manageLinkEmail(data, site) {
 // Sent only to addresses confirmed by opening the manage link, so the reply (escaped) is shown.
 export function replyNoticeEmail(data, site) {
   const d = pick(data, ['postUrl', 'unsubscribeUrl', 'postTitle', 'name', 'isTeam', 'replyAuthor', 'replyBody']);
-  const { origin } = siteOf(site);
+  const { origin } = resolveSite(site);
   const postUrl = ownUrl(d.postUrl, origin, `${origin}/`);
   const unsub = ownUrl(d.unsubscribeUrl, origin, `${origin}/contact/`);
   const title = clip(d.postTitle, 160) || 'an article';
@@ -278,7 +343,7 @@ export function replyNoticeEmail(data, site) {
     preheader: d.isTeam
       ? 'The Mayobe Bros team replied to the comment you left on our site. Read the reply here, or open the article to answer.'
       : 'Someone replied to the comment you left on Mayobe Bros. Read the reply here, or open the article to answer it.',
-    eyebrowText: 'New reply', heading: H(d.isTeam ? 'The team replied to your comment' : 'New reply to your comment', d.isTeam ? 'THE TEAM REPLIED TO YOUR COMMENT' : 'NEW REPLY TO YOUR COMMENT'),
+    kickerText: 'New reply', heading: H(d.isTeam ? 'The team replied to your comment' : 'New reply to your comment', d.isTeam ? 'THE TEAM REPLIED TO YOUR COMMENT' : 'NEW REPLY TO YOUR COMMENT'),
     html: {
       before: p(esc(greet)) + p(`${esc(who)} replied to your comment on ${link(postUrl, esc(title))}:`)
         + quote(multi(clipText(d.replyBody, 1200)), `${esc(who)} wrote:`),
@@ -298,21 +363,21 @@ const ALERTS = {
   held: {
     subject: (d) => `Comment held for review (#${clip(d.commentId, 20)})`,
     preheader: 'A new comment was held by the automatic screen and is waiting for you. The reason and the full text are inside.',
-    eyebrow: 'Moderation', heading: 'A comment is waiting for review',
+    kicker: 'Moderation', heading: 'A comment is waiting for review',
     lead: () => 'The automatic screen held this comment, so it is not on the site yet. To approve or remove it, run this on your computer:',
     command: 'node scripts/comments.mjs list',
   },
   question: {
     subject: (d) => `New reader question on ${clip(d.postSlug, 80) || 'an article'}`,
     preheader: 'A reader asked a question in the comments. The question and a link to the article are inside, ready for a reply.',
-    eyebrow: 'Reader question', heading: 'A reader asked a question',
+    kicker: 'Reader question', heading: 'A reader asked a question',
     lead: () => 'This comment looks like a question. After you reply as the team, run this so the answer is saved into the page:',
     command: 'node scripts/qa-sync.mjs',
   },
   'contact-failed': {
     subject: () => 'A contact message could not be emailed to you',
     preheader: 'A message sent through the contact form could not be emailed to you. What the visitor wrote and their address are inside.',
-    eyebrow: 'Delivery problem', heading: 'A contact message did not reach you',
+    kicker: 'Delivery problem', heading: 'A contact message did not reach you',
     lead: (hasEmail) => `A message sent through the contact form could not be emailed to you. What the visitor wrote is below.${hasEmail ? ' To answer, reply to the address shown.' : ''}`,
   },
 };
@@ -320,7 +385,7 @@ const ALERTS = {
 // Owner only: full content, escaped. data.email is used by kind 'contact-failed' (the visitor's address).
 export function ownerAlertEmail(data, site) {
   const d = pick(data, ['kind', 'postUrl', 'email', 'reason', 'postSlug', 'commentId', 'name', 'body']);
-  const { origin } = siteOf(site);
+  const { origin } = resolveSite(site);
   const kind = typeof d.kind === 'string' && Object.prototype.hasOwnProperty.call(ALERTS, d.kind) ? d.kind : 'held';
   const a = ALERTS[kind];
   const postUrl = ownUrl(d.postUrl, origin, '');
@@ -331,7 +396,7 @@ export function ownerAlertEmail(data, site) {
   const btn = email ? { buttonUrl: mailto(email, 'Re: your message to Mayobe Bros'), buttonShown: email, buttonLabel: 'Reply to the visitor' }
     : { buttonUrl: postUrl || `${origin}/`, buttonLabel: postUrl ? 'Open the article' : 'Open the website' };
   return build({
-    site, subject: a.subject(d), preheader: a.preheader, eyebrowText: a.eyebrow, heading: H(esc(a.heading), a.heading.toUpperCase()),
+    site, subject: a.subject(d), preheader: a.preheader, kickerText: a.kicker, heading: H(esc(a.heading), a.heading.toUpperCase()),
     signoff: false,
     html: { before: p(esc(lead), { mb: a.command ? 8 : 16 }) + (a.command ? `<p style="margin:0 0 24px;line-height:2;">${code(a.command)}</p>` : '') + details(rows.map(([k, v]) => [k, esc(v)])) + (body ? quote(longHtml(body), 'What they wrote:') : '') },
     text: {
@@ -362,7 +427,7 @@ const when = (v) => {
 // Owner only: the full message, escaped. reply_to is set to the visitor by the sender (Task 6).
 export function contactOwnerEmail(data, site) {
   const d = pick(data, ['subject', 'type', 'email', 'name', 'receivedAt', 'message']);
-  const { origin } = siteOf(site);
+  const { origin } = resolveSite(site);
   const subj = clip(d.subject, 120) || '(no subject)';
   const type = typeLabel(d.type);
   const email = clip(d.email, 254);
@@ -373,7 +438,7 @@ export function contactOwnerEmail(data, site) {
   return build({
     site, subject: `Contact form (${type}): ${clip(d.subject, 90) || '(no subject)'}`,
     preheader: 'Someone sent a message through the contact form on mayobebros.com. Press Reply in your mail app to answer them.',
-    eyebrowText: `Contact form · ${type}`, heading: H('New message from the contact form', 'NEW MESSAGE FROM THE CONTACT FORM'),
+    kickerText: `Contact form · ${type}`, heading: H('New message from the contact form', 'NEW MESSAGE FROM THE CONTACT FORM'),
     html: {
       before: p(esc(lead)) + details(rows.map(([k, v]) => [k, esc(v)])) + quote(longHtml(message), 'Message:'),
       after: p(esc(tip), { muted: true }),
@@ -387,7 +452,7 @@ export function contactOwnerEmail(data, site) {
 
 // Sent to an address that has not been verified: fixed text only. No name, subject, type or message is echoed.
 export function contactVisitorEmail(data, site) {
-  const { origin } = siteOf(site);
+  const { origin } = resolveSite(site);
   const lines = [
     'Hello,',
     'Your message reached us. If it needs a reply, we will write to the address you gave us.',
@@ -398,7 +463,7 @@ export function contactVisitorEmail(data, site) {
   return build({
     site, subject: 'We received your message',
     preheader: 'Thank you for writing to Mayobe Bros. Your message reached us. If it needs a reply, we will write to the address you gave.',
-    eyebrowText: 'Message received', heading: H('Thank you for your message', 'THANK YOU FOR YOUR MESSAGE'),
+    kickerText: 'Message received', heading: H('Thank you for your message', 'THANK YOU FOR YOUR MESSAGE'),
     html: { before: lines.map((l) => p(esc(l))).join('') + p(esc(privacy), { muted: true }) + p(esc(wait)) },
     text: { before: [...lines, privacy, wait] },
     buttonUrl: `${origin}/post/`, buttonLabel: 'Read the latest articles',
@@ -411,17 +476,20 @@ export function contactVisitorEmail(data, site) {
 
 export function confirmSubscriptionEmail(data, site) {
   const d = pick(data, ['confirmUrl']);
-  const { origin } = siteOf(site);
+  const { origin } = resolveSite(site);
   const url = ownUrl(d.confirmUrl, origin, `${origin}/`);
-  const a = 'Someone, we hope you, asked to get new Mayobe Bros articles by email at this address. Press the button to confirm.';
+  const a = 'Someone, we hope you, asked to get new Mayobe Bros articles by email at this address.';
+  // The button opens /newsletter/, where one more press confirms (so mail scanners that open links sign nobody up).
+  const how = 'The button opens a page on our website. Press Confirm my subscription there to finish.';
+  const copy = 'If the page does not open, copy the link below into your browser. If it still does not work, reply to this email and tell us.';
   const b = 'We will not send you any newsletter email until you confirm. If you did not ask for this, ignore this email and nothing more will be sent.';
   return build({
     site, subject: 'Please confirm your Mayobe Bros subscription',
     preheader: 'Please confirm that you want new Mayobe Bros articles by email. Nothing will be sent until you press the button.',
-    eyebrowText: 'Newsletter', heading: H('Confirm your subscription', 'CONFIRM YOUR SUBSCRIPTION'),
-    html: { before: p(esc(a)), after: p(esc(b), { muted: true }) },
-    text: { before: [a], after: [b] },
-    buttonUrl: url, buttonLabel: 'Confirm my subscription',
+    kickerText: 'Newsletter', heading: H('Confirm your subscription', 'CONFIRM YOUR SUBSCRIPTION'),
+    html: { before: p(esc(a)) + p(esc(how)), after: p(esc(b), { muted: true }) },
+    text: { before: [a, how, copy], after: [b] },
+    buttonUrl: url, buttonLabel: 'Confirm my subscription', fallbackLead: copy,
     why: 'You got this email because this address was entered in the newsletter form on mayobebros.com.',
     links: commonLinks(origin),
   });
@@ -430,7 +498,7 @@ export function confirmSubscriptionEmail(data, site) {
 // latestPosts = [{ title, url, excerpt? }] from the site's own data (search.json); at most 3 are shown.
 export function welcomeEmail(data, site) {
   const d = pick(data, ['unsubscribeUrl', 'latestPosts']);
-  const { origin } = siteOf(site);
+  const { origin } = resolveSite(site);
   const unsub = ownUrl(d.unsubscribeUrl, origin, `${origin}/contact/`);
   const posts = asList(d.latestPosts)
     .map((item) => pick(item, ['title', 'url', 'excerpt']))
@@ -440,15 +508,15 @@ export function welcomeEmail(data, site) {
   const b = 'We write clear, honest guides on education, jobs, money and technology for readers in Tanzania.';
   const c = 'You can stop at any time with the unsubscribe link at the bottom of every email.';
   const list = posts.length
-    ? eyebrow('Recent articles') + `<table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">`
+    ? kicker('Recent articles') + `<table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">`
       + posts.map((x) => `<tr><td class="mb-rule" style="padding:16px 0;border-top:1px solid ${L.rule};">`
-        + `<p style="margin:0 0 8px;${SERIF}font-size:18px;line-height:1.4;">${link(x.url, esc(x.title))}</p>`
+        + `<p style="margin:0 0 6px;${SANS}font-size:18px;line-height:1.35;font-weight:800;">${link(x.url, esc(x.title))}</p>`
         + (x.excerpt ? p(esc(x.excerpt), { muted: true, size: 15, mb: 0 }) : '') + '</td></tr>').join('') + '</table>'
     : '';
   return build({
     site, subject: 'Welcome to the Mayobe Bros newsletter',
     preheader: 'You are now subscribed to Mayobe Bros. We will email you when a new article is published, and you can stop any time.',
-    eyebrowText: 'Welcome', heading: H('You are subscribed', 'YOU ARE SUBSCRIBED'),
+    kickerText: 'Welcome', heading: H('You are subscribed', 'YOU ARE SUBSCRIBED'),
     html: { before: p(esc(a)) + p(esc(b), { mb: posts.length ? 32 : 16 }) + list, after: p(esc(c), { muted: true }) },
     text: { before: [a, b, posts.length ? 'Recent articles:\n\n' + posts.map((x) => `${plain(x.title)}\n${x.url}`).join('\n\n') : null], after: [c] },
     buttonUrl: `${origin}/post/`, buttonLabel: 'Read the latest articles',
@@ -458,9 +526,10 @@ export function welcomeEmail(data, site) {
 }
 
 // post = { title, url, excerpt?, image? (same-origin https URL of the 1200 x 630 share card), imageAlt?, category? }
+// Task 3 of the email redesign moves the picture to ownImage() and assets/email/ (search.json m/w/a).
 export function newPostEmail(data, site) {
   const d = pick(data, ['post', 'unsubscribeUrl']);
-  const { origin } = siteOf(site);
+  const { origin } = resolveSite(site);
   const post = pick(d.post, ['title', 'url', 'excerpt', 'image', 'imageAlt', 'category']);
   const url = ownUrl(post.url, origin, `${origin}/`);
   const unsub = ownUrl(d.unsubscribeUrl, origin, `${origin}/contact/`);
@@ -472,9 +541,9 @@ export function newPostEmail(data, site) {
   return build({
     site, subject: `New article: ${clip(post.title, 110) || 'Mayobe Bros'}`,
     preheader: pre.length >= 90 ? pre : 'A new article is on Mayobe Bros. Read the short summary here, then open the full article when you are ready.',
-    eyebrowText: oneLine(post.category) ? `New article · ${clip(post.category, 40)}` : 'New article', heading: H(esc(title), plain(title)),
+    kickerText: oneLine(post.category) ? `New article · ${clip(post.category, 40)}` : 'New article', heading: H(esc(title), plain(title)),
     html: {
-      before: (image ? `<img src="${esc(image)}" width="520" height="273" alt="${esc(clip(post.imageAlt, 200))}" style="display:block;border:0;width:100%;height:auto;margin:0 0 24px;">` : '')
+      before: (image ? `<img class="mb-img" src="${esc(image)}" width="520" height="273" alt="${esc(clip(post.imageAlt, 200))}" style="display:block;border:0;width:100%;max-width:520px;height:auto;margin:0 0 24px;border-radius:10px;background:${L.imageBg};${SANS}font-size:14px;line-height:1.5;color:${L.imageAlt};">` : '')
         + (excerpt ? p(esc(excerpt)) : ''),
       after: p(esc(c), { muted: true }),
     },
@@ -487,14 +556,14 @@ export function newPostEmail(data, site) {
 
 export function farewellEmail(data, site) {
   const d = pick(data, ['resubscribeUrl']);
-  const { origin } = siteOf(site);
+  const { origin } = resolveSite(site);
   const url = ownUrl(d.resubscribeUrl, origin, `${origin}/`);
   const a = 'We have removed this address from our newsletter list. This is the last newsletter email we will send to it.';
   const b = 'If you unsubscribed by mistake, you can subscribe again with the button below. Thank you for reading Mayobe Bros.';
   return build({
     site, subject: 'You have unsubscribed from Mayobe Bros',
     preheader: 'You have been unsubscribed from the Mayobe Bros newsletter. This is the last newsletter email we will send to you.',
-    eyebrowText: 'Newsletter', heading: H('You are unsubscribed', 'YOU ARE UNSUBSCRIBED'),
+    kickerText: 'Newsletter', heading: H('You are unsubscribed', 'YOU ARE UNSUBSCRIBED'),
     html: { before: p(esc(a)) + p(esc(b)) },
     text: { before: [a, b] },
     buttonUrl: url, buttonLabel: 'Subscribe again',
