@@ -346,7 +346,7 @@ export function ownerAlertEmail(data, site) {
 
 /* ------------------------------------------------------------------ contact form */
 
-const CONTACT_TYPES = {
+export const CONTACT_TYPES = {
   general: 'General question', support: 'Technical support', technical: 'Technical issue', advertising: 'Advertising',
   editorial: 'Editorial feedback', partnership: 'Partnership', press: 'Press and media', other: 'Other',
 };

@@ -28,7 +28,7 @@ async function giveBack(env, kind, day) {
 }
 
 const oneLine = (s) => String(s ?? '').replace(/[\r\n\u2028\u2029]+/g, ' ').trim();
-const validEmail = (s) => { const v = String(s ?? '').trim().toLowerCase(); return v.length > 0 && v.length <= 254 && !/[\r\n]/.test(String(s)) && EMAIL_RE.test(v); };
+export const validEmail = (s) => { const v = String(s ?? '').trim().toLowerCase(); return v.length > 0 && v.length <= 254 && !/[\r\n]/.test(String(s)) && EMAIL_RE.test(v); };
 const logFail = (what, status, bodyText) => console.error(`mail: ${what}${status ? ` status=${status}` : ''}${bodyText ? ` body=${String(bodyText).slice(0, 300)}` : ''}`);
 
 // Resolves to { ok, skipped?, id?, status? }; skipped is 'no-key' (no API key, or no idempotency key on the message),

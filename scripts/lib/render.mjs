@@ -323,7 +323,7 @@ ${body}
 </main>
 ${footer()}
 ${SEARCH_MODAL()}
-<script src="${assetUrl('js/site.js')}" defer></script>${meta.listen ? `\n<script src="${assetUrl('js/listen.js')}" defer></script>` : ''}${body.includes('class="pagination"') || body.includes('hero-listing') ? `\n<script src="${assetUrl('js/pager.js')}" defer></script>` : ''}${api ? `\n<script src="${assetUrl('js/engage.js')}" defer></script>` : ''}${api && meta.manage ? `\n<script src="${assetUrl('js/manage.js')}" defer></script>` : ''}${cfToken ? `\n<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${cfToken}"}'></script>` : ''}
+<script src="${assetUrl('js/site.js')}" defer></script>${meta.listen ? `\n<script src="${assetUrl('js/listen.js')}" defer></script>` : ''}${body.includes('class="pagination"') || body.includes('hero-listing') ? `\n<script src="${assetUrl('js/pager.js')}" defer></script>` : ''}${api ? `\n<script src="${assetUrl('js/engage.js')}" defer></script>` : ''}${api && meta.contact ? `\n<script src="${assetUrl('js/contact.js')}" defer></script>` : ''}${api && meta.manage ? `\n<script src="${assetUrl('js/manage.js')}" defer></script>` : ''}${cfToken ? `\n<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${cfToken}"}'></script>` : ''}
 </body>
 </html>
 `;
@@ -890,15 +890,19 @@ ${discover()}`;
   /* ------------------------------------------------------- static pages */
   function contactForm() {
     const c = config.contact;
-    return `<form class="form" id="contact-form" action="${e(c.formAction || '#')}" method="post" novalidate data-mailto="${e(c.general)}" data-endpoint="${e(c.formAction || '')}">
+    const endpoint = api ? `${api}/v1/contact` : c.formAction || ''; // with the comments service on, the form sends email through it
+    const field = (id, label, input, hint = '') => `<div class="field"><label for="cf-${id}">${label}</label>${input}<p class="field-err" id="cf-${id}-err" hidden></p>${hint}</div>`;
+    return `<form class="form" id="contact-form" action="${e(c.formAction || '#')}" method="post" novalidate data-mailto="${e(c.general)}" data-endpoint="${e(endpoint)}"${api ? ' data-mail-api' : ''}>
   <div class="form-row">
-    <div class="field"><label for="cf-name">Your name</label><input id="cf-name" name="name" type="text" autocomplete="name" required placeholder="Your name"></div>
-    <div class="field"><label for="cf-email">Your email</label><input id="cf-email" name="email" type="email" autocomplete="email" required placeholder="you@example.com"></div>
+    ${field('name', 'Your name', '<input id="cf-name" name="name" type="text" autocomplete="name" required maxlength="50" placeholder="Your name" aria-describedby="cf-name-err">')}
+    ${field('email', 'Your email', '<input id="cf-email" name="email" type="email" autocomplete="email" required maxlength="254" placeholder="you@example.com" aria-describedby="cf-email-err">')}
   </div>
-  <div class="field"><label for="cf-subject">Subject</label><input id="cf-subject" name="subject" type="text" required placeholder="How can we help?"></div>
-  <div class="field"><label for="cf-message">Message</label><textarea id="cf-message" name="message" rows="6" required placeholder="Write your message here"></textarea></div>
+  ${field('subject', 'Subject', '<input id="cf-subject" name="subject" type="text" required maxlength="120" placeholder="How can we help?" aria-describedby="cf-subject-err">')}
+  ${field('message', 'Message', '<textarea id="cf-message" name="message" rows="6" required maxlength="3000" placeholder="Write your message here" aria-describedby="cf-message-err"></textarea>')}
+  ${endpoint ? '<div class="hp" aria-hidden="true"><label>Leave this field empty <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>' : ''}
   <button class="btn btn-primary btn-lg" type="submit">Send message ${icon('arrowRight', 18)}</button>
-  <p class="form-status" role="status" aria-live="polite"></p>
+  <p class="form-status" role="status" aria-live="polite" tabindex="-1"></p>
+  <noscript><p>This form needs JavaScript. Please email us at <a href="mailto:${e(c.general)}">${e(c.general)}</a>.</p></noscript>
 </form>`;
   }
 
@@ -938,7 +942,7 @@ ${withIds.html}
     const body = `${hero({ image: heroFor(pg.slug, pg.hero), title: e(pg.heading || pg.title), sub: pg.subtitle })}
 <section class="section">${inner}</section>`;
     return layout(
-      { title: pg.title, description: pg.description, path: `/${pg.slug}/`, noindex: true, noReferrer: pg.slug === 'manage', bodyClass: pg.slug === 'manage' ? 'page-manage' : '', manage: pg.slug === 'manage', adKind: isDoc ? 'legal' : 'page', preload: heroFor(pg.slug, pg.hero), jsonLd: [{ '@context': 'https://schema.org', '@type': pg.slug === 'about' ? 'AboutPage' : pg.slug === 'contact' ? 'ContactPage' : 'WebPage', name: pg.title, description: pg.description, url: abs(`/${pg.slug}/`) }] },
+      { title: pg.title, description: pg.description, path: `/${pg.slug}/`, noindex: true, noReferrer: pg.slug === 'manage', bodyClass: pg.slug === 'manage' ? 'page-manage' : '', manage: pg.slug === 'manage', contact: pg.slug === 'contact', adKind: isDoc ? 'legal' : 'page', preload: heroFor(pg.slug, pg.hero), jsonLd: [{ '@context': 'https://schema.org', '@type': pg.slug === 'about' ? 'AboutPage' : pg.slug === 'contact' ? 'ContactPage' : 'WebPage', name: pg.title, description: pg.description, url: abs(`/${pg.slug}/`) }] },
       { page: pg.slug },
       body,
     );

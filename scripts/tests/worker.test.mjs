@@ -1497,3 +1497,219 @@ test('exchange and unsubscribe give the generic 404 for bad JSON, non-objects an
     }
   }
 });
+
+/* ------------------------------------------------------------------ Task 6: contact form */
+const contactBody = (over = {}) => ({ name: 'Neema Joseph', email: 'neema@example.com', subject: 'A question about the site', message: 'Hello, I would like to ask how you choose your topics.', website: '', ts: Date.now() - 10000, ...over });
+let ipN = 0;
+const contact = (over = {}, ip) => call('POST', '/v1/contact', { body: contactBody(over), ip: ip || `10.1.${Math.floor(++ipN / 250)}.${ipN % 250}` });
+
+test('contact: happy path sends the owner notice then the fixed confirmation, with the right recipients, kinds and keys', async () => {
+  const r = await contact();
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.json, { ok: true });
+  assert.equal(r.headers.get('access-control-allow-origin'), ORIGIN);
+  await flushMail();
+  assert.equal(sent.length, 2);
+  const [own, ack] = sent;
+  assert.deepEqual(own.body.to, ['info@mayobebros.com']);
+  assert.equal(own.body.reply_to, 'neema@example.com');
+  assert.match(own.body.subject, /^Contact form \(General question\): A question about the site/);
+  assert.ok(own.body.html.includes('how you choose your topics'));
+  assert.deepEqual(ack.body.to, ['neema@example.com']);
+  assert.equal(ack.body.subject, 'We received your message');
+  assert.equal(ack.body.reply_to, undefined);
+  const id = own.headers['Idempotency-Key'].replace(/^contact-/, '');
+  assert.match(own.headers['Idempotency-Key'], /^contact-[0-9a-f-]{36}$/);
+  assert.equal(ack.headers['Idempotency-Key'], `contactack-${id}`);
+  // nothing about the message is stored
+  const dump = JSON.stringify(['comments', 'hits'].map((t) => env.DB.raw.prepare(`SELECT * FROM ${t}`).all()));
+  for (const s of ['neema', 'Neema', 'choose your topics', 'A question about']) assert.equal(dump.includes(s), false, `${s} is not stored`);
+});
+
+test('contact: OWNER_EMAIL is used, a known type reaches the owner email, an unknown one becomes general', async () => {
+  env.OWNER_EMAIL = 'boss@example.org';
+  await contact({ type: 'advertising' });
+  await contact({ type: '__proto__' });
+  await flushMail();
+  const owners = sent.filter((s) => s.body.to[0] === 'boss@example.org');
+  assert.equal(owners.length, 2);
+  assert.match(owners[0].body.subject, /\(Advertising\)/);
+  assert.match(owners[1].body.subject, /\(General question\)/);
+});
+
+test('contact: a second message is a new message (fresh idempotency key)', async () => {
+  await contact({ email: 'a1@example.com' });
+  await contact({ email: 'a2@example.com' });
+  await flushMail();
+  const keys = sent.filter((s) => s.body.to[0] === 'info@mayobebros.com').map((s) => s.headers['Idempotency-Key']);
+  assert.equal(new Set(keys).size, 2);
+});
+
+test('contact: validation matrix', async () => {
+  const bad = async (over, re) => {
+    const r = await contact(over);
+    assert.equal(r.status, 400, JSON.stringify(over).slice(0, 80));
+    if (re) assert.match(r.json.error, re);
+  };
+  await bad({ name: 'A' }, /name/i);
+  await bad({ name: 'x'.repeat(51) }, /name/i);
+  await bad({ name: '​\u0007 ' }, /name/i);
+  await bad({ email: 'nope' }, /email/i);
+  await bad({ email: 'a b@example.com' }, /email/i);
+  await bad({ email: 'a@example.com\r\nBcc: x@evil.test' }, /email/i);
+  await bad({ email: 'a​@example.com' }, /email/i);
+  await bad({ email: `${'a'.repeat(250)}@example.com` }, /email/i);
+  await bad({ email: '"a"@example.com' }, /email/i);
+  await bad({ email: 42 }, /email/i);
+  await bad({ subject: 'ab' }, /subject/i);
+  await bad({ subject: 'x'.repeat(121) }, /subject/i);
+  await bad({ message: 'too short' }, /short/i);
+  await bad({ message: 'x'.repeat(3001) }, /long/i);
+  await bad({ message: 12345 }, /short/i);
+  assert.equal(sent.length, 0);
+  // the edges are accepted
+  assert.equal((await contact({ name: 'Al', subject: 'abc', message: '1234567890' })).status, 200);
+  assert.equal((await contact({ name: 'x'.repeat(50), subject: 'x'.repeat(120), message: 'y'.repeat(3000), email: 'edge@example.com' })).status, 200);
+  const big = await call('POST', '/v1/contact', { body: { ...contactBody(), message: 'q'.repeat(20000) } });
+  assert.equal(big.status, 413);
+  assert.equal((await call('POST', '/v1/contact', { body: null })).status, 400, 'not JSON');
+});
+
+test('contact: a message of 3,000 characters full of quotes and line breaks is still read', async () => {
+  const msg = '"\n'.repeat(1500);
+  const r = await contact({ message: `${msg}end of the text` .slice(-3000) });
+  assert.equal(r.status, 200);
+});
+
+test('contact: links in the message are allowed and arrive as inert text', async () => {
+  const r = await contact({ message: 'Please read https://example.com/page?a=1&b=2 and tell me what you think.' });
+  assert.equal(r.status, 200);
+  await flushMail();
+  const html = sent[0].body.html;
+  assert.ok(!/href="https?:\/\/example\.com/.test(html), 'not a clickable link');
+  assert.ok(html.includes('https://example.com/page?a=1&amp;b=2'));
+});
+
+test('contact: honeypot and a too-fast post are answered 200 with no mail and no count', async () => {
+  const a = await contact({ website: 'http://spam.example' });
+  const b = await contact({ ts: Date.now() - 500 });
+  assert.deepEqual([a.status, a.json], [200, { ok: true }]);
+  assert.deepEqual([b.status, b.json], [200, { ok: true }]);
+  await flushMail();
+  assert.equal(sent.length, 0);
+  assert.equal(env.DB.raw.prepare("SELECT COUNT(*) AS n FROM hits WHERE k LIKE 'ct%'").get().n, 0);
+});
+
+test('contact: 3 an hour per IP and 2 an hour per address (any spelling), keyed without the raw address', async () => {
+  for (let i = 0; i < 3; i++) assert.equal((await contact({ email: `p${i}@example.com` }, '9.9.9.9')).status, 200);
+  const fourth = await contact({ email: 'p9@example.com' }, '9.9.9.9');
+  assert.equal(fourth.status, 429);
+  assert.match(fourth.json.error, /try again later/i);
+  const spellings = ['Pat@Gmail.com', 'p.a.t+x@gmail.com', 'pat@googlemail.com'];
+  assert.equal((await contact({ email: spellings[0] })).status, 200);
+  assert.equal((await contact({ email: spellings[1] })).status, 200);
+  assert.equal((await contact({ email: spellings[2] })).status, 429);
+  const keys = env.DB.raw.prepare('SELECT k FROM hits').all().map((h) => h.k).join('\n');
+  assert.equal(/example\.com|gmail/i.test(keys), false, 'no raw address in hits');
+  assert.equal(keys.includes('9.9.9.9'), false);
+});
+
+test('contact: a full owner slice answers 503 with the address, while commenter mail still goes out', async () => {
+  for (let i = 0; i < 10; i++) assert.equal((await contact({ email: `flood${i}@example.com` })).status, 200);
+  await flushMail();
+  const before = sent.length;
+  const r = await contact({ email: 'late@example.com' });
+  assert.equal(r.status, 503);
+  assert.equal(r.json.error, 'We could not send your message. Please email us at info@mayobebros.com.');
+  await flushMail();
+  assert.equal(sent.length, before, 'no confirmation for a message nobody received');
+  const c = await post(comment({ email: MAILBOX, notify: true }));
+  assert.equal(c.status, 201);
+  await flushMail();
+  assert.ok(sent.slice(before).some((s) => s.body.to[0] === MAILBOX), 'the manage-link mail still sends');
+});
+
+test('contact: owner mail failing (500, thrown fetch, no key) answers 503 and sends no confirmation', async () => {
+  for (const mode of ['500', 'throw']) {
+    resendMode = mode;
+    sent = [];
+    const r = await contact({ email: `m${mode}@example.com` });
+    await flushMail();
+    assert.equal(r.status, 503, mode);
+    assert.match(r.json.error, /info@mayobebros\.com/);
+    assert.ok(sent.every((s) => s.body.to[0] === 'info@mayobebros.com'), 'only the owner mail was tried');
+  }
+  resendMode = 'ok';
+  sent = [];
+  delete env.RESEND_API_KEY;
+  const r = await contact({ email: 'nokey@example.com' });
+  assert.equal(r.status, 503);
+  assert.equal(sent.length, 0);
+  env.CONTACT_EMAIL = 'help@example.org';
+  assert.match((await contact({ email: 'nokey2@example.com' })).json.error, /help@example\.org/);
+});
+
+test('contact: a failing confirmation never changes the 200', async () => {
+  const realF = globalThis.fetch;
+  globalThis.fetch = async (u, init) => {
+    if (String(u) === 'https://api.resend.com/emails' && JSON.parse(init.body).subject === 'We received your message') throw new Error('down');
+    return realF(u, init);
+  };
+  try {
+    const r = await contact();
+    await flushMail();
+    assert.equal(r.status, 200);
+    assert.deepEqual(r.json, { ok: true });
+    assert.equal(sent.length, 1);
+  } finally { globalThis.fetch = realF; }
+});
+
+test('contact: the confirmation to the unverified address contains none of the visitor\'s text', async () => {
+  const name = 'Zanzibar Quokka', subject = 'Marmalade sandwiches', message = 'The purple elephant wishes to discuss <b>cheese</b> urgently.';
+  await contact({ name, subject, message, email: 'unverified@example.com' });
+  await flushMail();
+  const ack = sent.find((s) => s.body.to[0] === 'unverified@example.com');
+  assert.ok(ack);
+  const all = JSON.stringify(ack.body);
+  for (const s of ['Zanzibar', 'Quokka', 'Marmalade', 'purple elephant', 'cheese']) assert.equal(all.includes(s), false, s);
+});
+
+test('contact: hostile name, subject and message never break the headers, the JSON or the HTML', async () => {
+  const name = 'Eve <script>alert(1)</script>\r\nBcc: x@evil.test';
+  const subject = 'Hi\r\nBcc: evil@evil.test <img src=x onerror=alert(1)>';
+  const message = `<script>alert("x")</script>\r\n\ud800 lone \udc00 surrogates \u001b[31m red & "quotes" 'single'\n${'z'.repeat(2800)}`;
+  const r = await contact({ name, subject, message, email: 'eve@example.com' });
+  assert.equal(r.status, 200);
+  await flushMail();
+  assert.equal(sent.length, 2);
+  for (const s of sent) {
+    assert.doesNotThrow(() => JSON.parse(s.raw));
+    assert.equal(/<script|<img src=x|<b>/i.test(s.body.html), false, 'no raw tag in the HTML');
+    assert.equal(/[\r\n]/.test(s.body.subject), false, 'one-line subject');
+    assert.equal(s.raw.includes('\\ud800') || s.raw.includes('\ud800'), false, 'no lone surrogate on the wire');
+    assert.equal(s.body.to.length, 1);
+  }
+  assert.equal(sent[0].body.reply_to, 'eve@example.com');
+  assert.equal(sent[0].body.bcc, undefined);
+});
+
+test('contact: Origin is required and CORS answers only our site', async () => {
+  assert.equal((await call('POST', '/v1/contact', { body: contactBody(), origin: 'https://evil.example' })).status, 403);
+  assert.equal((await call('POST', '/v1/contact', { body: contactBody(), origin: null })).status, 403);
+  const pre = await worker.fetch(new Request('https://api.test/v1/contact', { method: 'OPTIONS', headers: { Origin: ORIGIN } }), env, {});
+  assert.equal(pre.status, 204);
+  assert.equal(pre.headers.get('access-control-allow-origin'), ORIGIN);
+  await flushMail();
+  assert.equal(sent.length, 0);
+});
+
+test('contact: when TURNSTILE_SECRET is set the check runs first', async () => {
+  env.TURNSTILE_SECRET = 'secret';
+  const realF = globalThis.fetch;
+  globalThis.fetch = async (u, init) => (String(u).includes('turnstile') ? new Response(JSON.stringify({ success: false })) : realF(u, init));
+  try {
+    assert.equal((await contact()).status, 400);
+    await flushMail();
+    assert.equal(sent.length, 0);
+  } finally { globalThis.fetch = realF; }
+});

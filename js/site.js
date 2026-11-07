@@ -894,7 +894,8 @@
       .catch(function () { statusEl.classList.add('is-err'); statusEl.textContent = 'Sorry, that did not go through. Please try again, or email us directly.'; });
   }
   var cf = $('#contact-form');
-  if (cf) {
+  // with the mail service on, js/contact.js sends the message (data-mail-api); this handler is the mailto form and the old plain form post
+  if (cf && !cf.hasAttribute('data-mail-api')) {
     var cfStatus = $('.form-status', cf);
     cf.addEventListener('submit', function (e) {
       e.preventDefault();

@@ -26,8 +26,8 @@
 
 import { screen, looksLikeTeam } from './moderation.js';
 import { looksLikeQuestion } from './question.js';
-import { sendMail } from './mail.js';
-import { manageLinkEmail, replyNoticeEmail, ownerAlertEmail } from './mail-templates.js';
+import { sendMail, validEmail } from './mail.js';
+import { manageLinkEmail, replyNoticeEmail, ownerAlertEmail, contactOwnerEmail, contactVisitorEmail, CONTACT_TYPES } from './mail-templates.js';
 
 export const REACTIONS = ['like', 'amazed', 'sad', 'angry'];
 const COL = { like: 'r_like', amazed: 'r_amazed', sad: 'r_sad', angry: 'r_angry' };
@@ -112,22 +112,38 @@ async function dropLinks(env, id) {
 }
 // Cleans a comment's name and text the way they are stored, and checks length and links. Shared by the create and edit routes.
 // Returns { name, body } or { error } (a message for a 400).
+// The two cleaners are shared by comments and the contact form, so both strip the same characters.
+const cleanName = (raw) => String(raw || '').normalize('NFKC').replace(/[\p{Cc}\p{Cf}]+/gu, '').replace(/\s+/g, ' ').trim(); // stored exactly as it was checked: no invisible characters
+const cleanText = (raw) => String(raw || '').replace(/\r\n?/g, '\n').replace(/\t/g, ' ').replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g, '').replace(/\n{3,}/g, '\n\n').trim(); // no control characters (terminal escapes) are stored; newlines stay
 function cleanComment(rawName, rawBody) {
-  const name = String(rawName || '').normalize('NFKC').replace(/[\p{Cc}\p{Cf}]+/gu, '').replace(/\s+/g, ' ').trim(); // stored exactly as it was checked: no invisible characters
-  const body = String(rawBody || '').replace(/\r\n?/g, '\n').replace(/\t/g, ' ').replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g, '').replace(/\n{3,}/g, '\n\n').trim(); // no control characters (terminal escapes) are stored; newlines stay
+  const name = cleanName(rawName);
+  const body = cleanText(rawBody);
   if (name.length < 2 || name.length > 50) return { error: 'Please enter your name (2 to 50 characters).' };
   if (body.length < 3) return { error: 'Your comment is too short.' };
   if (body.length > 1500) return { error: 'Your comment is too long (1,500 characters at most).' };
   if (LINK_RE.test(body) || LINK_RE.test(name)) return { error: 'Links are not allowed in comments.' };
   return { name, body };
 }
+// The contact form: same cleaning, other limits, and links are allowed (the owner email shows them as plain text). Returns { name, email, subject, message, type } or { error }.
+function cleanContact(b) {
+  const name = cleanName(b.name);
+  const subject = cleanName(String(b.subject ?? '').replace(/[\r\n\t]+/g, ' ')); // one line: no line breaks, no invisible characters
+  const message = cleanText(b.message);
+  const email = String(b.email ?? '').trim();
+  if (name.length < 2 || name.length > 50) return { error: 'Please enter your name (2 to 50 characters).' };
+  if (email.length > 254 || /\p{Cc}|\p{Cf}/u.test(email) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !validEmail(email)) return { error: 'That email address does not look right.' };
+  if (subject.length < 3 || subject.length > 120) return { error: 'Please enter a subject (3 to 120 characters).' };
+  if (message.length < 10) return { error: 'Your message is too short (10 characters at least).' };
+  if (message.length > 3000) return { error: 'Your message is too long (3,000 characters at most).' };
+  return { name, email, subject, message, type: typeof b.type === 'string' && Object.hasOwn(CONTACT_TYPES, b.type) ? b.type : 'general' };
+}
 function isAdmin(request, env) {
   const t = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
   return !!env.ADMIN_TOKEN && env.ADMIN_TOKEN.length >= 16 && same(t, env.ADMIN_TOKEN);
 }
-async function readJson(request) {
+async function readJson(request, max = MAX_BODY) {
   const text = await request.text();
-  if (text.length > MAX_BODY) throw Object.assign(new Error('Request is too large.'), { status: 413 });
+  if (text.length > max) throw Object.assign(new Error('Request is too large.'), { status: 413 });
   try {
     const v = JSON.parse(text || '{}');
     if (!v || typeof v !== 'object') throw 0;
@@ -397,6 +413,42 @@ async function handle(request, env, ctx) {
     }
     // id and token only for a row that was really inserted (approved or held), so the browser can keep the token even when no comment is shown yet
     return reply({ ok: true, status, comment: shown, ...(newId ? { id: newId, token } : {}) }, status === 'approved' ? 201 : 202, cors);
+  }
+
+  if (method === 'POST' && path === '/v1/contact') {
+    const b = await readJson(request, 14000); // 3,000 characters can double when quotes and line breaks are escaped
+    // bots: a filled hidden field or a form sent faster than a person can type. Pretend it worked; nothing is sent.
+    if (b.website || (Number(b.ts) && now() - Number(b.ts) < 2500)) return reply({ ok: true }, 200, cors);
+    if (env.TURNSTILE_SECRET) {
+      const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body: new URLSearchParams({ secret: env.TURNSTILE_SECRET, response: String(b.tt || '') }) });
+      const j = await r.json().catch(() => ({}));
+      if (!j.success) return fail('Please complete the security check and try again.', 400, cors);
+    }
+    const c = cleanContact(b);
+    if (c.error) return fail(c.error, 400, cors);
+    const ih = await ipHash(request, env);
+    const hour = Math.floor(now() / 3600000);
+    if (!(await hit(env, ctx, `ct:${ih}:${hour}`, 3, 3700))) return fail('You have sent several messages already. Please try again later.', 429, cors);
+    // the key holds a hash of the address, never the address itself
+    if (!(await hit(env, ctx, `cte:${(await sha(`${canonicalEmail(c.email)}|${env.HASH_SALT || 'mayobe'}`)).slice(0, 32)}:${hour}`, 2, 3700))) return fail('You have sent several messages already. Please try again later.', 429, cors);
+    const general = env.CONTACT_EMAIL || 'info@mayobebros.com';
+    const down = () => fail(`We could not send your message. Please email us at ${general}.`, 503, cors);
+    if (!env.RESEND_API_KEY) return down();
+    const id = crypto.randomUUID(); // a new message every time, so a second send is never swallowed as a repeat
+    let owner;
+    try {
+      const m = contactOwnerEmail({ name: c.name, email: c.email, subject: c.subject, message: c.message, type: c.type, receivedAt: now() }, siteOf(env));
+      owner = await sendMail(env, ctx, { kind: 'owner', to: env.OWNER_EMAIL || 'info@mayobebros.com', replyTo: c.email, ...m, key: `contact-${id}` });
+    } catch (err) {
+      console.error('contact mail failed', err && err.message ? err.message : err);
+    }
+    if (!owner || !owner.ok) { console.error('contact message could not be emailed to the owner'); return down(); }
+    // the visitor's confirmation goes to an address nobody has verified: fixed text only, best effort, after the owner has the message
+    later(env, ctx, async () => {
+      const v = contactVisitorEmail({}, siteOf(env));
+      await sendMail(env, ctx, { kind: 'contact', to: c.email, ...v, key: `contactack-${id}` });
+    });
+    return reply({ ok: true }, 200, cors);
   }
 
   if (method === 'POST' && path === '/v1/manage/exchange') {
