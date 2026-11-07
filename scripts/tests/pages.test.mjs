@@ -155,6 +155,7 @@ test('no newsletter page, no subscribe script and no newsletter wording in the f
   assert.doesNotMatch(privacy, /subscribe\.js|newsletter\.js/);
   assert.doesNotMatch(footer, /newsletter|data-endpoint|foot-form/i);
   assert.match(footer, /Follow with RSS/);
+  assert.match(footer, /<h2>Learn something useful every week<\/h2>/, 'the RSS-only footer keeps its heading');
   assert.doesNotMatch(privacy.slice(privacy.indexOf('<main'), privacy.indexOf('</main>')), /newsletter/i);
 });
 
@@ -174,6 +175,22 @@ test('with the newsletter on: footer form, honeypot, privacy link, and a noindex
   assert.match(footer, /<p class="foot-status" role="status"/);
   assert.match(footer, /One email when we publish a new article\. Stop any time\. See our <a href="\/privacy-policy\/[^"]*">Privacy Policy<\/a>\./);
   assert.doesNotMatch(footer, /Follow with RSS<\/a>\s*<\/div>/, 'the RSS button is replaced by the form');
+  // no promise of how often: the heading over the form names no frequency
+  assert.match(footer, /<h2>Get new articles by email<\/h2>/);
+  assert.doesNotMatch(footer, /every week|weekly|daily/i);
+  // without JavaScript nothing is sent: the form starts hidden (js/subscribe.js shows it) and a <noscript> line outside it offers RSS
+  assert.match(form, /\shidden[\s>]/, 'the form starts hidden');
+  assert.match(footer, /<input[^>]*name="email"[^>]*\brequired\b/);
+  const ns = footer.match(/<noscript>[\s\S]*?<\/noscript>/);
+  assert.ok(ns, 'a noscript fallback');
+  assert.match(ns[0], /href="\/rss\/"/);
+  assert.ok(footer.indexOf('</form>') < footer.indexOf('<noscript>'), 'the noscript line is outside the hidden form');
+  const privacy = page('privacy-policy');
+  assert.match(privacy, /If JavaScript is switched off, the form is not shown and nothing is sent/, 'the privacy policy describes the no-JavaScript case as built');
+  assert.doesNotMatch(privacy, /puts the address you typed in the page address/);
+  const nlSrc = fs.readFileSync(path.join(ROOT, 'content', 'pages', 'newsletter.html'), 'utf8');
+  assert.doesNotMatch(nlSrc, /\{\{\^newsletter\}\}/, 'the page is built only when the newsletter is on, so no off branch');
+  assert.doesNotMatch(nlSrc, /Gmail|how often/);
   assert.match(about, /js\/subscribe\.js/, 'subscribe.js on every page');
   assert.doesNotMatch(about, /js\/newsletter\.js/);
   assert.match(about, /cloudflareinsights/, 'other pages keep the beacon');

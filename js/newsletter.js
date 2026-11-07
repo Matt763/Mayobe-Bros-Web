@@ -11,7 +11,7 @@
   var $ = function (s) { return box.querySelector(s); };
   var title = $('[data-nl-title]'), text = $('[data-nl-text]'), button = $('[data-nl-go]'), status = $('[data-nl-status]'), help = $('[data-nl-help]'), home = $('[data-nl-home]');
 
-  // Read the code from the address bar once, then take it (and any ?email= left by the form without JavaScript) out of the address,
+  // Read the code from the address bar once, then take it (and any query string) out of the address,
   // so it is not in history, the back button or a shared screenshot.
   var frag = String(location.hash || '');
   var m = /^#([cu])=([A-Za-z0-9_-]{32,64})$/.exec(frag);

@@ -55,7 +55,7 @@ async function call(path, { body, origin = ORIGIN, ip = '1.1.1.1' } = {}) {
   await flushMail();
   return { status: res.status, json: text ? JSON.parse(text) : null };
 }
-const sub = (email, over = {}, opts = {}) => call('/v1/newsletter/subscribe', { body: { email, website: '', ts: Date.now() - 10000, ...over }, ...opts });
+const sub = (email, over = {}, opts = {}) => call('/v1/newsletter/subscribe', { body: { email, website: '', elapsed: 10000, ...over }, ...opts });
 const sha = (s) => createHash('sha256').update(s).digest('hex');
 const rows = (sql, ...a) => env.DB.raw.prepare(sql).all(...a);
 const tokenFrom = (msg, mark) => new RegExp(`${mark.replace('/', '\\/')}([A-Za-z0-9_-]{32,64})`).exec(msg.body.html)?.[1];
@@ -127,13 +127,23 @@ test('4th sign-up from one IP in an hour is 429 and sends nothing', async () => 
   assert.equal(rows("SELECT 1 FROM newsletter_subscribers WHERE email = 'p4@example.com'").length, 0);
 });
 
-test('honeypot or ts under 2500 ms: 200 {ok:true}, no row, no mail', async () => {
-  for (const over of [{ website: 'http://bot' }, { ts: Date.now() - 500 }, { ts: undefined }]) {
+// `elapsed` is the time the visitor spent on the page (measured by the browser), so a phone clock set wrong does not matter
+test('honeypot, or elapsed missing, not a number or under 2500 ms: 200 {ok:true}, no row, no mail', async () => {
+  for (const over of [{ website: 'http://bot' }, { elapsed: 500 }, { elapsed: 2499 }, { elapsed: undefined }, { elapsed: 'abc' }, { elapsed: null }, { elapsed: -9000 }, { elapsed: undefined, ts: Date.now() - 10000 }]) {
     const r = await sub('bot@example.com', over);
     assert.deepEqual(r, { status: 200, json: { ok: true } });
   }
   assert.equal(rows('SELECT 1 FROM newsletter_subscribers').length, 0);
   assert.equal(sent.length, 0);
+});
+
+test('elapsed of exactly 2500 ms, or a numeric string, is a person', async () => {
+  for (const [i, elapsed] of [[1, 2500], [2, '4000']]) {
+    const r = await sub(`slow${i}@example.com`, { elapsed });
+    assert.deepEqual(r, { status: 200, json: { ok: true } });
+    await flushMail();
+    assert.equal(rows(`SELECT 1 FROM newsletter_subscribers WHERE email = 'slow${i}@example.com'`).length, 1, String(elapsed));
+  }
 });
 
 test('bad address: 400 field email', async () => {

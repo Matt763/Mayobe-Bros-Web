@@ -1,7 +1,7 @@
 // Newsletter routes (Phase 3). Every message goes through sendMail with kind 'news'. No visitor text is ever put in an email:
 // the only visitor input is the address the mail is sent to.
 //
-//   POST /v1/newsletter/subscribe   { email, website (honeypot), ts }  -> 200 { ok: true } for every valid address, whatever its state
+//   POST /v1/newsletter/subscribe   { email, website (honeypot), elapsed (ms on the page) }  -> 200 { ok: true } for every valid address, whatever its state
 //   POST /v1/newsletter/confirm     { token }                          -> 200 { ok: true } | 404 (one answer for every bad token)
 //   POST /v1/newsletter/unsubscribe { token }                          -> 200 { ok: true } (also when already unsubscribed) | 404; one farewell per row
 //   POST /v1/newsletter/one-click?t=  body List-Unsubscribe=One-Click  -> 200 for any token (RFC 8058, no Origin check, no farewell) | 400 for a wrong body
@@ -151,7 +151,9 @@ export async function newsletterRoute(request, env, ctx, path, cors) {
   if (path === '/v1/newsletter/subscribe') {
     const b = await readJson(request);
     // bots: a filled hidden field or a form sent faster than a person can type. Pretend it worked; nothing is stored or sent.
-    if (b.website || !(Number(b.ts) > 0) || now() - Number(b.ts) < MIN_FORM_MS) return reply({ ok: true }, 200, cors);
+    // `elapsed` is measured by the browser (ms since the page loaded), so a visitor's clock that is set wrong does not matter.
+    const elapsed = typeof b.elapsed === 'number' || (typeof b.elapsed === 'string' && b.elapsed.trim() !== '') ? Number(b.elapsed) : NaN;
+    if (b.website || !Number.isFinite(elapsed) || elapsed < MIN_FORM_MS) return reply({ ok: true }, 200, cors);
     if (!env.RESEND_API_KEY) return fail('The newsletter is not available right now.', 503, cors); // before anything is stored
     const address = cleanAddress(b.email);
     if (!address) return reply({ error: 'That email address does not look right.', field: 'email' }, 400, cors);

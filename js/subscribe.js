@@ -5,7 +5,11 @@
   'use strict';
 
   var doc = document;
-  var loaded = Date.now(); // the page-load time: the server ignores sign-ups sent too soon after it (most bots), so it is always sent
+  // the page-load time. Each sign-up sends how long the visitor has been on the page (ms, on this device's own clock only):
+  // the server ignores sign-ups sent in under 2.5 seconds (most bots), so it is always sent.
+  // performance.now() never jumps when the device clock is changed; Date.now() is the fallback for very old browsers.
+  var clock = function () { return typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now(); };
+  var loaded = clock();
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   var BAD = 'Please enter an email address that looks right, like you@example.com.';
   var base = doc.documentElement.getAttribute('data-base') || '';
@@ -55,7 +59,7 @@
       fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ email: email, website: trap ? String(trap.value || '') : '', ts: loaded }),
+        body: JSON.stringify({ email: email, website: trap ? String(trap.value || '') : '', elapsed: Math.max(0, Math.round(clock() - loaded)) }),
         credentials: 'omit'
       })
         .then(function (r) {
@@ -76,6 +80,7 @@
         .catch(function () { say('err', 'Sorry, that did not go through. Please try again later, or follow us with ', true); })
         .then(function () { sending = false; button.disabled = false; });
     });
+    form.hidden = false; // the form is hidden in the HTML so that nothing can be sent without this script
     input.addEventListener('input', function () {
       if (input.getAttribute('aria-invalid') === 'true' && EMAIL_RE.test(String(input.value || '').trim())) input.setAttribute('aria-invalid', 'false');
     });

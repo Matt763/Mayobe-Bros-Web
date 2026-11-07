@@ -277,23 +277,24 @@ export function createRenderer(ctx) {
     const li = (href, label) => `<li><a class="foot-link" href="${href}">${e(label)}</a></li>`;
     const legal = pages.filter((p) => p.kind === 'legal');
     const company = [['About us', '/about/'], ['Contact', '/contact/'], ['Work with us', '/advertise/'], ...authors.map((a) => [`${a.name} (author)`, `/author/${a.slug}/`])];
-    // the newsletter form (js/subscribe.js sends it); without JavaScript it opens /newsletter/, which explains the emails
+    // the newsletter form: hidden in the HTML and shown by js/subscribe.js, which sends it. Without JavaScript nothing can be sent
+    // (no address in a URL or a log); the <noscript> line after it offers RSS instead.
     const cta = newsletter
-      ? `<form class="foot-form" action="${u('/newsletter/')}" method="get" data-newsletter data-endpoint="${e(api)}/v1/newsletter/subscribe" novalidate>
+      ? `<form class="foot-form" action="${u('/newsletter/')}" method="get" data-newsletter data-endpoint="${e(api)}/v1/newsletter/subscribe" novalidate hidden>
           <label class="sr-only" for="foot-email">Email address</label>
           <input id="foot-email" type="email" name="email" required maxlength="254" placeholder="Your email address" autocomplete="email" aria-describedby="foot-note">
           <div class="hp" aria-hidden="true"><label>Leave this field empty <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
           <button class="btn btn-primary" type="submit">Subscribe ${icon('arrowRight', 16)}</button>
           <p class="foot-status" role="status"></p>
           <p class="foot-form-note" id="foot-note">One email when we publish a new article. Stop any time. See our <a href="${u('/privacy-policy/#newsletter')}">Privacy Policy</a>.</p>
-          <noscript><p class="foot-form-note">The sign-up form needs JavaScript. You can <a href="${u('/rss/')}">follow with RSS</a> instead.</p></noscript>
-        </form>`
+        </form>
+        <noscript><p class="foot-form-note foot-nojs">Email sign-up needs JavaScript. You can follow new articles with RSS instead.</p><a class="btn btn-primary btn-lg" href="${u('/rss/')}">${icon('rss', 18)} Follow with RSS</a></noscript>`
       : `<a class="btn btn-primary btn-lg" href="${u('/rss/')}">${icon('rss', 18)} Follow with RSS</a>`;
     return `<footer class="site-footer">
   <div class="foot-cta">
     <div class="wrap foot-cta-in">
       <div>
-        <h2>Learn something useful every week</h2>
+        <h2>${newsletter ? 'Get new articles by email' : 'Learn something useful every week'}</h2>
         <p>Clear, honest guides on education, money, business and technology in Tanzania. No spam, no paywall.</p>
       </div>
       <div class="foot-cta-act">${cta}</div>

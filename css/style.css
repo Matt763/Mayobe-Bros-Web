@@ -659,6 +659,8 @@ body.no-scroll { overflow: hidden; }
 .foot-status { flex-basis: 100%; font-size: 1rem; font-weight: 700; }
 /* newsletter form (js/subscribe.js): 44 px targets, a white focus ring that shows on the blue band, white status text (at least 4.5:1 on every part of the gradient) */
 .foot-form { max-width: 36rem; }
+.foot-form[hidden] { display: none; } /* shown by js/subscribe.js; without JavaScript the <noscript> RSS button stands in */
+.foot-cta .foot-nojs { margin: 0 0 0.75rem; }
 .foot-form input[type="email"] { flex: 1 1 16rem; min-height: 2.75rem; }
 .foot-form .btn { min-height: 2.75rem; }
 .foot-form input:focus-visible, .foot-form .btn:focus-visible, .foot-form a:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }

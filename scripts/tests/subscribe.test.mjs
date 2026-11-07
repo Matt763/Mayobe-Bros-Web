@@ -32,7 +32,7 @@ function setup({ fetchImpl = async () => ({ status: 200, body: { ok: true } }), 
   const website = el({ name: 'website', value: '' });
   const status = el();
   const button = el();
-  const form = el({ attrs: { 'data-newsletter': '', 'data-endpoint': ENDPOINT, ...attrs } });
+  const form = el({ hidden: true, attrs: { 'data-newsletter': '', 'data-endpoint': ENDPOINT, ...attrs } });
   form.elements = { email: input, website };
   form.reset = () => { log.push(['reset']); input.value = ''; website.value = ''; };
   form.querySelector = (s) => (s === '.foot-status' ? status : s.startsWith('button') ? button : null);
@@ -61,10 +61,18 @@ function setup({ fetchImpl = async () => ({ status: 200, body: { ok: true } }), 
 }
 const fetches = (t) => t.log.filter((l) => l[0] === 'fetch');
 
-test('nothing is fetched on load', () => {
+test('nothing is fetched on load, and the form (hidden in the HTML, so nothing is sent without JavaScript) is shown', () => {
   const t = setup();
   assert.equal(fetches(t).length, 0);
   assert.equal(typeof t.form.handlers.submit, 'function');
+  assert.equal(t.form.hidden, false);
+});
+
+test('an empty submit shows a message and sends nothing', async () => {
+  const t = setup({ email: '   ' });
+  await t.submit();
+  assert.equal(fetches(t).length, 0);
+  assert.match(shown(t.status), /Please enter an email address/);
 });
 
 test('a valid submit posts JSON {email, website:"", ts} once, disables the button while sending, shows the success text and clears the field', async () => {
@@ -78,11 +86,12 @@ test('a valid submit posts JSON {email, website:"", ts} once, disables the butto
   assert.equal(url, ENDPOINT);
   assert.equal(init.method, 'POST');
   assert.equal(init.headers['Content-Type'], 'application/json');
-  assert.deepEqual(Object.keys(body).sort(), ['email', 'ts', 'website']);
+  assert.deepEqual(Object.keys(body).sort(), ['elapsed', 'email', 'website']);
   assert.equal(body.email, 'neema@example.com');
   assert.equal(body.website, '');
-  // ruling R1: the server treats a missing or zero ts as a bot, so the page-load time must always be sent
-  assert.equal(body.ts, LOADED_AT, 'ts is the time the page loaded, in ms');
+  // the server treats a missing elapsed time (or under 2.5 s) as a bot, so the time spent on the page must always be sent;
+  // it is measured on the visitor's own clock only, so a phone clock set wrong cannot drop the sign-up
+  assert.equal(body.elapsed, 9000, 'elapsed = ms since the page loaded');
   release();
   await new Promise((r) => setTimeout(r, 20));
   assert.equal(shown(t.status), 'Almost done. If this address can get our emails, we have sent it a link to confirm. Please check your inbox and spam folder.');
@@ -96,7 +105,7 @@ test('the honeypot value is sent as it is', async () => {
   t.website.value = 'http://spam.test';
   await t.submit();
   assert.equal(fetches(t)[0][2].website, 'http://spam.test');
-  assert.equal(fetches(t)[0][2].ts, LOADED_AT);
+  assert.equal(fetches(t)[0][2].elapsed, 9000);
 });
 
 test('a bad address shows a message and fetches nothing', async () => {
@@ -140,6 +149,7 @@ test('a 400 naming the email field asks for a better address', async () => {
 test('without an endpoint the script does nothing', () => {
   const t = setup({ attrs: { 'data-endpoint': '' } });
   assert.equal(t.form.handlers.submit, undefined);
+  assert.equal(t.form.hidden, true, 'stays hidden');
 });
 
 test('the file has no "already subscribed" wording', () => {
