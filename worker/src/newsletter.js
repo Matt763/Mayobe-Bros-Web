@@ -6,10 +6,11 @@
 //   POST /v1/newsletter/unsubscribe { token }                          -> 200 { ok: true } (also when already unsubscribed) | 404; one farewell per row
 //   POST /v1/newsletter/one-click?t=  body List-Unsubscribe=One-Click  -> 200 for any token (RFC 8058, no Origin check, no farewell) | 400 for a wrong body
 //   GET  /v1/newsletter/one-click?t=                                   -> 303 to the /newsletter/ page; changes nothing (link scanners GET)
+//   runNewsletter(env, ctx, opts)  the daily Cron Trigger job: seed guard, one email per new article per subscriber, clean-up
 
-import { sendMail, validEmail } from './mail.js';
-import { confirmSubscriptionEmail, welcomeEmail, farewellEmail } from './mail-templates.js';
-import { TOKEN_RE, now, reply, fail, sha, ipHash, newToken, hit, readJson, siteOrigin, siteOf, canonicalEmail, utcDay, DAY_TTL, later } from './util.js';
+import { sendMail, validEmail, CAPS } from './mail.js';
+import { confirmSubscriptionEmail, welcomeEmail, farewellEmail, newPostEmail } from './mail-templates.js';
+import { SLUG_RE, TOKEN_RE, now, reply, fail, sha, ipHash, newToken, hit, readJson, siteOrigin, siteOf, canonicalEmail, utcDay, DAY_TTL, later } from './util.js';
 
 export const NL_UNSUB_NOT_FOUND = 'We could not find that request.';
 const ONE_CLICK_MAX = 1024;
@@ -97,7 +98,7 @@ async function unsubscribeByToken(env, given) {
   const tok = await env.DB.prepare("SELECT subscriber_id FROM newsletter_tokens WHERE hash = ? AND kind = 'unsub'").bind(givenHash).first();
   if (!tok) return null;
   const changed = await env.DB.prepare("UPDATE newsletter_subscribers SET status = 'unsubscribed', unsubscribed = ? WHERE id = ? AND status != 'unsubscribed' RETURNING id").bind(now(), tok.subscriber_id).first();
-  return { found: true, changed: !!changed, id: tok.subscriber_id };
+  return { changed: !!changed, id: tok.subscriber_id };
 }
 
 // At most one farewell per row: the flag is taken before the mail is sent, so a failed send is never retried.
@@ -108,6 +109,9 @@ async function sendFarewell(env, ctx, id) {
   await sendMail(env, ctx, { kind: 'news', to: claimed.email, ...m, key: `nl-bye-${id}` });
 }
 
+// Only the button route is limited per IP. The one-click POST is not: it comes from mail providers (Gmail, Yahoo, Outlook) whose
+// few shared IPs act for millions of readers, so a per-IP limit would answer 429 and the unsubscribe would fail. The token is the
+// secret (24 random bytes, only its hash stored), so guessing is pointless, and each call costs one hash and one indexed lookup.
 const unsubLimit = async (request, env, ctx) => hit(env, ctx, `nlu:${await ipHash(request, env)}:${Math.floor(now() / 3600000)}`, 30, 3700);
 
 export async function newsletterRoute(request, env, ctx, path, cors) {
@@ -119,7 +123,6 @@ export async function newsletterRoute(request, env, ctx, path, cors) {
   if (request.method !== 'POST') return null;
 
   if (path === '/v1/newsletter/one-click') {
-    if (!(await unsubLimit(request, env, ctx))) return fail('Too many requests. Please try again later.', 429, cors);
     const declared = Number(request.headers.get('content-length'));
     if (Number.isFinite(declared) && declared > ONE_CLICK_MAX) return fail('Bad request.', 400, cors);
     const raw = await request.text().catch(() => null);
@@ -168,4 +171,162 @@ export async function newsletterRoute(request, env, ctx, path, cors) {
   }
 
   return null;
+}
+
+/* ------------------------------------------------------------------ the daily sender (Cron Trigger) */
+const D = 86400000;
+const FRESH_DAYS = 7; // an unknown post dated earlier than this is recorded, never emailed (renamed slug, a list that was down for a while)
+const PAGE = 10;
+const GAP_MS = 200; // 5 sends a second, under Resend's limit
+const PENDING_DAYS = 7;
+const GONE_DAYS = 30;
+const DELIVERY_DAYS = 30;
+const dayStr = (ms) => new Date(ms).toISOString().slice(0, 10);
+const POST_PATH_RE = /^\/post\/[a-z0-9/-]*$/; // the same rule as postMeta in index.js
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// The site's own list of published posts, cleaned: null when it cannot be read or has no usable entry.
+async function publishedPosts(env, today) {
+  try {
+    const r = await fetch(`${siteOrigin(env)}/data/search.json`, { cf: { cacheTtl: 300, cacheEverything: true } });
+    if (!r.ok) return null;
+    const list = await r.json();
+    if (!Array.isArray(list)) return null;
+    const seen = new Set();
+    const out = list.filter((p) => p && typeof p.s === 'string' && p.s.length <= 140 && SLUG_RE.test(p.s)
+      && typeof p.u === 'string' && p.u.length <= 300 && POST_PATH_RE.test(p.u) && !p.u.includes('//')
+      && typeof p.d === 'string' && DATE_RE.test(p.d) && p.d <= today
+      && !seen.has(p.s) && seen.add(p.s));
+    out.sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : a.s < b.s ? -1 : 1)); // oldest first
+    return out.length ? out : null;
+  } catch {
+    return null;
+  }
+}
+
+const str = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
+function postMail(env, p, unsubscribeUrl) {
+  const origin = siteOrigin(env);
+  const title = str(p.t, 200);
+  return newPostEmail({
+    post: { title, url: `${origin}${p.u}`, excerpt: str(p.e, 400), category: str(p.c, 40), image: `${origin}/assets/share/post-${p.s}.jpg`, imageAlt: `Cover picture for: ${title}` },
+    unsubscribeUrl,
+  }, siteOf(env));
+}
+
+// Deletes what is no longer needed; returns the number of rows removed.
+async function cleanUp(env, t) {
+  const n = async (sql, ...a) => (await env.DB.prepare(sql).bind(...a).run())?.meta?.changes || 0;
+  // pending rows older than 7 days with no live confirm token (a row revived by a new sign-up keeps its old `created` but has a fresh token)
+  const stalePending = "SELECT id FROM newsletter_subscribers s WHERE s.status = 'pending' AND s.created < ? AND NOT EXISTS (SELECT 1 FROM newsletter_tokens k WHERE k.subscriber_id = s.id AND k.kind = 'confirm' AND k.expires > ?)";
+  const gone = "SELECT id FROM newsletter_subscribers WHERE status = 'unsubscribed' AND unsubscribed < ?";
+  const pc = t - PENDING_DAYS * D;
+  const gc = t - GONE_DAYS * D;
+  let purged = 0;
+  purged += await n(`DELETE FROM newsletter_tokens WHERE subscriber_id IN (${stalePending})`, pc, t);
+  purged += await n(`DELETE FROM newsletter_subscribers WHERE id IN (${stalePending})`, pc, t);
+  purged += await n("DELETE FROM newsletter_tokens WHERE kind = 'confirm' AND expires < ?", t);
+  purged += await n(`DELETE FROM newsletter_tokens WHERE subscriber_id IN (${gone})`, gc);
+  purged += await n(`DELETE FROM newsletter_deliveries WHERE subscriber_id IN (${gone})`, gc);
+  purged += await n(`DELETE FROM newsletter_subscribers WHERE id IN (${gone})`, gc);
+  purged += await n('DELETE FROM newsletter_deliveries WHERE slug IN (SELECT slug FROM newsletter_sent WHERE sent_at IS NOT NULL AND sent_at < ?)', t - DELIVERY_DAYS * D);
+  return purged;
+}
+
+// The daily job. Seeds on the first run (nothing old is ever mass-mailed), records old unknown posts without sending, then sends each
+// new post once per subscriber: every send is claimed in newsletter_deliveries first, so an overlapping run or a crash never sends twice.
+// mode 'dry' writes nothing and sends nothing; 'seed' records posts and cleans up but sends nothing. Never throws.
+export async function runNewsletter(env, ctx, opts = {}) {
+  const report = { paused: env.NEWSLETTER_SEND !== 'true', seeded: [], tooOld: [], posts: [], stopped: null, purged: 0 };
+  const mode = opts.mode === 'dry' || opts.mode === 'seed' ? opts.mode : 'send';
+  const dry = mode === 'dry';
+  const sleep = opts.sleep || ((ms) => new Promise((r) => setTimeout(r, ms)));
+  try {
+    const t = Number.isFinite(opts.now) ? opts.now : now();
+    const list = await publishedPosts(env, dayStr(t));
+    if (!list) {
+      report.stopped = 'no-list';
+      console.error('newsletter: the post list could not be read or had no valid entry; nothing recorded or sent');
+    } else {
+      await sendRun(env, ctx, report, list, { t, dry, mode, sleep });
+    }
+    if (!dry) report.purged = await cleanUp(env, t);
+  } catch (err) {
+    console.error('newsletter run failed', err && err.message ? err.message : err);
+  }
+  console.log(`newsletter: ${JSON.stringify({ mode, ...report, seeded: report.seeded.length })}`);
+  return report;
+}
+
+async function sendRun(env, ctx, report, list, { t, dry, mode, sleep }) {
+  const DB = env.DB;
+  // (2) first run ever: record every listed post as already handled, send nothing
+  const any = await DB.prepare('SELECT 1 AS x FROM newsletter_sent LIMIT 1').first();
+  if (!any) {
+    report.seeded = list.map((p) => p.s);
+    if (!dry) await DB.batch(list.map((p) => DB.prepare('INSERT OR IGNORE INTO newsletter_sent(slug, title, queued_at, sent_at, seeded) VALUES(?, ?, ?, ?, 1)').bind(p.s, str(p.t, 200), t, t)));
+    return;
+  }
+  const known = new Map((await DB.prepare('SELECT slug, queued_at, sent_at, seeded FROM newsletter_sent').all()).results.map((r) => [r.slug, r]));
+  const freshFrom = dayStr(t - FRESH_DAYS * D);
+  const unknown = list.filter((p) => !known.has(p.s));
+  // (3) an unknown post older than 7 days (a renamed slug, or a list that was down) is recorded and never emailed
+  const old = unknown.filter((p) => p.d < freshFrom);
+  report.tooOld = old.map((p) => p.s);
+  if (old.length && !dry) await DB.batch(old.map((p) => DB.prepare('INSERT OR IGNORE INTO newsletter_sent(slug, title, queued_at, sent_at, seeded) VALUES(?, ?, ?, ?, 1)').bind(p.s, str(p.t, 200), t, t)));
+  // (4)
+  if (mode === 'seed') return;
+  if (report.paused && !dry) return;
+  if (!apiOrigin(env)) { report.stopped = 'no-api-origin'; console.error('newsletter: API_ORIGIN is missing or not https; nothing sent'); return; }
+  if (!env.RESEND_API_KEY && !dry) { report.stopped = 'no-key'; console.error('newsletter: RESEND_API_KEY is not set; nothing sent'); return; }
+  // (5) queue new posts, oldest first
+  const fresh = unknown.filter((p) => p.d >= freshFrom);
+  if (fresh.length && !dry) await DB.batch(fresh.map((p) => DB.prepare('INSERT OR IGNORE INTO newsletter_sent(slug, title, queued_at, sent_at, seeded) VALUES(?, ?, ?, NULL, 0)').bind(p.s, str(p.t, 200), t)));
+  const bySlug = new Map(list.map((p) => [p.s, p]));
+  const queue = dry
+    ? [...[...known.values()].filter((r) => r.sent_at === null && !r.seeded), ...fresh.map((p) => ({ slug: p.s, queued_at: t }))]
+    : (await DB.prepare('SELECT slug, queued_at FROM newsletter_sent WHERE sent_at IS NULL AND seeded = 0').all()).results;
+  const todo = queue.filter((r) => bySlug.has(r.slug)).sort((a, b) => {
+    const x = bySlug.get(a.slug), y = bySlug.get(b.slug);
+    return x.d < y.d ? -1 : x.d > y.d ? 1 : a.slug < b.slug ? -1 : 1;
+  });
+  // A queued post that has left the list (unpublished) is not sent; after 7 days it is closed so it cannot come back to life.
+  if (!dry) for (const r of queue) if (!bySlug.has(r.slug) && r.queued_at < t - FRESH_DAYS * D) await DB.prepare('UPDATE newsletter_sent SET sent_at = ? WHERE slug = ? AND sent_at IS NULL').bind(t, r.slug).run();
+
+  const eligible = "FROM newsletter_subscribers s WHERE s.status = 'active' AND s.confirmed <= ? AND NOT EXISTS (SELECT 1 FROM newsletter_deliveries d WHERE d.slug = ? AND d.subscriber_id = s.id)";
+  let calls = 0; // Resend calls in this run: at most CAPS.news, whatever happens to the budget (a 429 or 5xx gives its unit back)
+  for (const row of todo) {
+    const p = bySlug.get(row.slug);
+    const stat = { slug: p.s, recipients: (await DB.prepare(`SELECT COUNT(*) AS n ${eligible}`).bind(row.queued_at, p.s).first())?.n || 0, sent: 0, skipped: 0, failed: 0 };
+    report.posts.push(stat);
+    if (dry) continue;
+    let after = 0;
+    for (;;) {
+      const page = (await DB.prepare(`SELECT s.id, s.email ${eligible} AND s.id > ? ORDER BY s.id LIMIT ${PAGE}`).bind(row.queued_at, p.s, after).all()).results;
+      if (!page.length) break;
+      for (const s of page) {
+        after = s.id;
+        if (calls >= CAPS.news) { report.stopped = 'budget'; return; }
+        if (calls > 0) await sleep(GAP_MS);
+        // the claim re-checks the subscriber, so someone who left since the page was read gets nothing
+        const claimed = await DB.prepare("INSERT OR IGNORE INTO newsletter_deliveries(slug, subscriber_id, status, at) SELECT ?, id, 'claimed', ? FROM newsletter_subscribers WHERE id = ? AND status = 'active' RETURNING subscriber_id")
+          .bind(p.s, now(), s.id).first();
+        if (!claimed) continue;
+        const kit = await unsubscribeKit(env, s.id);
+        const m = postMail(env, p, kit.pageUrl);
+        const res = await sendMail(env, ctx, { kind: 'news', to: s.email, ...m, headers: kit.headers, key: `nl-post-${p.s}-${s.id}` });
+        const mark = (status) => DB.prepare('UPDATE newsletter_deliveries SET status = ?, at = ? WHERE slug = ? AND subscriber_id = ?').bind(status, now(), p.s, s.id).run();
+        const release = () => DB.prepare("DELETE FROM newsletter_deliveries WHERE slug = ? AND subscriber_id = ? AND status = 'claimed'").bind(p.s, s.id).run();
+        if (res.ok) { calls++; stat.sent++; await mark('sent'); continue; }
+        if (res.skipped === 'suppressed' || res.skipped === 'bad-address') { stat.skipped++; await mark('skipped'); continue; }
+        if (res.skipped === 'budget') { await release(); report.stopped = 'budget'; return; }
+        if (res.skipped) { await release(); report.stopped = 'no-key'; return; } // no key: nothing reached Resend
+        calls++;
+        if (res.status === 429) { await release(); report.stopped = 'rate'; return; }
+        stat.failed++; await mark('failed'); // 5xx, thrown, timed out: Resend may have taken it, so never retried
+      }
+    }
+    // (7) nobody left for this post
+    await DB.prepare('UPDATE newsletter_sent SET sent_at = ? WHERE slug = ? AND sent_at IS NULL').bind(now(), p.s).run();
+  }
 }

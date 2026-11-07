@@ -1,10 +1,10 @@
 // Newsletter Worker routes (subscribe, confirm) against the SQLite-backed D1 shim.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
 import worker from '../../worker/src/index.js';
-import { createHmac } from 'node:crypto';
-import { unsubscribeKit } from '../../worker/src/newsletter.js';
+import { unsubscribeKit, runNewsletter } from '../../worker/src/newsletter.js';
+import { takeBudget } from '../../worker/src/mail.js';
 import { makeD1 } from '../lib/d1-shim.mjs';
 
 const ORIGIN = 'https://mayobebros.com';
@@ -20,11 +20,19 @@ let env;
 let sent = [];
 let resendMode = 'ok';
 let pendingMail = [];
+let searchList = FIXTURE; // what /data/search.json answers
+let searchMode = 'ok'; // 'ok' | 'fail' (HTTP 500) | 'throw'
+let resendFn = null; // optional (callNumber, body) => Response, or throws; replaces the default 200
 test.before(() => {
   globalThis.fetch = async (u, init) => {
-    if (String(u).endsWith('/data/search.json')) return new Response(JSON.stringify(FIXTURE), { status: 200 });
+    if (String(u).endsWith('/data/search.json')) {
+      if (searchMode === 'throw') throw new Error('site down');
+      if (searchMode === 'fail') return new Response('oops', { status: 500 });
+      return new Response(JSON.stringify(searchList), { status: 200 });
+    }
     if (String(u) === 'https://api.resend.com/emails') {
       sent.push({ body: JSON.parse(init.body), headers: init.headers });
+      if (resendFn) return resendFn(sent.length, JSON.parse(init.body));
       if (resendMode === 'throw') throw new Error('network down');
       return new Response(JSON.stringify({ id: `msg_${sent.length}` }), { status: 200 });
     }
@@ -34,7 +42,7 @@ test.before(() => {
 test.after(() => { globalThis.fetch = realFetch; });
 const flushMail = async () => { while (pendingMail.length) await Promise.all(pendingMail.splice(0)); };
 test.afterEach(flushMail);
-test.beforeEach(() => { sent = []; resendMode = 'ok'; pendingMail = []; env = { DB: makeD1(), SITE_ORIGIN: ORIGIN, RESEND_API_KEY: 're_test_key', API_ORIGIN: 'https://worker.test' }; });
+test.beforeEach(() => { sent = []; resendMode = 'ok'; pendingMail = []; searchList = FIXTURE; searchMode = 'ok'; resendFn = null; env = { DB: makeD1(), SITE_ORIGIN: ORIGIN, RESEND_API_KEY: 're_test_key', API_ORIGIN: 'https://worker.test' }; });
 
 async function call(path, { body, origin = ORIGIN, ip = '1.1.1.1' } = {}) {
   const headers = { 'CF-Connecting-IP': ip, 'Content-Type': 'application/json' };
@@ -340,11 +348,25 @@ test('a bounce suppresses but does not touch the subscriber row', async () => {
   assert.equal(statusOf().status, 'active');
 });
 
-test('the 31st unsubscribe call in an hour from one IP is 429', async () => {
-  for (let i = 0; i < 30; i++) assert.equal((i % 2 ? await oneClick('A'.repeat(32), { ip: '8.0.0.1' }) : await call('/v1/newsletter/unsubscribe', { body: { token: 'A'.repeat(32) }, ip: '8.0.0.1' })).status, i % 2 ? 200 : 404);
+test('the 31st unsubscribe button call in an hour from one IP is 429', async () => {
+  for (let i = 0; i < 30; i++) assert.equal((await call('/v1/newsletter/unsubscribe', { body: { token: 'A'.repeat(32) }, ip: '8.0.0.1' })).status, 404);
   assert.equal((await call('/v1/newsletter/unsubscribe', { body: { token: 'A'.repeat(32) }, ip: '8.0.0.1' })).status, 429);
-  assert.equal((await oneClick('A'.repeat(32), { ip: '8.0.0.1' })).status, 429);
   assert.equal((await call('/v1/newsletter/unsubscribe', { body: { token: 'A'.repeat(32) }, ip: '8.0.0.2' })).status, 404);
+});
+
+test('one-click POST is not limited per IP (mail providers share addresses): the 41st from one IP still unsubscribes', async () => {
+  const u = await active();
+  for (let i = 0; i < 40; i++) assert.equal((await oneClick('A'.repeat(32), { ip: '8.0.0.9' })).status, 200);
+  assert.deepEqual(await oneClick(u, { ip: '8.0.0.9' }), { status: 200, location: null, json: { ok: true } });
+  assert.equal(statusOf().status, 'unsubscribed');
+});
+
+test('a complaint for an owner address leaves the owner subscriber row untouched', async () => {
+  env.OWNER_EMAIL = 'info@mayobebros.com';
+  env.DB.raw.prepare("INSERT INTO newsletter_subscribers(email, email_key, status, created, confirmed) VALUES('info@mayobebros.com', 'info@mayobebros.com', 'active', 1, 2)").run();
+  assert.equal(await complaint(['info@mayobebros.com', 'INFO@mayobebros.com']), 200);
+  assert.deepEqual({ ...rows('SELECT status, unsubscribed, confirmed FROM newsletter_subscribers')[0] }, { status: 'active', unsubscribed: null, confirmed: 2 });
+  assert.equal(rows('SELECT 1 FROM suppressed').length, 0);
 });
 
 test('farewell still not resent after Resend fails the first time', async () => {
@@ -356,4 +378,339 @@ test('farewell still not resent after Resend fails the first time', async () => 
   resendMode = 'ok';
   await call('/v1/newsletter/unsubscribe', { body: { token: u } });
   assert.equal(farewells().length, 1, 'at most once');
+});
+
+// ---- Task 3: the daily sender ----
+const dayOf = (offsetDays) => new Date(Date.now() + offsetDays * 86400000).toISOString().slice(0, 10);
+const entry = (s, d, over = {}) => ({ s, t: `Title ${s}`, u: `/post/educational/${s}/`, e: `Excerpt for ${s}`, c: 'Educational', d, i: `/assets/posts/${s}.webp`, ...over });
+const OLD_LIST = [entry('first-post', dayOf(-40)), entry('second-post', dayOf(-3))];
+let sleeps = [];
+let sleepHook = null;
+const recSleep = async (ms) => { sleeps.push(ms); if (sleepHook) await sleepHook(sleeps.length); };
+const cronCtx = () => ({ waitUntil: (p) => { pendingMail.push(p); } });
+async function run(opts = {}) {
+  const r = await runNewsletter(env, cronCtx(), { sleep: recSleep, ...opts });
+  await flushMail();
+  return r;
+}
+function addSub(email, { status = 'active', confirmed = Date.now() - 86400000, created = Date.now() - 2 * 86400000, unsubscribed = null } = {}) {
+  return Number(env.DB.raw.prepare('INSERT INTO newsletter_subscribers(email, email_key, status, created, confirmed, unsubscribed) VALUES(?, ?, ?, ?, ?, ?)')
+    .run(email, email, status, created, status === 'pending' ? null : confirmed, unsubscribed).lastInsertRowid);
+}
+const postMails = () => sent.filter((m) => m.body.subject.startsWith('New article:'));
+const to = (m) => m.body.to[0];
+async function seeded(list = OLD_LIST) {
+  searchList = list;
+  const r = await run();
+  assert.equal(sent.length, 0);
+  return r;
+}
+const count = (t) => rows(`SELECT COUNT(*) AS n FROM ${t}`)[0].n;
+function sendOn() { env.NEWSLETTER_SEND = 'true'; sleeps = []; sleepHook = null; }
+
+test('the first run with an empty newsletter_sent seeds every listed post and sends nothing, even when paused', async () => {
+  for (const flag of ['false', 'true', undefined]) {
+    env = { DB: makeD1(), SITE_ORIGIN: ORIGIN, RESEND_API_KEY: 're_test_key', API_ORIGIN: 'https://worker.test', NEWSLETTER_SEND: flag };
+    sent = [];
+    addSub('a@example.com');
+    searchList = [...OLD_LIST, entry('today-post', dayOf(0))];
+    const r = await run();
+    assert.deepEqual([...r.seeded].sort(), ['first-post', 'second-post', 'today-post'], String(flag));
+    assert.equal(sent.length, 0);
+    const s = rows('SELECT * FROM newsletter_sent');
+    assert.equal(s.length, 3);
+    for (const x of s) { assert.equal(x.seeded, 1); assert.ok(x.sent_at > 0); }
+    assert.equal(count('newsletter_deliveries'), 0);
+    const again = await run(); // the next day: nothing is new
+    assert.deepEqual(again.seeded, []);
+    assert.equal(sent.length, 0);
+  }
+});
+
+test('no seed and no write when search.json fails, is not an array or has no valid entry; the next good run seeds', async () => {
+  sendOn();
+  addSub('a@example.com');
+  const cases = [
+    ['fail', OLD_LIST], ['throw', OLD_LIST], ['ok', { posts: OLD_LIST }], ['ok', []], ['ok', null],
+    ['ok', [entry('Bad Slug', dayOf(-2)), entry('evil', dayOf(-2), { u: 'https://evil.example/x' }), entry('dbl', dayOf(-2), { u: '/post//x/' }), entry('later', dayOf(2)), entry('nodate', '2026-1-1'), null, 7]],
+  ];
+  for (const [mode, list] of cases) {
+    searchMode = mode; searchList = list;
+    const r = await run();
+    assert.equal(r.stopped, 'no-list', `${mode} ${JSON.stringify(list)?.slice(0, 40)}`);
+    assert.equal(count('newsletter_sent'), 0);
+    assert.equal(count('newsletter_deliveries'), 0);
+    assert.equal(sent.length, 0);
+  }
+  searchMode = 'ok'; searchList = OLD_LIST;
+  const r = await run();
+  assert.equal(r.stopped, null);
+  assert.deepEqual([...r.seeded].sort(), ['first-post', 'second-post']);
+  assert.equal(sent.length, 0);
+});
+
+test('after the seed, a new post goes once to each active subscriber confirmed before it was queued', async () => {
+  await seeded();
+  sendOn();
+  const a = addSub('a@example.com');
+  addSub('pending@example.com', { status: 'pending' });
+  addSub('gone@example.com', { status: 'unsubscribed', unsubscribed: Date.now() - 1000 });
+  addSub('late@example.com', { confirmed: Date.now() + 3600000 }); // confirmed after the post was queued
+  searchList = [...OLD_LIST, entry('fresh-post', dayOf(0))];
+  const r = await run();
+  assert.equal(r.stopped, null);
+  assert.deepEqual(postMails().map(to), ['a@example.com']);
+  assert.deepEqual(r.posts, [{ slug: 'fresh-post', recipients: 1, sent: 1, skipped: 0, failed: 0 }]);
+  const row = rows("SELECT * FROM newsletter_sent WHERE slug = 'fresh-post'")[0];
+  assert.equal(row.seeded, 0);
+  assert.ok(row.sent_at >= row.queued_at);
+  assert.deepEqual(rows('SELECT subscriber_id, status FROM newsletter_deliveries').map((x) => ({ ...x })), [{ subscriber_id: a, status: 'sent' }]);
+  await run();
+  assert.equal(postMails().length, 1, 'a second run sends nothing');
+});
+
+test('each post email has the unsubscribe headers, a visible /newsletter/#u= link in html and text, Idempotency-Key nl-post-<slug>-<id>, and the share-card JPEG', async () => {
+  await seeded();
+  sendOn();
+  const id = addSub('reader@example.com');
+  searchList = [...OLD_LIST, entry('fresh-post', dayOf(0), { t: 'Fresh & New', e: 'What the reader learns.' })];
+  await run();
+  assert.equal(sent.length, 1);
+  const m = sent[0];
+  assert.equal(m.headers['Idempotency-Key'], `nl-post-fresh-post-${id}`);
+  assert.equal(m.body.subject, 'New article: Fresh & New');
+  assert.deepEqual(m.body.to, ['reader@example.com']);
+  const u = tokenFrom(m, 'newsletter/#u=');
+  assert.match(u, /^[A-Za-z0-9_-]{32,64}$/);
+  assert.ok(m.body.text.includes(`https://mayobebros.com/newsletter/#u=${u}`));
+  assert.equal(m.body.headers['List-Unsubscribe'], `<https://worker.test/v1/newsletter/one-click?t=${u}>`);
+  assert.equal(m.body.headers['List-Unsubscribe-Post'], 'List-Unsubscribe=One-Click');
+  assert.equal(rows('SELECT subscriber_id, kind FROM newsletter_tokens WHERE hash = ?', sha(u))[0].subscriber_id, id);
+  assert.ok(m.body.html.includes('src="https://mayobebros.com/assets/share/post-fresh-post.jpg"'));
+  assert.equal(m.body.html.includes('.webp'), false, 'never the WebP cover');
+  assert.ok(m.body.html.includes('alt="Cover picture for: Fresh &amp; New"'));
+  assert.ok(m.body.html.includes('https://mayobebros.com/post/educational/fresh-post/'));
+  assert.ok(m.body.html.includes('What the reader learns.'));
+});
+
+test('a post dated tomorrow is ignored; an unknown post dated 8 days ago (a renamed slug) is recorded as seeded and never emailed', async () => {
+  await seeded();
+  sendOn();
+  addSub('a@example.com');
+  searchList = [...OLD_LIST, entry('tomorrow-post', dayOf(1)), entry('renamed-post', dayOf(-8)), entry('week-post', dayOf(-6))];
+  const r = await run();
+  assert.deepEqual(r.tooOld, ['renamed-post']);
+  assert.equal(rows("SELECT seeded FROM newsletter_sent WHERE slug = 'renamed-post'")[0].seeded, 1);
+  assert.equal(rows("SELECT 1 FROM newsletter_sent WHERE slug = 'tomorrow-post'").length, 0);
+  assert.deepEqual(postMails().map((m) => m.body.subject), ['New article: Title week-post'], 'only the post from within the last 7 days');
+  await run();
+  assert.equal(postMails().length, 1);
+});
+
+test('40 subscribers: today sends what is left of the 35 news units and stops with budget; the next UTC day sends the rest exactly once', async () => {
+  await seeded();
+  sendOn();
+  env.MAIL_TEST_DAY = '2030-01-01';
+  for (let i = 1; i <= 40; i++) addSub(`s${i}@example.com`);
+  for (let i = 0; i < 3; i++) assert.equal(await takeBudget(env, 'news'), true);
+  searchList = [...OLD_LIST, entry('fresh-post', dayOf(0))];
+  const r1 = await run();
+  assert.equal(r1.stopped, 'budget');
+  assert.equal(postMails().length, 32);
+  assert.equal(rows("SELECT sent_at FROM newsletter_sent WHERE slug = 'fresh-post'")[0].sent_at, null, 'not finished yet');
+  assert.equal(rows("SELECT 1 FROM newsletter_deliveries WHERE status = 'claimed'").length, 0, 'the claim of the refused send was released');
+  const again = await run(); // the same day: nothing left in the slice
+  assert.equal(again.stopped, 'budget');
+  assert.equal(postMails().length, 32);
+  env.MAIL_TEST_DAY = '2030-01-02';
+  const r2 = await run();
+  assert.equal(r2.stopped, null);
+  assert.equal(postMails().length, 40);
+  assert.equal(new Set(postMails().map(to)).size, 40, 'each subscriber once');
+  assert.ok(rows("SELECT sent_at FROM newsletter_sent WHERE slug = 'fresh-post'")[0].sent_at > 0);
+});
+
+test('two runs started together send each (post, subscriber) once', async () => {
+  await seeded();
+  sendOn();
+  for (let i = 1; i <= 12; i++) addSub(`t${i}@example.com`);
+  searchList = [...OLD_LIST, entry('fresh-post', dayOf(0)), entry('other-post', dayOf(-1))];
+  await Promise.all([run(), run(), run()]);
+  assert.equal(postMails().length, 24);
+  assert.equal(new Set(postMails().map((m) => m.headers['Idempotency-Key'])).size, 24);
+  assert.equal(rows("SELECT COUNT(*) AS n FROM newsletter_deliveries WHERE status = 'sent'")[0].n, 24);
+});
+
+test('a left-over claimed row (crash after send) is not resent; 429 releases the claim and stops; 500 and a thrown fetch mark failed and are not retried', async () => {
+  await seeded();
+  sendOn();
+  const ids = [1, 2, 3, 4].map((i) => addSub(`c${i}@example.com`));
+  searchList = [...OLD_LIST, entry('fresh-post', dayOf(0))];
+  // a run that crashed after Resend took the message for c1: the post is queued and c1's claim is left behind
+  env.DB.raw.prepare("INSERT INTO newsletter_sent(slug, title, queued_at, sent_at, seeded) VALUES('fresh-post', 'x', ?, NULL, 0)").run(Date.now());
+  env.DB.raw.prepare("INSERT INTO newsletter_deliveries(slug, subscriber_id, status, at) VALUES('fresh-post', ?, 'claimed', 1)").run(ids[0]);
+  resendFn = () => new Response('{"message":"slow down"}', { status: 429 });
+  const r1 = await run();
+  assert.equal(r1.stopped, 'rate');
+  assert.deepEqual(sent.map(to), ['c2@example.com']);
+  assert.equal(rows('SELECT 1 FROM newsletter_deliveries WHERE subscriber_id = ?', ids[1]).length, 0, '429 released the claim');
+  sent = [];
+  resendFn = (n) => { if (n === 1) return new Response('{}', { status: 500 }); if (n === 2) throw new Error('timeout'); return new Response('{"id":"m"}', { status: 200 }); };
+  const r2 = await run();
+  assert.equal(r2.stopped, null);
+  assert.deepEqual(sent.map(to), ['c2@example.com', 'c3@example.com', 'c4@example.com']);
+  assert.deepEqual(r2.posts, [{ slug: 'fresh-post', recipients: 3, sent: 1, skipped: 0, failed: 2 }]);
+  const st = Object.fromEntries(rows('SELECT subscriber_id, status FROM newsletter_deliveries').map((x) => [x.subscriber_id, x.status]));
+  assert.deepEqual(st, { [ids[0]]: 'claimed', [ids[1]]: 'failed', [ids[2]]: 'failed', [ids[3]]: 'sent' });
+  sent = [];
+  await run();
+  assert.equal(sent.length, 0, 'failed sends are never retried and c1 is never resent');
+});
+
+test('a suppressed subscriber is marked skipped and not tried again', async () => {
+  await seeded();
+  sendOn();
+  const id = addSub('blocked@example.com');
+  addSub('ok@example.com');
+  env.DB.raw.exec("INSERT INTO suppressed(email, reason, created) VALUES('blocked@example.com', 'bounce', 1)");
+  searchList = [...OLD_LIST, entry('fresh-post', dayOf(0))];
+  const r = await run();
+  assert.deepEqual(postMails().map(to), ['ok@example.com']);
+  assert.equal(r.posts[0].skipped, 1);
+  assert.equal(rows('SELECT status FROM newsletter_deliveries WHERE subscriber_id = ?', id)[0].status, 'skipped');
+  await run();
+  assert.equal(sent.length, 1);
+});
+
+test('a subscriber unsubscribed between pages gets nothing', async () => {
+  await seeded();
+  sendOn();
+  const ids = [];
+  for (let i = 1; i <= 15; i++) ids.push(addSub(`u${i}@example.com`));
+  searchList = [...OLD_LIST, entry('fresh-post', dayOf(0))];
+  sleepHook = (n) => {
+    if (n === 2) env.DB.raw.prepare("UPDATE newsletter_subscribers SET status = 'unsubscribed', unsubscribed = ? WHERE id = ?").run(Date.now(), ids[4]); // same page, not yet sent
+    if (n === 9) env.DB.raw.prepare("UPDATE newsletter_subscribers SET status = 'unsubscribed', unsubscribed = ? WHERE id = ?").run(Date.now(), ids[12]); // on the second page, read after this
+  };
+  await run();
+  const got = postMails().map(to);
+  assert.equal(got.length, 13);
+  assert.equal(got.includes('u5@example.com'), false);
+  assert.equal(got.includes('u13@example.com'), false);
+  assert.equal(rows('SELECT 1 FROM newsletter_deliveries WHERE subscriber_id IN (?, ?)', ids[4], ids[12]).length, 0);
+});
+
+test('NEWSLETTER_SEND missing or "false": no post emails and no queued rows; API_ORIGIN missing or http://example.com: no sends, stopped no-api-origin', async () => {
+  await seeded();
+  addSub('a@example.com');
+  searchList = [...OLD_LIST, entry('fresh-post', dayOf(0))];
+  for (const flag of [undefined, 'false', 'TRUE', '1']) {
+    env.NEWSLETTER_SEND = flag;
+    const r = await run();
+    assert.equal(r.paused, true, String(flag));
+    assert.equal(sent.length, 0);
+    assert.equal(rows("SELECT 1 FROM newsletter_sent WHERE slug = 'fresh-post'").length, 0);
+  }
+  env.NEWSLETTER_SEND = 'true';
+  for (const api of [undefined, '', 'http://example.com', 'https://', 'ftp://x.test']) {
+    env.API_ORIGIN = api;
+    const r = await run();
+    assert.equal(r.paused, false);
+    assert.equal(r.stopped, 'no-api-origin', String(api));
+    assert.equal(sent.length, 0);
+    assert.equal(rows("SELECT 1 FROM newsletter_sent WHERE slug = 'fresh-post'").length, 0);
+  }
+  env.API_ORIGIN = 'https://worker.test';
+  const r = await run({ mode: 'seed' });
+  assert.equal(sent.length, 0, 'seed mode never sends');
+  assert.equal(r.stopped, null);
+  await run();
+  assert.equal(postMails().length, 1);
+});
+
+test('sleep(200) is awaited between sends and a run makes at most 35 Resend calls', async () => {
+  await seeded();
+  sendOn();
+  for (let i = 1; i <= 50; i++) addSub(`z${i}@example.com`);
+  searchList = [...OLD_LIST, entry('fresh-post', dayOf(0))];
+  let inSleep = false;
+  let overlap = 0;
+  sleepHook = async () => { inSleep = true; await new Promise((r) => setTimeout(r, 3)); inSleep = false; };
+  resendFn = () => { if (inSleep) overlap++; return new Response('{}', { status: 500 }); }; // 500 gives the budget unit back, so only the call cap stops it
+  const r = await run();
+  assert.equal(sent.length, 35);
+  assert.equal(r.stopped, 'budget');
+  assert.equal(overlap, 0, 'no send while a sleep is still running');
+  assert.deepEqual(sleeps, Array(34).fill(200));
+});
+
+test('clean-up removes old pending, expired confirm tokens and month-old unsubscribed rows with their tokens and deliveries', async () => {
+  await seeded();
+  const D = 86400000;
+  const t = Date.now();
+  const tok = (sid, kind, expires) => env.DB.raw.prepare('INSERT INTO newsletter_tokens(hash, subscriber_id, kind, expires, created) VALUES(?, ?, ?, ?, ?)').run(`h${Math.random()}`, sid, kind, expires, t - 8 * D);
+  const del = (slug, sid) => env.DB.raw.prepare("INSERT INTO newsletter_deliveries(slug, subscriber_id, status, at) VALUES(?, ?, 'sent', 1)").run(slug, sid);
+  const oldPending = addSub('oldpending@example.com', { status: 'pending', created: t - 8 * D });
+  tok(oldPending, 'confirm', t - D);
+  const revived = addSub('revived@example.com', { status: 'pending', created: t - 60 * D }); // signed up again today: a live confirm token
+  tok(revived, 'confirm', t + 6 * D);
+  const newPending = addSub('newpending@example.com', { status: 'pending', created: t - D });
+  tok(newPending, 'confirm', t - 1000); // expired token on a recent row: only the token goes
+  const oldGone = addSub('oldgone@example.com', { status: 'unsubscribed', unsubscribed: t - 31 * D });
+  tok(oldGone, 'unsub', null);
+  del('first-post', oldGone);
+  const recentGone = addSub('recentgone@example.com', { status: 'unsubscribed', unsubscribed: t - 10 * D });
+  tok(recentGone, 'unsub', null);
+  const keeper = addSub('keeper@example.com');
+  tok(keeper, 'unsub', null);
+  env.DB.raw.prepare("INSERT INTO newsletter_sent(slug, title, queued_at, sent_at, seeded) VALUES('done-long-ago', 'x', ?, ?, 0), ('done-lately', 'y', ?, ?, 0)").run(t - 40 * D, t - 31 * D, t - 6 * D, t - 5 * D);
+  del('done-long-ago', keeper);
+  del('done-lately', keeper);
+  const r = await run(); // paused: clean-up still runs
+  assert.equal(r.paused, true);
+  const left = rows('SELECT email FROM newsletter_subscribers ORDER BY id').map((x) => x.email);
+  assert.deepEqual(left, ['revived@example.com', 'newpending@example.com', 'recentgone@example.com', 'keeper@example.com']);
+  assert.equal(rows('SELECT 1 FROM newsletter_tokens WHERE subscriber_id IN (?, ?, ?)', oldPending, newPending, oldGone).length, 0);
+  assert.equal(rows('SELECT 1 FROM newsletter_tokens WHERE subscriber_id IN (?, ?, ?)', revived, recentGone, keeper).length, 3);
+  assert.deepEqual(rows('SELECT slug FROM newsletter_deliveries').map((x) => x.slug), ['done-lately']);
+  // rows: 2 subscribers, 3 tokens (old pending, new pending, old unsubscribed), 2 deliveries
+  assert.equal(r.purged, 7);
+  assert.equal(rows("SELECT 1 FROM newsletter_sent WHERE slug = 'done-long-ago'").length, 1, 'the per-post record stays, so it is never sent again');
+});
+
+test('scheduled() hands the run to ctx.waitUntil and does not throw when D1 throws', async () => {
+  const handed = [];
+  const broken = { ...env, NEWSLETTER_SEND: 'true', DB: { prepare() { throw new Error('D1 down'); }, batch() { throw new Error('D1 down'); } } };
+  const origErr = console.error;
+  console.error = () => {};
+  try {
+    assert.doesNotThrow(() => worker.scheduled({ cron: '0 4 * * *', scheduledTime: Date.now() }, broken, { waitUntil: (p) => handed.push(p) }));
+    assert.equal(handed.length, 1);
+    const r = await handed[0];
+    assert.equal(typeof r, 'object');
+    assert.equal(sent.length, 0);
+  } finally { console.error = origErr; }
+});
+
+test('mode dry writes nothing and calls Resend never, but reports what it would seed or send', async () => {
+  sendOn();
+  addSub('a@example.com');
+  addSub('b@example.com');
+  searchList = OLD_LIST;
+  const tables = ['newsletter_subscribers', 'newsletter_tokens', 'newsletter_sent', 'newsletter_deliveries'];
+  const snap = () => tables.map(count).join(',') + `|${count('mail_budget')}`;
+  let before = snap();
+  const first = await run({ mode: 'dry' });
+  assert.deepEqual([...first.seeded].sort(), ['first-post', 'second-post']);
+  assert.equal(snap(), before);
+  await run(); // the real seed
+  searchList = [...OLD_LIST, entry('fresh-post', dayOf(0)), entry('renamed-post', dayOf(-9))];
+  addSub('old@example.com', { status: 'pending', created: Date.now() - 30 * 86400000 }); // clean-up would remove it
+  before = snap();
+  const r = await run({ mode: 'dry' });
+  assert.equal(snap(), before);
+  assert.equal(sent.length, 0);
+  assert.deepEqual(r.tooOld, ['renamed-post']);
+  assert.deepEqual(r.posts, [{ slug: 'fresh-post', recipients: 2, sent: 0, skipped: 0, failed: 0 }]);
+  assert.deepEqual(sleeps, []);
 });

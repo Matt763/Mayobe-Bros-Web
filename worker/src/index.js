@@ -28,7 +28,7 @@
 import { screen, looksLikeTeam } from './moderation.js';
 import { looksLikeQuestion } from './question.js';
 import { SLUG_RE, TOKEN_RE, enc, now, reply, fail, sha, ipHash, same, newToken, hit, readJson, siteOrigin, siteOf, canonicalEmail, utcDay, DAY_TTL, later } from './util.js';
-import { newsletterRoute } from './newsletter.js';
+import { newsletterRoute, runNewsletter } from './newsletter.js';
 import { sendMail, validEmail } from './mail.js';
 import { manageLinkEmail, replyNoticeEmail, ownerAlertEmail, contactOwnerEmail, contactVisitorEmail, CONTACT_TYPES } from './mail-templates.js';
 
@@ -171,13 +171,8 @@ async function resendWebhook(request, env, cors) {
     if (own.has(a.trim().toLowerCase())) { ownerSeen = true; continue; }
     await env.DB.prepare('INSERT OR IGNORE INTO suppressed(email, reason, created) VALUES(?, ?, ?)').bind(a.trim().toLowerCase(), reason, now()).run();
     n++;
-  }
-  if (reason === 'complaint') {
     // A complaint also ends the subscription (no farewell: they asked not to hear from us).
-    for (const a of list) {
-      if (!validEmail(a) || own.has(a.trim().toLowerCase())) continue;
-      await env.DB.prepare("UPDATE newsletter_subscribers SET status = 'unsubscribed', unsubscribed = ? WHERE email_key = ? AND status != 'unsubscribed'").bind(now(), canonicalEmail(a)).run();
-    }
+    if (reason === 'complaint') await env.DB.prepare("UPDATE newsletter_subscribers SET status = 'unsubscribed', unsubscribed = ? WHERE email_key = ? AND status != 'unsubscribed'").bind(now(), canonicalEmail(a)).run();
   }
   if (ownerSeen) console.log('resend webhook: owner address reported, not suppressed');
   console.log(`resend webhook: ${reason}, ${n} address(es)`);
@@ -659,5 +654,9 @@ export default {
       console.error('engage error', err && err.stack ? err.stack : err);
       return fail('Something went wrong. Please try again.', 500, cors);
     }
+  },
+  // Cron Trigger (wrangler.jsonc "triggers"): the daily newsletter run. runNewsletter never throws.
+  scheduled(event, env, ctx) {
+    ctx.waitUntil(runNewsletter(env, ctx));
   },
 };

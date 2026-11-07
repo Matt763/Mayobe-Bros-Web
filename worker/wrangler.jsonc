@@ -12,8 +12,14 @@
     "MAIL_FROM": "Mayobe Bros <info@mayobebros.com>",
     "MAIL_FROM_SUPPORT": "Mayobe Bros <support@mayobebros.com>",
     "OWNER_EMAIL": "info@mayobebros.com",
-    "CONTACT_EMAIL": "info@mayobebros.com"
+    "CONTACT_EMAIL": "info@mayobebros.com",
+    // Newsletter: new-article emails go out only when this is exactly "true". Seeding and the daily clean-up run either way.
+    "NEWSLETTER_SEND": "false",
+    // This Worker's own https origin, used only in the List-Unsubscribe header (one-click POST). Missing or not https: no article emails.
+    "API_ORIGIN": "https://mayobe-engage.mattmclean763.workers.dev"
   },
+  // Daily newsletter run (runNewsletter) at 04:00 UTC, 07:00 in Tanzania.
+  "triggers": { "crons": ["0 4 * * *"] },
   "d1_databases": [
     {
       "binding": "DB",
