@@ -419,9 +419,10 @@ export async function newsletterAdmin(request, env, ctx, path, url, cors) {
     const s = url.searchParams.get('status');
     const status = NL_STATUSES.includes(s) ? s : s === 'all' || !s ? 'all' : 'active';
     const limit = Math.min(500, Math.max(1, Number(url.searchParams.get('limit')) || 100));
+    const offset = Math.max(0, Math.floor(Number(url.searchParams.get('offset')) || 0));
     const where = status === 'all' ? '' : 'WHERE status = ?';
-    const stmt = DB.prepare(`SELECT id, email, status, created, confirmed, unsubscribed FROM newsletter_subscribers ${where} ORDER BY id DESC LIMIT ?`);
-    const rows = await (status === 'all' ? stmt.bind(limit) : stmt.bind(status, limit)).all();
+    const stmt = DB.prepare(`SELECT id, email, status, created, confirmed, unsubscribed FROM newsletter_subscribers ${where} ORDER BY id DESC LIMIT ? OFFSET ?`);
+    const rows = await (status === 'all' ? stmt.bind(limit, offset) : stmt.bind(status, limit, offset)).all();
     return reply({ subscribers: rows.results || [] }, 200, cors);
   }
   if (method === 'GET' && path === '/v1/admin/newsletter/count') {
@@ -430,7 +431,7 @@ export async function newsletterAdmin(request, env, ctx, path, url, cors) {
       DB.prepare("SELECT n FROM mail_budget WHERE day = ? AND kind = 'news'").bind(utcDay()),
       DB.prepare(`SELECT n.slug AS slug,
         (SELECT COUNT(*) FROM newsletter_deliveries d WHERE d.slug = n.slug AND d.status IN ('claimed','sent')) AS sent,
-        (SELECT COUNT(*) FROM newsletter_subscribers s WHERE s.status = 'active' AND NOT EXISTS (SELECT 1 FROM newsletter_deliveries d WHERE d.slug = n.slug AND d.subscriber_id = s.id)) AS left
+        (SELECT COUNT(*) FROM newsletter_subscribers s WHERE s.status = 'active' AND s.confirmed <= n.queued_at AND NOT EXISTS (SELECT 1 FROM newsletter_deliveries d WHERE d.slug = n.slug AND d.subscriber_id = s.id)) AS left
         FROM newsletter_sent n WHERE n.sent_at IS NULL AND n.seeded = 0 ORDER BY n.queued_at LIMIT 50`),
     ]);
     const c = Object.fromEntries((byStatus.results || []).map((r) => [r.status, r.n]));

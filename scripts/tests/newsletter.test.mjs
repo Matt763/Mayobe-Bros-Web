@@ -897,21 +897,36 @@ async function admin(path, { method = 'GET', body, token = ADMIN } = {}) {
 }
 
 test('admin newsletter routes are 401 without the token', async () => {
+  addSub('victim@example.com');
+  const snap = () => JSON.stringify(['newsletter_sent', 'newsletter_subscribers', 'newsletter_tokens'].map((t) => rows(`SELECT * FROM ${t}`)));
+  const before = snap();
+  searchList = OLD_LIST;
   for (const [m, p] of [['GET', '/v1/admin/newsletter'], ['GET', '/v1/admin/newsletter/count'], ['POST', '/v1/admin/newsletter/remove'], ['POST', '/v1/admin/newsletter/run']]) {
     assert.equal((await admin(p, { method: m, body: m === 'POST' ? { email: 'a@b.co', mode: 'seed' } : undefined, token: null })).status, 401, p);
-    assert.equal((await admin(p, { method: m, body: m === 'POST' ? { email: 'a@b.co', mode: 'seed' } : undefined, token: 'wrong-token-wrong-token' })).status, 401, p);
+    assert.equal((await admin(p, { method: m, body: m === 'POST' ? { email: 'victim@example.com', mode: 'seed' } : undefined, token: 'wrong-token-wrong-token' })).status, 401, p);
   }
+  assert.equal(snap(), before, 'rejected remove and run changed nothing');
 });
 
 test('list never contains hash or token fields and filters by status', async () => {
   addSub('a@example.com'); addSub('b@example.com', { status: 'pending' }); addSub('c@example.com', { status: 'unsubscribed', unsubscribed: Date.now() });
-  await unsubscribeKit(env, 1);
+  const firstId = rows('SELECT id FROM newsletter_subscribers ORDER BY id LIMIT 1')[0].id;
+  await unsubscribeKit(env, firstId);
   const all = await admin('/v1/admin/newsletter?status=all');
   assert.equal(all.json.subscribers.length, 3);
   for (const s of all.json.subscribers) assert.deepEqual(Object.keys(s).sort(), ['confirmed', 'created', 'email', 'id', 'status', 'unsubscribed']);
   assert.ok(!/hash|token|email_key/i.test(JSON.stringify(all.json)));
   assert.deepEqual((await admin('/v1/admin/newsletter?status=pending')).json.subscribers.map((s) => s.email), ['b@example.com']);
   assert.deepEqual((await admin('/v1/admin/newsletter?status=active&limit=1')).json.subscribers.map((s) => s.email), ['a@example.com']);
+});
+
+test('list takes an offset so every row can be reached', async () => {
+  for (let i = 0; i < 5; i++) addSub(`o${i}@example.com`);
+  const a = (await admin('/v1/admin/newsletter?status=all&limit=2')).json.subscribers;
+  const b = (await admin('/v1/admin/newsletter?status=all&limit=2&offset=2')).json.subscribers;
+  const c = (await admin('/v1/admin/newsletter?status=all&limit=2&offset=4')).json.subscribers;
+  assert.deepEqual([a.length, b.length, c.length], [2, 2, 1]);
+  assert.equal(new Set([...a, ...b, ...c].map((x) => x.id)).size, 5);
 });
 
 test('remove by a different spelling of the address deletes the row, its tokens and its deliveries', async () => {
@@ -945,6 +960,9 @@ test("count reports the queue and today's news units", async () => {
   assert.ok(n >= 1 && n < 3, `sent ${n}`);
   assert.equal(c.newsToday, n);
   assert.deepEqual(c.queue, [{ slug: 'fresh-post', sent: n, left: 3 - n }]);
+  addSub('late@example.com', { confirmed: Date.now() + 3600000 }); // joined after the article was queued: the run never mails them
+  c = (await admin('/v1/admin/newsletter/count')).json;
+  assert.deepEqual(c.queue, [{ slug: 'fresh-post', sent: n, left: 3 - n }], 'a later subscriber is not counted as still to send');
   env.NEWSLETTER_SEND = 'false';
   assert.equal((await admin('/v1/admin/newsletter/count')).json.paused, true);
 });

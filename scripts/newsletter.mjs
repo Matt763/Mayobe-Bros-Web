@@ -3,7 +3,7 @@
 //
 //   node scripts/newsletter.mjs list [active|pending|unsubscribed|all] [--csv]   subscribers (default: active)
 //   node scripts/newsletter.mjs count                                          totals, today's news units, posts still being sent
-//   node scripts/newsletter.mjs remove <email>                                 delete one address with its tokens and send log
+//   node scripts/newsletter.mjs remove <email> --yes                           delete one address with its tokens and send log (cannot be undone; refused without --yes)
 //   node scripts/newsletter.mjs dry-run                                        what the next run would do; changes nothing, sends nothing
 //   node scripts/newsletter.mjs seed                                           record the posts now listed as already handled (sends nothing)
 //
@@ -23,7 +23,9 @@ if (!token && fs.existsSync(tokenFile)) token = fs.readFileSync(tokenFile, 'utf8
 const safe = (s) => String(s ?? '').replace(/[\u0000-\u001f\u007f-\u009f\p{Cf}]/gu, ' '); // addresses are typed by visitors: no terminal escape sequences reach the screen
 const args = process.argv.slice(2);
 const csv = args.includes('--csv');
-const [cmd = 'list', ...rest] = args.filter((a) => a !== '--csv');
+const yes = args.includes('--yes');
+const [cmd = 'list', ...rest] = args.filter((a) => a !== '--csv' && a !== '--yes');
+if (api && !/^https:\/\//.test(api) && !/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/|$)/.test(api)) { console.error('The API address must start with https:// (the admin token would travel unprotected). http:// is allowed only for 127.0.0.1 or localhost.'); process.exit(1); }
 if (!api) { console.error('No API address. Set "commentsApi" in site.config.json (or MAYOBE_API) after deploying the Worker.'); process.exit(1); }
 if (!token) { console.error('No admin token. Set ADMIN_TOKEN, or save it in a file named .admin-token in the project root.'); process.exit(1); }
 
@@ -47,7 +49,12 @@ function show(r) {
 try {
   if (cmd === 'list') {
     const status = rest[0] || 'active';
-    const { subscribers } = await call('GET', `/admin/newsletter?status=${encodeURIComponent(status)}&limit=500`);
+    const subscribers = []; // pages of 500 until the end, so nothing is cut off
+    for (;;) {
+      const page = (await call('GET', `/admin/newsletter?status=${encodeURIComponent(status)}&limit=500&offset=${subscribers.length}`)).subscribers;
+      subscribers.push(...page);
+      if (page.length < 500) break;
+    }
     if (csv) {
       console.log('id,email,status,created,confirmed,unsubscribed');
       for (const s of subscribers) console.log([s.id, s.email, s.status, day(s.created), day(s.confirmed), day(s.unsubscribed)].map(csvCell).join(','));
@@ -63,7 +70,8 @@ try {
     if (!c.queue.length) console.log('no article is being sent now');
     for (const q of c.queue) console.log(`being sent: ${safe(q.slug)}  sent ${safe(q.sent)}, still to send ${safe(q.left)}`);
   } else if (cmd === 'remove') {
-    if (!rest[0]) throw new Error('Usage: remove <email>');
+    if (!rest[0]) throw new Error('Usage: remove <email> --yes');
+    if (!yes) throw new Error(`Removing ${safe(rest[0])} cannot be undone. Run it again with --yes to confirm.`);
     const j = await call('POST', '/admin/newsletter/remove', { email: rest[0] });
     console.log(`removed ${safe(j.removed)}`);
   } else if (cmd === 'dry-run' || cmd === 'seed') {

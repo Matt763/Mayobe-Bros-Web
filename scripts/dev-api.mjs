@@ -5,9 +5,9 @@
 // DEV_MAIL_LOG=1 node --no-warnings scripts/dev-api.mjs   also switches mail on with a fake Resend: nothing is sent, and every
 //   message the Worker would send is printed (to, subject, text part) so the emailed links can be copied. Default behaviour is unchanged.
 //   The email templates only accept https links, so in this mode the Worker is told the site is https://mayobebros.com; the printed text
+//   has that address swapped for the local site (the first site-origin argument), and the article list is read from ./data/search.json.
 //   In this mode the newsletter is also on: API_ORIGIN and NEWSLETTER_SEND are set, the [mail] block prints the List-Unsubscribe headers, and
 //   POST /__dev/cron (answered here, not by the Worker) runs the daily newsletter job once and prints its report. The first call seeds.
-//   has that address swapped for the local site (the first site-origin argument), and the article list is read from ./data/search.json.
 import fs from 'node:fs';
 import http from 'node:http';
 import worker from '../worker/src/index.js';
@@ -38,12 +38,19 @@ if (process.env.DEV_MAIL_LOG === '1') {
 http.createServer(async (req, res) => {
   if (req.method === 'POST' && req.url === '/__dev/cron') {
     if (process.env.DEV_MAIL_LOG !== '1') { res.writeHead(404); return res.end('Only with DEV_MAIL_LOG=1'); }
-    const pending = [];
-    await worker.scheduled({ cron: 'dev', scheduledTime: Date.now() }, env, { waitUntil: (p) => pending.push(p) });
-    const [report] = await Promise.all(pending);
-    console.log(`[cron] ${JSON.stringify(report)}`);
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify(report ?? null));
+    try {
+      const pending = [];
+      await worker.scheduled({ cron: 'dev', scheduledTime: Date.now() }, env, { waitUntil: (p) => pending.push(p) });
+      const reports = await Promise.all(pending);
+      const report = reports.find((r) => r && typeof r === 'object' && 'paused' in r) ?? null;
+      console.log(`[cron] ${JSON.stringify(report)}`);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(report));
+    } catch (err) {
+      console.error('[cron] failed', err);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ error: String(err && err.message ? err.message : err) }));
+    }
   }
   const chunks = [];
   for await (const c of req) chunks.push(c);

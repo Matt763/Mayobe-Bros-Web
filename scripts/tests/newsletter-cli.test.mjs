@@ -28,6 +28,9 @@ test.before(async () => {
 });
 test.after(() => { globalThis.fetch = realFetch; server.close(); });
 
+const reset = () => { for (const t of ['newsletter_tokens', 'newsletter_deliveries', 'newsletter_sent', 'newsletter_subscribers']) env.DB.raw.exec(`DELETE FROM ${t}`); };
+const total = (t) => env.DB.raw.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get().n;
+test.beforeEach(reset);
 const add = (email, status = 'active') => env.DB.raw.prepare('INSERT INTO newsletter_subscribers(email, email_key, status, created, confirmed) VALUES(?, ?, ?, ?, ?)').run(email, email.toLowerCase(), status, Date.UTC(2026, 10, 1), status === 'pending' ? null : Date.UTC(2026, 10, 2));
 const cli = (args, { token = TOKEN } = {}) => new Promise((ok) => {
   const e = { ...process.env, MAYOBE_API: base, ADMIN_TOKEN: token, ADMIN_TOKEN_FILE: path.join(path.dirname(CLI), 'no-such-token-file') };
@@ -46,29 +49,59 @@ test('list --csv prints a header line and one line per subscriber', async () => 
   assert.ok(lines.some((l) => l.includes(",'=cmd@example.com,")), 'formula-looking address is defused');
 });
 
-test('remove prints removed 1, then removed 0', async () => {
-  assert.match((await cli(['remove', 'ONE@example.com'])).stdout, /removed 1/);
-  assert.match((await cli(['remove', 'one@example.com'])).stdout, /removed 0/);
+test('list --csv exports every row, past the 500 a single call returns', async () => {
+  env.DB.raw.exec('BEGIN');
+  for (let i = 0; i < 503; i++) add(`bulk${i}@example.com`);
+  env.DB.raw.exec('COMMIT');
+  const r = await cli(['list', 'active', '--csv']);
+  assert.equal(r.code, 0);
+  assert.equal(r.stdout.trim().split('\n').length, 504);
+  assert.equal(new Set(r.stdout.trim().split('\n').map((l) => l.split(',')[1])).size, 504);
 });
 
-test('count and dry-run work', async () => {
+test('remove without --yes refuses and deletes nothing; with --yes prints removed 1, then removed 0', async () => {
+  add('one@example.com');
+  const no = await cli(['remove', 'one@example.com']);
+  assert.equal(no.code, 1);
+  assert.match(no.stderr, /--yes/);
+  assert.equal(total('newsletter_subscribers'), 1);
+  assert.match((await cli(['remove', 'ONE@example.com', '--yes'])).stdout, /removed 1/);
+  assert.match((await cli(['remove', 'one@example.com', '--yes'])).stdout, /removed 0/);
+  assert.equal(total('newsletter_subscribers'), 0);
+});
+
+test('count and dry-run work; seed writes, dry-run does not', async () => {
+  add('a@example.com'); add('b@example.com'); add('c@example.com', 'pending');
   const c = await cli(['count']);
   assert.equal(c.code, 0);
-  assert.match(c.stdout, /active 2/);
+  assert.match(c.stdout, /active 2, waiting to confirm 1/);
   const d = await cli(['dry-run']);
   assert.equal(d.code, 0);
   assert.match(d.stdout, /seeded: old-one/);
+  assert.equal(total('newsletter_sent'), 0, 'dry-run wrote nothing');
   assert.match((await cli(['seed'])).stdout, /seeded: old-one/);
-  assert.equal(env.DB.raw.prepare('SELECT COUNT(*) AS n FROM newsletter_sent').get().n, 1, 'dry-run wrote nothing, seed wrote one row');
+  assert.equal(total('newsletter_sent'), 1);
 });
 
-test('no token: exit 1 with the message', async () => {
+test('no token: exit 1 with the message; a wrong token is a 401', async () => {
   const r = await cli(['count'], { token: '' });
   assert.equal(r.code, 1);
   assert.match(r.stderr, /No admin token/);
-  const bad = await cli(['count'], { token: 'wrong-token-wrong-token' });
+  add('keep@example.com');
+  const bad = await cli(['remove', 'keep@example.com', '--yes'], { token: 'wrong-token-wrong-token' });
   assert.equal(bad.code, 1);
   assert.match(bad.stderr, /401/);
+  assert.equal(total('newsletter_subscribers'), 1, 'a rejected remove changed nothing');
+  assert.equal((await cli(['seed'], { token: 'wrong-token-wrong-token' })).code, 1);
+  assert.equal(total('newsletter_sent'), 0, 'a rejected seed changed nothing');
+});
+
+test('a non-https API address is refused (the token would travel in clear), except localhost', async () => {
+  const run = (api) => new Promise((ok) => execFile(process.execPath, [CLI, 'count'], { env: { ...process.env, MAYOBE_API: api, ADMIN_TOKEN: TOKEN, ADMIN_TOKEN_FILE: 'none' } }, (err, stdout, stderr) => ok({ code: err ? err.code : 0, stdout, stderr })));
+  const r = await run('http://example.com');
+  assert.equal(r.code, 1);
+  assert.match(r.stderr, /https/);
+  assert.equal((await run(base)).code, 0, 'http://127.0.0.1 is allowed');
 });
 
 test('a subscriber email holding \\u001b[31m prints without the escape', async () => {
