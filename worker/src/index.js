@@ -172,6 +172,13 @@ async function resendWebhook(request, env, cors) {
     await env.DB.prepare('INSERT OR IGNORE INTO suppressed(email, reason, created) VALUES(?, ?, ?)').bind(a.trim().toLowerCase(), reason, now()).run();
     n++;
   }
+  if (reason === 'complaint') {
+    // A complaint also ends the subscription (no farewell: they asked not to hear from us).
+    for (const a of list) {
+      if (!validEmail(a) || own.has(a.trim().toLowerCase())) continue;
+      await env.DB.prepare("UPDATE newsletter_subscribers SET status = 'unsubscribed', unsubscribed = ? WHERE email_key = ? AND status != 'unsubscribed'").bind(now(), canonicalEmail(a)).run();
+    }
+  }
   if (ownerSeen) console.log('resend webhook: owner address reported, not suppressed');
   console.log(`resend webhook: ${reason}, ${n} address(es)`);
   return reply({ ok: true }, 200, cors);
@@ -283,8 +290,9 @@ async function handle(request, env, ctx) {
 
   if (method === 'POST' && path === '/v1/webhooks/resend') return resendWebhook(request, env, cors);
 
+  // (The one-click unsubscribe is exempt: a mail app posts it, so it has no Origin; it only ever unsubscribes.)
   // Browsers always send Origin on cross-site POSTs. Refuse any that is not our site.
-  if (method === 'POST' && !path.startsWith('/v1/admin/')) {
+  if (method === 'POST' && !path.startsWith('/v1/admin/') && path !== '/v1/newsletter/one-click') {
     const o = request.headers.get('Origin');
     if (!o || !origins(env).includes(o)) return fail('Origin not allowed.', 403, cors);
   }

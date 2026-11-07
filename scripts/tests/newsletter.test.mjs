@@ -3,11 +3,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import worker from '../../worker/src/index.js';
+import { createHmac } from 'node:crypto';
+import { unsubscribeKit } from '../../worker/src/newsletter.js';
 import { makeD1 } from '../lib/d1-shim.mjs';
 
 const ORIGIN = 'https://mayobebros.com';
 const realFetch = globalThis.fetch;
-const TODAY = new Date().toISOString().slice(0, 10);
 const FIXTURE = [
   { s: 'old-one', t: 'Old One', u: '/post/old-one/', e: 'Old excerpt', c: 'Educational', d: '2026-01-01', i: '/assets/posts/a.webp' },
   { s: 'new-one', t: 'New One', u: '/post/new-one/', e: 'New excerpt', c: 'Educational', d: '2026-10-30', i: '/assets/posts/b.webp' },
@@ -151,6 +152,8 @@ test('9th confirmation of the UTC day (9 different IPs and addresses) is not sen
   for (let i = 1; i <= 9; i++) assert.equal((await sub(`d${i}@example.com`, {}, { ip: `4.0.0.${i}` })).status, 200);
   assert.equal(sent.length, 8);
   assert.equal(rows('SELECT 1 FROM newsletter_subscribers').length, 9);
+  const ninth = rows("SELECT id FROM newsletter_subscribers WHERE email = 'd9@example.com'")[0].id;
+  assert.equal(rows('SELECT 1 FROM newsletter_tokens WHERE subscriber_id = ?', ninth).length, 0, 'the 9th row got no confirm token');
 });
 
 async function confirmed(email = 'welcome@example.com') {
@@ -182,7 +185,6 @@ test('confirm: one press activates, deletes the token and sends one welcome', as
   assert.equal(rows("SELECT kind, expires FROM newsletter_tokens WHERE hash = ?", sha(u))[0].kind, 'unsub');
   assert.equal(m.headers['List-Unsubscribe'], `<https://worker.test/v1/newsletter/one-click?t=${u}>`);
   assert.equal(m.headers['List-Unsubscribe-Post'], 'List-Unsubscribe=One-Click');
-  assert.ok(TODAY);
 });
 
 test('confirm: a second press, an expired token (created set 8 days back), a malformed token and an unknown token all give the same 404 body', async () => {
@@ -226,4 +228,132 @@ test('resubscribing after unsubscribe returns to pending, deletes the old tokens
   assert.equal(rows("SELECT 1 FROM newsletter_tokens WHERE subscriber_id = ? AND kind = 'confirm'", id).length, 1);
   assert.equal(sent.length, 1);
   assert.equal(sent[0].body.subject, 'Please confirm your Mayobe Bros subscription');
+});
+
+// ---- Task 2: unsubscribe ----
+const UNSUB = 'You have unsubscribed from Mayobe Bros';
+const farewells = () => sent.filter((m) => m.body.subject === UNSUB);
+async function active(email = 'leaver@example.com') {
+  await confirmed(email);
+  const u = tokenFrom(sent[0], 'newsletter/#u=');
+  sent.length = 0;
+  return u;
+}
+async function oneClick(t, { body = 'List-Unsubscribe=One-Click', ip = '1.1.1.1', method = 'POST' } = {}) {
+  const res = await worker.fetch(new Request(`https://api.test/v1/newsletter/one-click?t=${t}`, { method, headers: { 'CF-Connecting-IP': ip, 'Content-Type': 'application/x-www-form-urlencoded' }, body: method === 'POST' ? body : undefined, redirect: 'manual' }), env, { waitUntil: (p) => { pendingMail.push(p); } });
+  const text = await res.text();
+  await flushMail();
+  return { status: res.status, location: res.headers.get('Location'), json: text && res.headers.get('content-type')?.includes('json') ? JSON.parse(text) : null };
+}
+const statusOf = () => rows('SELECT status, unsubscribed, farewell_sent FROM newsletter_subscribers')[0];
+
+test('the button unsubscribes once and sends one farewell; a second press is 200 with no second farewell', async () => {
+  const u = await active();
+  const r = await call('/v1/newsletter/unsubscribe', { body: { token: u } });
+  assert.deepEqual(r, { status: 200, json: { ok: true } });
+  const s = statusOf();
+  assert.equal(s.status, 'unsubscribed');
+  assert.ok(s.unsubscribed > 0);
+  assert.equal(farewells().length, 1);
+  assert.deepEqual(farewells()[0].body.to, ['leaver@example.com']);
+  assert.match(farewells()[0].body.html, /https:\/\/mayobebros\.com\/newsletter\/"/);
+  const again = await call('/v1/newsletter/unsubscribe', { body: { token: u } });
+  assert.deepEqual(again, { status: 200, json: { ok: true } });
+  assert.equal(farewells().length, 1);
+});
+
+test('unknown and malformed tokens give the same 404', async () => {
+  await active();
+  const bad = [await call('/v1/newsletter/unsubscribe', { body: { token: 'A'.repeat(32) } }), await call('/v1/newsletter/unsubscribe', { body: { token: 'short' } }), await call('/v1/newsletter/unsubscribe', { body: {} }), await call('/v1/newsletter/unsubscribe', { body: { token: 5 } })];
+  for (const r of bad) assert.deepEqual(r, { status: 404, json: { error: 'We could not find that request.' } });
+  assert.equal(statusOf().status, 'active');
+});
+
+test('the unsubscribe button needs the site Origin', async () => {
+  const u = await active();
+  const r = await call('/v1/newsletter/unsubscribe', { body: { token: u }, origin: 'https://evil.example' });
+  assert.equal(r.status, 403);
+  assert.equal(statusOf().status, 'active');
+});
+
+test('an unsubscribe token from the welcome still works after later emails made new ones', async () => {
+  const u = await active();
+  const id = rows('SELECT id FROM newsletter_subscribers')[0].id;
+  await unsubscribeKit(env, id);
+  await unsubscribeKit(env, id);
+  assert.equal(rows("SELECT 1 FROM newsletter_tokens WHERE kind = 'unsub'").length, 3);
+  assert.deepEqual(await call('/v1/newsletter/unsubscribe', { body: { token: u } }), { status: 200, json: { ok: true } });
+  assert.equal(statusOf().status, 'unsubscribed');
+});
+
+test('one-click POST without Origin and with the RFC 8058 body unsubscribes and sends no farewell', async () => {
+  const u = await active();
+  const r = await oneClick(u);
+  assert.deepEqual(r, { status: 200, location: null, json: { ok: true } });
+  assert.equal(statusOf().status, 'unsubscribed');
+  assert.equal(sent.length, 0);
+});
+
+test('one-click with a wrong body is 400 and changes nothing; with an unknown token it is 200 and changes nothing', async () => {
+  const u = await active();
+  for (const body of ['', 'List-Unsubscribe=Other', 'List-Unsubscribe=One-Click&x=1', 'x'.repeat(2000)]) assert.equal((await oneClick(u, { body })).status, 400, body.slice(0, 20));
+  assert.equal(statusOf().status, 'active');
+  assert.equal((await oneClick('A'.repeat(32))).status, 200);
+  assert.equal((await oneClick('short')).status, 200);
+  assert.equal(statusOf().status, 'active');
+});
+
+test('GET one-click redirects 303 to the page fragment and changes nothing', async () => {
+  const u = await active();
+  const r = await oneClick(u, { method: 'GET' });
+  assert.equal(r.status, 303);
+  assert.equal(r.location, `https://mayobebros.com/newsletter/#u=${u}`);
+  assert.equal(statusOf().status, 'active');
+  const odd = await oneClick('<bad>', { method: 'GET' });
+  assert.equal(odd.status, 303);
+  assert.equal(odd.location, 'https://mayobebros.com/newsletter/');
+  assert.equal(statusOf().status, 'active');
+});
+
+const WH_KEY = Buffer.from('test-signing-key-0123456789abcdef');
+async function complaint(to, type = 'email.complained') {
+  env.RESEND_WEBHOOK_SECRET = `whsec_${WH_KEY.toString('base64')}`;
+  const raw = JSON.stringify({ type, data: { to } });
+  const ts = String(Math.floor(Date.now() / 1000));
+  const sig = `v1,${createHmac('sha256', WH_KEY).update(`msg_1.${ts}.${raw}`).digest('base64')}`;
+  const res = await worker.fetch(new Request('https://api.test/v1/webhooks/resend', { method: 'POST', headers: { 'svix-id': 'msg_1', 'svix-timestamp': ts, 'svix-signature': sig }, body: raw }), env, { waitUntil: (p) => { pendingMail.push(p); } });
+  await flushMail();
+  return res.status;
+}
+
+test('a complained address is suppressed and its subscriber row becomes unsubscribed', async () => {
+  await active('Foo.Bar+x@gmail.com');
+  assert.equal(await complaint(['foobar@googlemail.com', 'Foo.Bar+x@gmail.com']), 200);
+  assert.equal(statusOf().status, 'unsubscribed');
+  assert.equal(sent.length, 0, 'no farewell to someone who complained');
+  assert.equal(rows('SELECT 1 FROM suppressed WHERE email = ?', 'foo.bar+x@gmail.com').length, 1);
+});
+
+test('a bounce suppresses but does not touch the subscriber row', async () => {
+  await active('b@example.com');
+  assert.equal(await complaint(['b@example.com'], 'email.bounced'), 200);
+  assert.equal(statusOf().status, 'active');
+});
+
+test('the 31st unsubscribe call in an hour from one IP is 429', async () => {
+  for (let i = 0; i < 30; i++) assert.equal((i % 2 ? await oneClick('A'.repeat(32), { ip: '8.0.0.1' }) : await call('/v1/newsletter/unsubscribe', { body: { token: 'A'.repeat(32) }, ip: '8.0.0.1' })).status, i % 2 ? 200 : 404);
+  assert.equal((await call('/v1/newsletter/unsubscribe', { body: { token: 'A'.repeat(32) }, ip: '8.0.0.1' })).status, 429);
+  assert.equal((await oneClick('A'.repeat(32), { ip: '8.0.0.1' })).status, 429);
+  assert.equal((await call('/v1/newsletter/unsubscribe', { body: { token: 'A'.repeat(32) }, ip: '8.0.0.2' })).status, 404);
+});
+
+test('farewell still not resent after Resend fails the first time', async () => {
+  const u = await active();
+  resendMode = 'throw';
+  assert.deepEqual(await call('/v1/newsletter/unsubscribe', { body: { token: u } }), { status: 200, json: { ok: true } });
+  assert.equal(farewells().length, 1);
+  assert.equal(statusOf().farewell_sent, 1);
+  resendMode = 'ok';
+  await call('/v1/newsletter/unsubscribe', { body: { token: u } });
+  assert.equal(farewells().length, 1, 'at most once');
 });

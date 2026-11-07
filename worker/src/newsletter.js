@@ -3,11 +3,16 @@
 //
 //   POST /v1/newsletter/subscribe   { email, website (honeypot), ts }  -> 200 { ok: true } for every valid address, whatever its state
 //   POST /v1/newsletter/confirm     { token }                          -> 200 { ok: true } | 404 (one answer for every bad token)
+//   POST /v1/newsletter/unsubscribe { token }                          -> 200 { ok: true } (also when already unsubscribed) | 404; one farewell per row
+//   POST /v1/newsletter/one-click?t=  body List-Unsubscribe=One-Click  -> 200 for any token (RFC 8058, no Origin check, no farewell) | 400 for a wrong body
+//   GET  /v1/newsletter/one-click?t=                                   -> 303 to the /newsletter/ page; changes nothing (link scanners GET)
 
 import { sendMail, validEmail } from './mail.js';
-import { confirmSubscriptionEmail, welcomeEmail } from './mail-templates.js';
+import { confirmSubscriptionEmail, welcomeEmail, farewellEmail } from './mail-templates.js';
 import { TOKEN_RE, now, reply, fail, sha, ipHash, newToken, hit, readJson, siteOrigin, siteOf, canonicalEmail, utcDay, DAY_TTL, later } from './util.js';
 
+export const NL_UNSUB_NOT_FOUND = 'We could not find that request.';
+const ONE_CLICK_MAX = 1024;
 export const NL_NOT_FOUND = 'That link has expired or was already used.';
 const CONFIRM_DAYS = 7;
 const MIN_FORM_MS = 2500;
@@ -85,8 +90,54 @@ async function sendWelcome(env, ctx, id, address) {
   await sendMail(env, ctx, { kind: 'news', to: address, ...m, headers: kit.headers, key: `nl-welcome-${id}` });
 }
 
+// Marks the owner of an unsubscribe token as unsubscribed. Returns the subscriber when this call made the change, else null.
+async function unsubscribeByToken(env, given) {
+  const givenHash = await sha(given); // always computed, so the time taken does not say whether the token has the right shape
+  if (!TOKEN_RE.test(given)) return null;
+  const tok = await env.DB.prepare("SELECT subscriber_id FROM newsletter_tokens WHERE hash = ? AND kind = 'unsub'").bind(givenHash).first();
+  if (!tok) return null;
+  const changed = await env.DB.prepare("UPDATE newsletter_subscribers SET status = 'unsubscribed', unsubscribed = ? WHERE id = ? AND status != 'unsubscribed' RETURNING id").bind(now(), tok.subscriber_id).first();
+  return { found: true, changed: !!changed, id: tok.subscriber_id };
+}
+
+// At most one farewell per row: the flag is taken before the mail is sent, so a failed send is never retried.
+async function sendFarewell(env, ctx, id) {
+  const claimed = await env.DB.prepare('UPDATE newsletter_subscribers SET farewell_sent = 1 WHERE id = ? AND farewell_sent = 0 RETURNING email').bind(id).first();
+  if (!claimed) return;
+  const m = farewellEmail({ resubscribeUrl: `${siteOrigin(env)}/newsletter/` }, siteOf(env));
+  await sendMail(env, ctx, { kind: 'news', to: claimed.email, ...m, key: `nl-bye-${id}` });
+}
+
+const unsubLimit = async (request, env, ctx) => hit(env, ctx, `nlu:${await ipHash(request, env)}:${Math.floor(now() / 3600000)}`, 30, 3700);
+
 export async function newsletterRoute(request, env, ctx, path, cors) {
+  if (path === '/v1/newsletter/one-click' && request.method === 'GET') {
+    const t = new URL(request.url).searchParams.get('t') || '';
+    const to = `${siteOrigin(env)}/newsletter/${TOKEN_RE.test(t) ? `#u=${t}` : ''}`;
+    return new Response(null, { status: 303, headers: { ...cors, Location: to, 'Cache-Control': 'no-store' } });
+  }
   if (request.method !== 'POST') return null;
+
+  if (path === '/v1/newsletter/one-click') {
+    if (!(await unsubLimit(request, env, ctx))) return fail('Too many requests. Please try again later.', 429, cors);
+    const declared = Number(request.headers.get('content-length'));
+    if (Number.isFinite(declared) && declared > ONE_CLICK_MAX) return fail('Bad request.', 400, cors);
+    const raw = await request.text().catch(() => null);
+    if (raw === null || raw.length > ONE_CLICK_MAX) return fail('Bad request.', 400, cors);
+    const p = new URLSearchParams(raw);
+    if ([...p].length !== 1 || p.get('List-Unsubscribe') !== 'One-Click') return fail('Bad request.', 400, cors);
+    await unsubscribeByToken(env, new URL(request.url).searchParams.get('t') || ''); // same answer for any token
+    return reply({ ok: true }, 200, cors);
+  }
+
+  if (path === '/v1/newsletter/unsubscribe') {
+    if (!(await unsubLimit(request, env, ctx))) return fail('Too many requests. Please try again later.', 429, cors);
+    const b = await readJson(request).catch(() => null);
+    const r = b && !Array.isArray(b) ? await unsubscribeByToken(env, typeof b.token === 'string' ? b.token : '') : (await sha(''), null);
+    if (!r) return fail(NL_UNSUB_NOT_FOUND, 404, cors);
+    if (r.changed) later(env, ctx, () => sendFarewell(env, ctx, r.id));
+    return reply({ ok: true }, 200, cors);
+  }
 
   if (path === '/v1/newsletter/subscribe') {
     const b = await readJson(request);
