@@ -12,7 +12,7 @@
 //   GET  /v1/admin/comments?status=pending  (Authorization: Bearer ADMIN_TOKEN)
 //   POST /v1/admin/comments/:id             { action: "approve" | "spam" | "delete" }
 //   POST /v1/admin/reply                    { parent, body, name? }  a published reply from the team (shows a Team badge)
-//   POST /v1/manage/exchange                { link }              swap the token from an emailed manage link (kept in the page's #l= fragment) for a device token -> { ok, id, slug, token }
+//   POST /v1/manage/exchange                { link }              swap the token from an emailed manage link (kept in the page's #l= fragment) for a device token -> { ok, id, slug, path?, token }
 //   POST /v1/notify/unsubscribe             { token }             stop reply emails for the comment that owns this (#u=) token
 //
 // Email (worker/src/mail.js, mail-templates.js): the create route also takes `notify: true` with an email address. That sends one
@@ -168,14 +168,15 @@ async function slugKnown(env, slug) {
 // Title and address of one of OUR articles, from the site's own list; '' and a plain /post/<slug>/ address if it is not listed.
 // Never taken from visitor input: this is what goes into emails to addresses nobody has verified.
 async function postMeta(env, slug) {
-  const fallback = { title: '', path: `/post/${slug}/` };
+  const fallback = { title: '', path: `/post/${slug}/`, found: false };
   try {
     const r = await fetch(`${siteOrigin(env)}/data/search.json`, { cf: { cacheTtl: 300, cacheEverything: true } });
     if (!r.ok) return fallback;
     const list = await r.json();
     const p = Array.isArray(list) ? list.find((x) => x && x.s === slug) : null;
     if (!p) return fallback;
-    return { title: typeof p.t === 'string' ? p.t.slice(0, 200) : '', path: typeof p.u === 'string' && /^\/post\/[a-z0-9/-]*$/.test(p.u) && p.u.length <= 300 ? p.u : fallback.path };
+    const ok = typeof p.u === 'string' && /^\/post\/[a-z0-9/-]*$/.test(p.u) && p.u.length <= 300 && !p.u.includes('//');
+    return { title: typeof p.t === 'string' ? p.t.slice(0, 200) : '', path: ok ? p.u : fallback.path, found: ok };
   } catch {
     return fallback;
   }
@@ -409,7 +410,8 @@ async function handle(request, env, ctx) {
     if (!row || !['approved', 'pending'].includes(row.status)) return fail(NOT_FOUND, 404, cors);
     const device = await addLink(env, 'device', row.id, null);
     if (row.notify_wanted) await env.DB.prepare('UPDATE comments SET notify_confirmed = 1 WHERE id = ? AND notify_wanted = 1').bind(row.id).run(); // opening the link proves the address is read by the commenter
-    return reply({ ok: true, id: row.id, slug: row.slug, token: device }, 200, cors);
+    const meta = await postMeta(env, row.slug); // the real article address (it includes the category); absent when the list cannot be read
+    return reply({ ok: true, id: row.id, slug: row.slug, ...(meta.found ? { path: meta.path } : {}), token: device }, 200, cors);
   }
 
   if (method === 'POST' && path === '/v1/notify/unsubscribe') {

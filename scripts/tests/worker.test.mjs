@@ -1127,6 +1127,7 @@ test('exchange: a device token works for edit and delete, confirms notices, and 
   assert.equal(x.json.ok, true);
   assert.equal(x.json.id, r.json.id);
   assert.equal(x.json.slug, 'hello-post');
+  assert.equal(x.json.path, '/post/guides/hello-post/'); // the real article address, from the site's own article list
   assert.match(x.json.token, /^[A-Za-z0-9_-]{32,}$/);
   assert.notEqual(x.json.token, link);
   assert.equal(env.DB.raw.prepare('SELECT notify_confirmed FROM comments WHERE id = ?').get(r.json.id).notify_confirmed, 1);

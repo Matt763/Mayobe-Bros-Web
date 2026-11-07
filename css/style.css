@@ -1501,3 +1501,4 @@ main.is-switching .hero-listing + .section > .wrap > * { animation: none !import
 @media (max-width: 480px) { .manage-card { padding: 1.25rem; } }
 /* /manage/ is a task page: keep the picture short so the button is on the first screen */
 .page-manage .hero { min-height: 17rem; }
+@media (max-width: 480px) { .notify-row { padding: 0.75rem; column-gap: 0.6rem; } .notify-row label { font-size: 0.9375rem; } .notify-row .notify-hint { grid-column: 1 / -1; font-size: 0.875rem; } }

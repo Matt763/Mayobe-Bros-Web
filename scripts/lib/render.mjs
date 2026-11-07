@@ -1085,6 +1085,7 @@ ${withIds.html}
       <div class="field"><label for="cm-email">Email <span class="opt">(optional, never shown)</span></label><input id="cm-email" name="email" type="email" maxlength="120" autocomplete="email" placeholder="you@example.com"></div>
     </div>
     <div class="field"><label for="cm-body">Your comment</label><textarea id="cm-body" name="body" rows="4" maxlength="1500" required placeholder="Share your thoughts, question or experience"></textarea></div>
+    <p class="sr-only" role="status" data-notify-live></p>
     <div class="notify-row" data-notify-row hidden>
       <input id="cm-notify" class="notify-box" type="checkbox" name="notify" value="1" aria-describedby="cm-notify-hint">
       <label for="cm-notify">Email me a link to edit or delete this comment, and tell me when the team replies</label>

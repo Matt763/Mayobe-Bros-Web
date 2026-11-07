@@ -213,8 +213,9 @@
     if (id == null || typeof token !== 'string') return;
     var o = ownAll();
     o[String(id)] = token;
-    var keys = Object.keys(o).sort(function (a, b) { return Number(a) - Number(b); });
-    while (keys.length > OWN_MAX) delete o[keys.shift()];
+    // at most 60: drop the oldest OTHER entries, never the one just added
+    var keys = Object.keys(o).filter(function (k) { return k !== String(id); }).sort(function (a, b) { return Number(a) - Number(b); });
+    while (keys.length + 1 > OWN_MAX) delete o[keys.shift()];
     ownSave(o);
   }
   function ownDrop(id) { var o = ownAll(); if (String(id) in o) { delete o[String(id)]; ownSave(o); } }
@@ -463,8 +464,11 @@
     var syncNotify = function () {
       if (!notifyRow) return;
       var ok = EMAIL_RE.test(form.elements.email.value.trim());
+      var was = !notifyRow.hidden;
       notifyRow.hidden = !ok;
       if (!ok) form.elements.notify.checked = false;
+      var live = $('[data-notify-live]', form);
+      if (live && ok !== was) live.textContent = ok ? 'A checkbox appeared below: you can ask us to email you a link to edit or delete this comment.' : 'The email checkbox was removed.';
     };
     if (notifyRow) { form.elements.email.addEventListener('input', syncNotify); form.elements.email.addEventListener('change', syncNotify); syncNotify(); }
     ['focusin'].forEach(function (ev) { form.addEventListener(ev, loadTurnstile, { once: true }); });

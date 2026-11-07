@@ -9,10 +9,11 @@ order: 90
 updated: 2026-11-07
 ---
 {{#comments}}<div class="manage-card" data-manage>
-  <h2 data-manage-title>Open your comment</h2>
+  <h2 data-manage-title tabindex="-1">Open your comment</h2>
   <p data-manage-text>This page works with the link in an email from us. If you came here without one, there is nothing to do.</p>
   <button class="btn btn-primary" type="button" data-manage-go hidden>Continue</button>
   <p class="form-status" role="status" aria-live="polite" data-manage-status></p>
+  <a class="btn btn-outline" href="{{base}}/post/" data-manage-home hidden>See all articles</a>
   <p class="manage-help" data-manage-help>Need help? <a href="{{base}}/contact/">Contact us</a> and tell us which article you wrote on. You can also read our <a href="{{base}}/comment-policy/">Comment Policy</a>.</p>
   <noscript><p class="form-status is-err">This page needs JavaScript to open your comment. You can still email us at {{email:general}} and we will help.</p></noscript>
 </div>{{/comments}}
