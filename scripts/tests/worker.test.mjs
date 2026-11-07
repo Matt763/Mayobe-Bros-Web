@@ -26,8 +26,10 @@ test.before(() => {
     return new Response('{}', { status: 404 });
   };
 });
+const EXPECT_HOSTILE = 10; // 4 approved hostile replies (a reply notice + a question alert each), 1 hostile reply held by the screen, 1 held top-level comment
 const flushMail = async () => { while (pendingMail.length) await Promise.all(pendingMail.splice(0)); };
 test.after(() => { globalThis.fetch = realFetch; });
+test.afterEach(async () => { await flushMail(); }); // mail from one test must never leak into the next
 test.beforeEach(() => { sent = []; resendMode = 'ok'; pendingMail = []; env = { DB: makeD1(), ADMIN_TOKEN: 'a-very-long-admin-token-123', SITE_ORIGIN: ORIGIN, RESEND_API_KEY: 're_test_key' }; });
 
 async function call(method, path, { body, origin = ORIGIN, auth, ip = '1.1.1.1' } = {}) {
@@ -1346,7 +1348,7 @@ test('hostile names and bodies never reach an email unescaped and never break th
   env.DB.raw.exec('DELETE FROM hits');
   await post(comment({ name: '<b>x</b>y', body: `${RUDE} <script>1</script> ${'z'.repeat(1300)}`, cid: 'hostile-visitor-9-abcdefg' }), '10.1.1.1');
   await flushMail();
-  assert.ok(sent.length >= 3);
+  assert.equal(sent.length, EXPECT_HOSTILE);
   for (const m of sent) {
     assert.equal(m.body.html.includes('<script>'), false);
     assert.equal(/<img[^>]*onerror/i.test(m.body.html), false);
@@ -1368,8 +1370,13 @@ test('a failing mail service changes nothing in the API answer', async () => {
     return { status: r.status, rest, hasId: typeof id, hasToken: typeof token, name: c.name };
   };
   const good = await run('ok');
-  assert.deepEqual(await run('throw'), good);
-  assert.deepEqual(await run('500'), good);
+  assert.ok(sent.length > 0, 'a send was attempted');
+  const thrown = await run('throw');
+  assert.ok(sent.length > 0, 'a send was attempted while fetch threw');
+  assert.deepEqual(thrown, good);
+  const five = await run('500');
+  assert.ok(sent.length > 0, 'a send was attempted while Resend answered 500');
+  assert.deepEqual(five, good);
   assert.equal(good.status, 201);
 });
 
@@ -1379,4 +1386,113 @@ test('without RESEND_API_KEY nothing is sent and comments still work', async () 
   await flushMail();
   assert.equal(r.status, 201);
   assert.equal(sent.length, 0);
+});
+
+/* ------------------------------------------------------------------ Task 4 fix round */
+test('one address in many spellings counts as one for the daily manage-link limit', async () => {
+  const spellings = ['victim@gmail.com', 'victim+1@gmail.com', 'VICTIM+two@Gmail.com', 'v.i.c.t.i.m@gmail.com', 'victim@googlemail.com', ' victim+x@gmail.com. ', 'ｖictim@gmail.com'];
+  let i = 0;
+  for (const e of spellings) {
+    const r = await post(comment({ body: `Alias try ${i}`, email: e.trim(), notify: true, cid: `aliasvisitor-${i}-abcdefgh` }), `20.0.0.${i++}`);
+    assert.ok([201, 202].includes(r.status), `${e}: ${r.status}`);
+  }
+  await flushMail();
+  assert.equal(sent.length, 1, 'all spellings are one inbox');
+  assert.equal(env.DB.raw.prepare("SELECT COUNT(*) AS n FROM hits WHERE k LIKE 'mlem:%'").get().n, 1);
+});
+
+test('plus-tag is stripped for every domain; dots only matter for gmail; different people do not collide', async () => {
+  const go = async (e, n) => { await post(comment({ body: `Distinct ${n}`, email: e, notify: true, cid: `distinctvis-${n}-abcdefghij` }), `21.0.0.${n}`); };
+  await go('pat+a@example.com', 1);
+  await go('pat+b@example.com', 2);   // same as the first
+  await go('p.at@example.com', 3);    // dots count outside gmail: different
+  await go('victim@gmail.com', 4);
+  await go('victim2@gmail.com', 5);   // different person
+  await go('victim@example.com', 6);  // same local part, other domain
+  await flushMail();
+  assert.deepEqual(sent.map((m) => m.body.to[0]).sort(), ['p.at@example.com', 'pat+a@example.com', 'victim2@gmail.com', 'victim@example.com', 'victim@gmail.com']);
+});
+
+test('a device token check also runs for a comment id that does not exist', async () => {
+  const src = fs.readFileSync(new URL('../../worker/src/index.js', import.meta.url), 'utf8');
+  const fn = src.slice(src.indexOf('async function ownerRow'), src.indexOf('// A reply counts when'));
+  assert.doesNotMatch(fn, /const device = row/, 'the device lookup must not depend on the comment row');
+  const r = await call('POST', '/v1/comments/99999/edit', { body: { token: 'q'.repeat(32), body: 'x y z' } });
+  assert.equal(r.status, 404);
+});
+
+test('a reply is announced once, only when approved from pending', async () => {
+  const a = await confirmed();
+  const held = await post(comment({ body: RUDE, cid: CID2, parent: a.id }), '6.6.6.6');
+  const act = (id, action) => call('POST', `/v1/admin/comments/${id}`, { body: { action }, auth: env.ADMIN_TOKEN, origin: null });
+  await act(held.json.id, 'approve'); await flushMail();
+  assert.equal(mail(MAILBOX).length, 1);
+  env.DB.raw.exec('DELETE FROM hits');
+  await act(held.json.id, 'spam');
+  await act(held.json.id, 'approve'); await flushMail();
+  assert.equal(mail(MAILBOX).length, 1, 'spam then approve again does not announce twice');
+  // a reply that was spam from the start, then approved: not announced
+  sent = [];
+  env.DB.raw.exec('DELETE FROM hits');
+  const other = await post(comment({ body: 'Another normal reply', cid: 'othervisitor-12345678', parent: a.id }), '6.6.6.7');
+  await flushMail();
+  assert.equal(mail(MAILBOX).length, 1);
+  sent = [];
+  env.DB.raw.exec('DELETE FROM hits');
+  await act(other.json.id, 'spam'); await act(other.json.id, 'approve'); await flushMail();
+  assert.equal(sent.length, 0, 'an auto-approved reply is not announced again by admin approval');
+  assert.equal(env.DB.raw.prepare('SELECT announced FROM comments WHERE id = ?').get(other.json.id).announced, 1);
+});
+
+test('manage_links rows go when a comment is deleted or hidden by the admin, and when a tombstone is purged', async () => {
+  const count = () => env.DB.raw.prepare('SELECT COUNT(*) AS n FROM manage_links').get().n;
+  const act = (id, action) => call('POST', `/v1/admin/comments/${id}`, { body: { action }, auth: env.ADMIN_TOKEN, origin: null });
+  const a = await confirmed();
+  const rep = await post(comment({ body: 'A reply to it', cid: CID2, parent: a.id }), '6.6.6.6');
+  await flushMail();
+  const ins = (cid, kind) => env.DB.raw.prepare("INSERT INTO manage_links(hash, comment_id, kind, expires, created) VALUES(?, ?, ?, NULL, 1)").run(`h${cid}${kind}${Math.random()}`, cid, kind);
+  ins(rep.json.id, 'device');
+  assert.ok(count() >= 3);
+  await act(a.id, 'spam');
+  assert.equal(count(), 0, 'spam removes the links of the comment and of its replies');
+  const b = await confirmed({ cid: 'secondparent-1234567', body: 'Second parent text', email: 'bee@example.com' });
+  ins(b.id, 'unsub');
+  await act(b.id, 'delete');
+  assert.equal(count(), 0, 'admin delete removes them');
+  // a tombstone purged once its last reply is removed
+  const c = await post(comment({ body: 'Third parent text', cid: 'thirdparent-12345678' }), '7.7.7.7');
+  const r2 = await post(comment({ body: 'Child reply text', cid: 'childvisitor-12345678', parent: c.json.id }), '7.7.7.8');
+  ins(c.json.id, 'device');
+  await call('POST', `/v1/comments/${c.json.id}/delete`, { body: { token: c.json.token } });
+  assert.equal(env.DB.raw.prepare("SELECT status FROM comments WHERE id = ?").get(c.json.id).status, 'deleted');
+  ins(c.json.id, 'device');
+  await act(r2.json.id, 'delete');
+  assert.equal(env.DB.raw.prepare('SELECT COUNT(*) AS n FROM comments WHERE id = ?').get(c.json.id).n, 0);
+  assert.equal(count(), 0, 'purging the tombstone removes its links');
+});
+
+test('at most 20 device tokens per comment; the oldest go first', async () => {
+  const r = await post(comment({ email: MAILBOX, notify: true }));
+  await flushMail();
+  const link = linkOf(sent[0]);
+  const toks = [];
+  for (let i = 0; i < 22; i++) {
+    env.DB.raw.exec('DELETE FROM hits');
+    const x = await exchange(link, `30.0.0.${i}`);
+    assert.equal(x.status, 200);
+    toks.push(x.json.token);
+  }
+  assert.equal(env.DB.raw.prepare("SELECT COUNT(*) AS n FROM manage_links WHERE kind = 'device'").get().n, 20);
+  assert.equal((await call('POST', `/v1/comments/${r.json.id}/edit`, { body: { token: toks[0], body: 'late edit text' } })).status, 404, 'the oldest is gone');
+  assert.equal((await call('POST', `/v1/comments/${r.json.id}/edit`, { body: { token: toks[21], body: 'late edit text' } })).status, 200);
+});
+
+test('exchange and unsubscribe give the generic 404 for bad JSON, non-objects and oversize bodies', async () => {
+  for (const path of ['/v1/manage/exchange', '/v1/notify/unsubscribe']) {
+    for (const raw of ['{nope', '[1,2]', '"str"', 'null', JSON.stringify({ link: 'y'.repeat(5000), token: 'y'.repeat(5000) })]) {
+      const res = await worker.fetch(new Request(`https://api.test${path}`, { method: 'POST', headers: { Origin: ORIGIN, 'CF-Connecting-IP': '1.2.3.4' }, body: raw }), env, { waitUntil() {} });
+      assert.equal(res.status, 404, `${path} ${raw.slice(0, 10)}`);
+      assert.deepEqual(await res.json(), { error: 'That comment could not be found.' });
+    }
+  }
 });

@@ -90,9 +90,8 @@ async function ownerRow(env, id, token) {
     : null;
   const match = same(givenHash, row?.manage_hash || '0'.repeat(64)); // a comment with no hash (older, or from the team) is compared with zeros and never matches
   // a device token (from the emailed manage link) is the same kind of secret, kept hashed in manage_links; it is looked up by its hash
-  const device = row && TOKEN_RE.test(given)
-    ? await env.DB.prepare("SELECT 1 AS ok FROM manage_links WHERE hash = ? AND comment_id = ? AND kind = 'device'").bind(givenHash, id).first()
-    : null;
+  // The lookup runs every time, with the id bound even when no such comment exists, so timing does not reveal which ids exist.
+  const device = await env.DB.prepare("SELECT 1 AS ok FROM manage_links WHERE hash = ? AND comment_id = ? AND kind = 'device'").bind(givenHash, Number.isSafeInteger(id) ? id : 0).first();
   if (!row || !TOKEN_RE.test(given) || !((row.manage_hash && match) || device) || !['approved', 'pending'].includes(row.status)) return null;
   const { manage_hash, ...own } = row; // the hash never leaves this function
   return own;
@@ -105,6 +104,11 @@ async function hasReplies(env, id) {
 async function purgeIfOrphan(env, parentId) {
   if (!parentId) return;
   await env.DB.prepare("DELETE FROM comments WHERE id = ? AND status = 'deleted' AND NOT EXISTS (SELECT 1 FROM comments WHERE parent_id = ? AND status IN ('approved', 'pending'))").bind(parentId, parentId).run();
+  await dropLinks(env, parentId); // links of a comment that no longer exists
+}
+// Removes the emailed links and device tokens of comments that are gone (no row left in comments).
+async function dropLinks(env, id) {
+  await env.DB.prepare('DELETE FROM manage_links WHERE comment_id = ? AND NOT EXISTS (SELECT 1 FROM comments WHERE id = ?)').bind(id, id).run();
 }
 // Cleans a comment's name and text the way they are stored, and checks length and links. Shared by the create and edit routes.
 // Returns { name, body } or { error } (a message for a 400).
@@ -180,6 +184,18 @@ async function postMeta(env, slug) {
 /* ------------------------------------------------------------------ email */
 const siteOrigin = (env) => String(env.SITE_ORIGIN || 'https://mayobebros.com').replace(/\/$/, '');
 const siteOf = (env) => ({ origin: siteOrigin(env), logoUrl: `${siteOrigin(env)}/assets/img/icon-192.png` });
+// One inbox, however it is spelled: NFKC, lower case, no trailing dot on the domain, no +tag, and for Gmail no dots and
+// googlemail.com = gmail.com. Used ONLY for rate-limit keys; mail still goes to the address as typed.
+export function canonicalEmail(raw) {
+  const e = String(raw ?? '').normalize('NFKC').trim().toLowerCase();
+  const at = e.lastIndexOf('@');
+  if (at < 1) return e;
+  let local = e.slice(0, at).split('+')[0];
+  let domain = e.slice(at + 1).replace(/\.+$/, '');
+  if (domain === 'googlemail.com') domain = 'gmail.com';
+  if (domain === 'gmail.com') local = local.replace(/\./g, '');
+  return `${local}@${domain}`;
+}
 const utcDay = () => new Date().toISOString().slice(0, 10);
 const DAY_TTL = 90000; // a little over a day, in seconds
 
@@ -193,6 +209,9 @@ function later(env, ctx, job) {
 async function addLink(env, kind, commentId, expires) {
   const token = await newToken();
   await env.DB.prepare('INSERT INTO manage_links(hash, comment_id, kind, expires, created) VALUES(?, ?, ?, ?, ?)').bind(await sha(token), commentId, kind, expires, now()).run();
+  if (kind === 'device') { // keep the newest 20 per comment
+    await env.DB.prepare("DELETE FROM manage_links WHERE kind = 'device' AND comment_id = ? AND hash NOT IN (SELECT hash FROM manage_links WHERE kind = 'device' AND comment_id = ? ORDER BY created DESC, rowid DESC LIMIT 20)").bind(commentId, commentId).run();
+  }
   return token; // the clear token exists only here, long enough to be put in the email
 }
 
@@ -200,7 +219,7 @@ async function addLink(env, kind, commentId, expires) {
 async function mailManageLink(env, ctx, c) {
   const day = utcDay();
   if (!(await hit(env, ctx, `mlip:${c.ih}:${day}`, 5, DAY_TTL))) return; // at most 5 a day per IP
-  if (!(await hit(env, ctx, `mlem:${(await sha(`${c.email.toLowerCase()}|${env.HASH_SALT || 'mayobe'}`)).slice(0, 32)}:${day}`, 1, DAY_TTL))) return; // 1 a day per address, never the raw address
+  if (!(await hit(env, ctx, `mlem:${(await sha(`${canonicalEmail(c.email)}|${env.HASH_SALT || 'mayobe'}`)).slice(0, 32)}:${day}`, 1, DAY_TTL))) return; // 1 a day per address, never the raw address
   const meta = await postMeta(env, c.slug);
   const origin = siteOrigin(env);
   const token = await addLink(env, 'link', c.id, now() + LINK_DAYS * 86400000);
@@ -213,7 +232,11 @@ async function mailReplyNotice(env, ctx, r) {
   const parent = r.parent_id ? await env.DB.prepare('SELECT id, slug, name, email, cid, status, notify_confirmed FROM comments WHERE id = ?').bind(r.parent_id).first() : null;
   if (!parent || parent.status !== 'approved' || !parent.notify_confirmed || !parent.email) return;
   if (!r.team && r.cid && r.cid === parent.cid) return; // never tell people about their own follow-up
-  if (!(await hit(env, ctx, `rn:${parent.id}:${utcDay()}`, 1, DAY_TTL))) return; // 1 a day per comment
+  // Announce each reply once: compare-and-set, so approve/spam/approve or a double click can never send twice.
+  if (!(await env.DB.prepare('UPDATE comments SET announced = 1 WHERE id = ? AND announced = 0 RETURNING id').bind(r.id).first())) return;
+  // One a day per parent comment. This slot is taken before the suppression and budget checks in sendMail on purpose:
+  // a recipient who cannot be mailed now is still not mailed a burst later, which protects them.
+  if (!(await hit(env, ctx, `rn:${parent.id}:${utcDay()}`, 1, DAY_TTL))) return;
   const meta = await postMeta(env, parent.slug);
   const origin = siteOrigin(env);
   const unsub = await addLink(env, 'unsub', parent.id, null); // a new one for every notice; all of them work
@@ -376,7 +399,8 @@ async function handle(request, env, ctx) {
   }
 
   if (method === 'POST' && path === '/v1/manage/exchange') {
-    const b = await readJson(request);
+    const b = await readJson(request).catch(() => null);
+    if (!b || Array.isArray(b)) return fail(NOT_FOUND, 404, cors);
     const ih = await ipHash(request, env);
     if (!(await hit(env, ctx, `mx:${ih}:${Math.floor(now() / 3600000)}`, 30, 3700))) return fail('Too many tries. Please try again later.', 429, cors);
     if (typeof b.link !== 'string' || !TOKEN_RE.test(b.link)) return fail(NOT_FOUND, 404, cors);
@@ -389,7 +413,8 @@ async function handle(request, env, ctx) {
   }
 
   if (method === 'POST' && path === '/v1/notify/unsubscribe') {
-    const b = await readJson(request);
+    const b = await readJson(request).catch(() => null);
+    if (!b || Array.isArray(b)) return fail(NOT_FOUND, 404, cors);
     const ih = await ipHash(request, env);
     if (!(await hit(env, ctx, `un:${ih}:${Math.floor(now() / 3600000)}`, 30, 3700))) return fail('Too many tries. Please try again later.', 429, cors);
     if (typeof b.token !== 'string' || !TOKEN_RE.test(b.token)) return fail(NOT_FOUND, 404, cors);
@@ -528,7 +553,7 @@ async function handle(request, env, ctx) {
             env.DB.prepare('UPDATE post_stats SET comments = comments + 1 WHERE slug = ? AND changes() > 0').bind(row.slug), // must stay right after the row statement
           ]);
           if (!(done[0]?.results || []).length) return fail('No such comment.', 404, cors); // it changed or was deleted while we looked
-          if (row.parent_id) { // a held reply is now public: tell the person it answers
+          if (row.parent_id && row.status === 'pending') { // a held reply is now public: tell the person it answers
             const rep = await env.DB.prepare('SELECT id, parent_id, name, body, team, cid FROM comments WHERE id = ?').bind(id).first();
             if (rep) later(env, ctx, () => mailReplyNotice(env, ctx, rep));
           }
@@ -539,10 +564,12 @@ async function handle(request, env, ctx) {
           minusChanged,
           env.DB.prepare("UPDATE comments SET status = 'spam' WHERE (id = ? OR parent_id = ?) AND status NOT IN ('approved', 'spam', 'deleted')").bind(id, id), // a tombstone stays a tombstone
         ]);
+        await env.DB.prepare('DELETE FROM manage_links WHERE comment_id IN (SELECT id FROM comments WHERE id = ? OR parent_id = ?)').bind(id, id).run(); // hidden comments cannot be managed or announced
         await purgeIfOrphan(env, row.id); // a tombstone whose replies were just hidden
         await purgeIfOrphan(env, row.parent_id);
       } else if (b.action === 'delete') {
         await env.DB.batch([
+          env.DB.prepare('DELETE FROM manage_links WHERE comment_id IN (SELECT id FROM comments WHERE id = ? OR parent_id = ?)').bind(id, id),
           env.DB.prepare('DELETE FROM comment_likes WHERE comment_id IN (SELECT id FROM comments WHERE id = ? OR parent_id = ?)').bind(id, id),
           env.DB.prepare("DELETE FROM comments WHERE (id = ? OR parent_id = ?) AND status = 'approved'").bind(id, id),
           minusChanged,
