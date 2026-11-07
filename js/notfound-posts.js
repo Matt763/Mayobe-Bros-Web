@@ -25,7 +25,7 @@
   var list = [];
   var page = 1;
   var total = 1;
-  var status = null;
+  var status = box.querySelector('[data-nf-pager-status]');
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
@@ -41,7 +41,7 @@
   }
   function dateText(d) {
     var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d || '');
-    return m ? MONTHS[+m[2] - 1] + ' ' + (+m[3]) + ', ' + m[1] : '';
+    return m && +m[2] >= 1 && +m[2] <= 12 && +m[3] >= 1 && +m[3] <= 31 ? MONTHS[+m[2] - 1] + ' ' + (+m[3]) + ', ' + m[1] : '';
   }
 
   function card(p) {
@@ -87,16 +87,8 @@
       '<p class="pagination-note">Page ' + page + ' of ' + total + ' · Articles ' + from + ' to ' + to + ' of ' + list.length + '</p></nav>';
   }
 
-  function announce(text) {
-    if (!status) {
-      status = doc.createElement('p');
-      status.className = 'sr-only';
-      status.setAttribute('role', 'status');
-      status.setAttribute('aria-live', 'polite');
-      box.appendChild(status);
-    }
-    status.textContent = text;
-  }
+  // the live region ships empty in the page (a region inserted already filled is often not read); only its text changes
+  function announce(text) { if (status) status.textContent = text; }
 
   function lazy() {
     var imgs = grid.querySelectorAll ? grid.querySelectorAll('img.lazyfade') : [];
@@ -108,7 +100,7 @@
 
   function draw() {
     grid.innerHTML = list.slice((page - 1) * PER, page * PER).map(card).join('');
-    pager.innerHTML = bar();
+    pager.innerHTML = total > 1 ? bar() : '';
     lazy();
   }
 

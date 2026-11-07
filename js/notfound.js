@@ -3,7 +3,7 @@
    - on an email-link path (/newsletter/, /manage/): takes the link code out of the address first, then shows the notice; never redirects;
    - "Go back" when there is a page to go back to;
    - a 10 second countdown to the home page, only for a plain, visible, first visit with motion allowed. A Stop button,
-     any key, pointer, wheel, touch or focus, hiding the tab or leaving the page stops it for good (WCAG 2.2.1, 2.2.2).
+     any key, pointer press or real pointer move, wheel, scroll, touch or focus, hiding the tab or leaving the page stops it for good (WCAG 2.2.1, 2.2.2).
    It never fetches, never stores anything and writes text only (textContent), so the address can never be injected. */
 (function () {
   'use strict';
@@ -57,6 +57,15 @@
     count.textContent = String(left);
     if (unit) unit.textContent = left === 1 ? 'second' : 'seconds';
   }
+  // A mouse that only drifts a little (or a layout shift that repeats the pointer position) does not count; a real move does.
+  var MOVE_PX = 12;
+  var origin = null;
+  function onMove(ev) {
+    if (!ev || typeof ev.clientX !== 'number') return;
+    if (!origin) { origin = { x: ev.clientX, y: ev.clientY }; return; }
+    var dx = ev.clientX - origin.x, dy = ev.clientY - origin.y;
+    if (dx * dx + dy * dy >= MOVE_PX * MOVE_PX) stop();
+  }
   function onVisibility() { if (doc.visibilityState === 'hidden') stop(); }
   function onPageshow(ev) { if (ev && ev.persisted) stop(); }
 
@@ -64,6 +73,8 @@
     var m = on ? 'addEventListener' : 'removeEventListener';
     for (var i = 0; i < STOP_ON.length; i++) doc[m](STOP_ON[i], stop, CAPTURE);
     doc[m]('touchstart', stop, PASSIVE);
+    doc[m]('pointermove', onMove, PASSIVE);
+    window[m]('scroll', stop, PASSIVE);
     doc[m]('visibilitychange', onVisibility);
     window[m]('pagehide', stop);
     window[m]('pageshow', onPageshow);

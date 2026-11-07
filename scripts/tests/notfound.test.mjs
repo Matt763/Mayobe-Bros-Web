@@ -295,15 +295,16 @@ test('the built 404.html loads notfound.js with a version and is in no sitemap',
 // ---- js/notfound-posts.js: random posts, nine per page, paginated in place ----
 const NP_SRC = () => fs.readFileSync(path.join(ROOT, 'js', 'notfound-posts.js'), 'utf8');
 function runPosts({ data, fail = false, base = '', random = () => 0.5, markup = true } = {}) {
-  const grid = { innerHTML: 'STATIC', querySelectorAll: () => [] };
+  const imgs = [];
+  const grid = { innerHTML: 'STATIC', querySelectorAll: () => imgs };
   const pager = Object.assign(target(), { innerHTML: '' });
   const all = { hidden: false };
   const title = { scrolled: 0, scrollIntoView() { this.scrolled++; } };
   const current = { focused: 0, offsetParent: {}, focus() { this.focused++; } };
-  const status = { textContent: '', attrs: {}, setAttribute(k, v) { this.attrs[k] = v; } };
+  const status = { textContent: '' };
   const box = {
     getAttribute: (k) => (k === 'data-per' ? '9' : null),
-    querySelector: (s) => ({ '[data-nf-grid]': grid, '[data-nf-pager]': pager, '[data-nf-all]': all, '.nf-more-title': title }[s] || null),
+    querySelector: (s) => ({ '[data-nf-grid]': grid, '[data-nf-pager]': pager, '[data-nf-all]': all, '.nf-more-title': title, '[data-nf-pager-status]': status }[s] || null),
     appendChild: () => {},
   };
   pager.querySelectorAll = (s) => (s === '.page-num.is-current' ? [{ offsetParent: null, focus() { hiddenFocused++; } }, current] : []);
@@ -326,7 +327,7 @@ function runPosts({ data, fail = false, base = '', random = () => 0.5, markup = 
     for (const f of pager.handlers.click || []) f({ target: { closest: () => a }, preventDefault: () => { prevented = true; }, ...extra });
     return prevented;
   };
-  return { hidden: () => hiddenFocused, grid, pager, all, title, current, status, fetched, click, settle: () => new Promise((r) => setTimeout(r, 5)) };
+  return { imgs, hidden: () => hiddenFocused, grid, pager, all, title, current, status, fetched, click, settle: () => new Promise((r) => setTimeout(r, 5)) };
 }
 const INDEX = Array.from({ length: 20 }, (_, i) => ({ t: `T${i} <b>`, u: `/post/c/s${i}/`, s: `s${i}`, e: `E${i}`, c: 'Cat', l: '', g: [], d: '2026-01-05', i: `/assets/posts/s${i}.webp`, x: '' }));
 
@@ -360,7 +361,6 @@ test('posts: page numbers change the cards in place, announce, move focus, and n
   assert.notEqual(t.grid.innerHTML, first);
   assert.equal((t.grid.innerHTML.match(/<article class="card"/g) || []).length, 9);
   assert.equal(t.status.textContent, 'Page 2 of 3');
-  assert.equal(t.status.attrs['aria-live'], 'polite');
   assert.equal(t.current.focused, 1, 'the visible current page number takes focus');
   assert.equal(t.hidden(), 0, 'not the hidden copy');
   assert.ok(t.title.scrolled >= 1);
@@ -396,4 +396,69 @@ test('posts: the script is loaded on the 404 and nowhere else', () => {
   assert.match(render404(), /js\/notfound-posts\.js/);
   const r = createRenderer({ config: SITE, categories: CATS, posts: [], pages: [], authors: [], versions: {} });
   assert.doesNotMatch(r.home(), /notfound-posts\.js/);
+});
+
+test('posts: the live region ships empty in the page, and the script only sets its text', () => {
+  const h = renderWith(POSTS);
+  assert.match(h, /<p class="sr-only" role="status" aria-live="polite" data-nf-pager-status><\/p>/);
+  assert.doesNotMatch(NP_SRC(), /createElement|appendChild/);
+});
+
+test('posts: nine or fewer posts make one page and no pager bar', async () => {
+  const t = runPosts({ data: INDEX.slice(0, 9) });
+  await t.settle();
+  assert.equal((t.grid.innerHTML.match(/<article class="card"/g) || []).length, 9);
+  assert.equal(t.pager.innerHTML, '');
+  const ten = runPosts({ data: INDEX.slice(0, 10) });
+  await ten.settle();
+  assert.match(ten.pager.innerHTML, /Page 1 of 2/);
+});
+
+test('posts: hostile index values are escaped or dropped (quote in title, javascript: image, bad date)', async () => {
+  const bad = { t: 'He said "hi" & <script>x</script>', u: '/post/c/ok/', e: `it's <i>`, c: '"><img src=x>', d: '2026-13-99', i: 'javascript:alert(1)' };
+  const proto = { t: 'proto image', u: '/post/c/two/', e: 'e', c: 'c', d: 'not a date', i: '//evil.example/x.webp' };
+  const t = runPosts({ data: [bad, proto] });
+  await t.settle();
+  const h = t.grid.innerHTML;
+  assert.doesNotMatch(h, /<script|<i>|<b>|<img src=x/);
+  assert.match(h, /He said &quot;hi&quot; &amp; &lt;script&gt;/);
+  assert.doesNotMatch(h, /javascript:|evil\.example/);
+  assert.doesNotMatch(h, /<img/);
+  assert.doesNotMatch(h, /<time|undefined/);
+  assert.match(h, /href="\/post\/c\/ok\/"/);
+});
+
+test('posts: pictures fade in when loaded or failed, and at once when already complete', async () => {
+  const mk = (complete) => { const i = { complete, classes: new Set(), handlers: {}, classList: { add(c) { i.classes.add(c); } }, addEventListener(type, f) { i.handlers[type] = f; } }; return i; };
+  const t = runPosts({ data: INDEX });
+  await t.settle();
+  const done = mk(true), late = mk(false), broken = mk(false);
+  t.imgs.push(done, late, broken);
+  t.click(2);
+  assert.ok(done.classes.has('is-loaded'));
+  assert.ok(!late.classes.has('is-loaded'));
+  late.handlers.load();
+  broken.handlers.error();
+  assert.ok(late.classes.has('is-loaded') && broken.classes.has('is-loaded'));
+});
+
+test('a real pointer move or a scroll stops the countdown; a small drift or the first position does not', () => {
+  const small = setup();
+  small.fire(small.doc, 'pointermove', { clientX: 100, clientY: 100 });
+  small.fire(small.doc, 'pointermove', { clientX: 105, clientY: 104 });
+  small.tick(3);
+  assert.equal(small.nodes.timer.classes.has('is-stopped'), false);
+  small.fire(small.doc, 'pointermove', { clientX: 100, clientY: 130 });
+  assert.equal(small.nodes.timer.classes.has('is-stopped'), true);
+  small.tick(20);
+  assert.equal(replaces(small).length, 0);
+  const sc = setup();
+  sc.fire(sc.win, 'scroll');
+  assert.equal(sc.nodes.timer.classes.has('is-stopped'), true);
+  sc.tick(20);
+  assert.equal(replaces(sc).length, 0);
+  const weird = setup();
+  weird.fire(weird.doc, 'pointermove', {});
+  weird.fire(weird.doc, 'pointermove', undefined);
+  assert.equal(weird.nodes.timer.classes.has('is-stopped'), false);
 });

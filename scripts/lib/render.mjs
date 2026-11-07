@@ -999,6 +999,7 @@ ${withIds.html}
     <div class="grid nf-grid" data-nf-grid>${newest.map((p) => card(p)).join('')}</div>
     <p class="nf-all" data-nf-all><a class="btn btn-outline" href="${u('/post/')}">More articles ${icon('arrowRight', 16)}</a></p>
     <div data-nf-pager></div>
+    <p class="sr-only" role="status" aria-live="polite" data-nf-pager-status></p>
   </div>
 </section>`,
     );
