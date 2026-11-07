@@ -133,12 +133,13 @@ and `.admin-token` (git-ignored) or `ADMIN_TOKEN`.
 Readers can edit their own comment for 30 minutes (only while it has no reply; edits are re-checked) and delete it at any time; a deleted comment with replies stays as a "This comment was deleted." note. After a reader deletes a comment that was an answered question, run `node scripts/qa-sync.mjs`, then build and push, so the saved copy in `content/qa.json` is rewritten.
 
 ## Email (Resend, sent by the Worker)
-Not a newsletter: comment manage links, reply notices, owner alerts and the contact form only (the newsletter, Phase 3, is not built and the footer form stays off).
+Comment manage links, reply notices, owner alerts, the contact form and the newsletter (Phase 3, built; deploy is the owner's checklist in `worker/README.md`).
 - Sending: `worker/src/mail.js` (`sendMail`, daily budget slices owner 10 / commenter 25 / contact 10 / news 35, suppression list). Templates: `worker/src/mail-templates.js` with colours in `mail-tokens.js`. Lint test: `scripts/tests/email-templates.test.mjs` (contrast, size, forbidden CSS, hostile input).
 - Look at every template before changing one: `node scripts/tools/email-preview.mjs` (writes HTML, text and PNGs to `~/.cache/mayobe-email-preview/`, never into the repo).
 - Rule: text typed by a visitor is never sent to an address that has not been confirmed. The manage-link mail and the contact confirmation carry fixed text only; owner-bound mail may carry escaped visitor text. Every link in an email is on our own origin.
 - A failed or skipped email must never fail a request (`ctx.waitUntil`), except the contact form, which answers with the mailto fallback when the owner notice cannot be sent. Owner addresses are never suppressed.
-- Policies (`content/pages/privacy-policy.html`, `comment-policy.html`, `contact.html`) describe all of this: change them with the code. Do not mention a newsletter until it exists.
+- Policies (`content/pages/privacy-policy.html`, `comment-policy.html`, `contact.html`, `terms-of-service.html`) describe all of this: change them with the code.
+- Newsletter: double opt-in sign-up, a welcome mail, one email per new article from a daily Cron Trigger, one-click unsubscribe. Code: `worker/src/newsletter.js`, `worker/migrations/0007_newsletter.sql`, `scripts/newsletter.mjs` (owner CLI: list, count, dry-run, seed, remove), `js/subscribe.js` (footer form), `js/newsletter.js` + `content/pages/newsletter.html` (the confirm/unsubscribe page, built only when on). The footer form, `/newsletter/` and every newsletter sentence in the policies (inside `{{#newsletter}}...{{/newsletter}}`) exist only when `newsletterAction` in `site.config.json` is `"api"` (git keeps `""`, the footer then shows the RSS button). Preview locally with `node scripts/build.mjs --api http://127.0.0.1:8787 --newsletter` (never commit that output). Article emails go out only when the Worker var `NEWSLETTER_SEND` is `"true"` (git ships `"false"`). They share the 35-a-day news slice, so a list of 60 gets an article within 2 days. Never rename a post in its first week (subscribers would get it twice). Details and the go-live order: `worker/README.md`.
 - Owner-run test send: `node scripts/mail-test.mjs <template> <to> --yes` (needs `RESEND_API_KEY` in the environment; never run it without the owner). Setup and limits: "Email setup (owner checklist)" at the end of `worker/README.md`.
 
 ## RSS feed
@@ -150,7 +151,7 @@ Do not add XSLT or scripts to the feed. Do not link third-party reader services 
 
 ## Do not hand-edit generated files
 Generated on every build: `index.html`, `404.html`, `post/`, `category/`, `label/`, `tag/` (every tag page and the `/tag/` index of all topics), `data/tags.json` (read by the sidebar's "More topics" button), `popular/`, `search/`, `author/`,
-every page folder from `content/pages/`, `sitemap.xml`, `*-sitemap<N>.xml`, `sitemap.xsl`, `feed.xml`, `feed.css`, `rss/`, `sitemap/`, `robots.txt`, `manifest.json`, `data/search.json`,
+every page folder from `content/pages/`, `sitemap.xml`, `*-sitemap<N>.xml`, `sitemap.xsl`, `feed.xml`, `feed.css`, `rss/`, `newsletter/` (only when the newsletter is on), `sitemap/`, `robots.txt`, `manifest.json`, `data/search.json`,
 `assets/share/*.jpg` (link-preview pictures), `.share-cards.json`, `.build-manifest.json`. Change the sources and rebuild:
 
 | To change | Edit |

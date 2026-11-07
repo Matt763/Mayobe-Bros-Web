@@ -190,6 +190,18 @@ test('with the newsletter on: footer form, honeypot, privacy link, and a noindex
   assert.doesNotMatch(nl, /\{\{[#^/]?newsletter\}\}/, 'no template tags left');
 });
 
+test('privacy policy and terms describe the newsletter only when it is on', () => {
+  const body = (h) => h.slice(h.indexOf('<main'), h.indexOf('</main>'));
+  const on = renderWith({ newsletterAction: 'api', commentsApi: 'https://api.test/' });
+  const privacy = body(on.page('privacy-policy'));
+  assert.match(privacy, /<h3 id="newsletter">Newsletter<\/h3>/);
+  for (const w of ['7 days', '30 days', 'Resend', 'JavaScript']) assert.ok(privacy.includes(w), w);
+  assert.match(body(on.page('terms-of-service')), /The newsletter is free/);
+  assert.match(footerOf(on.page('about')), /href="\/privacy-policy\/#newsletter"/);
+  const off = renderWith();
+  for (const slug of ['privacy-policy', 'terms-of-service', 'cookie-policy']) assert.doesNotMatch(body(off.page(slug)), /newsletter/i, slug);
+});
+
 test('{{#newsletter}} and {{^newsletter}} work in content pages', () => {
   const pg = { slug: 'x-test', title: 'X', heading: '', subtitle: '', description: 'x', kind: 'wide', menu: false, order: 1, hero: '', updated: null, html: '<p>{{#newsletter}}NL-ON{{/newsletter}}{{^newsletter}}NL-OFF{{/newsletter}}</p>' };
   const on = renderWith({ newsletterAction: 'api' }).R.staticPage(pg);

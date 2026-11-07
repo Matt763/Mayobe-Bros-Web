@@ -1,6 +1,6 @@
 # Comment controls, Resend email and newsletter: design
 
-Date: 2026-11-06. Status: Phase 1 (comment edit, delete and likes) and Phase 2 (email through Resend) are implemented on branch `comment-controls`, pending the owner's deploy (checklist: `worker/README.md`). Phase 3 (newsletter) is not built.
+Date: 2026-11-06. Status: Phase 1 (comment edit, delete and likes) and Phase 2 (email through Resend) are implemented on branch `comment-controls`, pending the owner's deploy (checklist: `worker/README.md`). Phase 3 (newsletter) is implemented on the same branch, pending the owner's deploy (go-live order: `worker/README.md`).
 
 ## Why
 
@@ -80,7 +80,7 @@ Calls below are the builder's starting point, not a final API. All are `POST` wi
 - **Sign up** `POST /v1/newsletter/subscribe {email}` from the footer form (`newsletterAction` set). Double opt-in: a confirmation email with a one-time link; the address is not subscribed until clicked. Per-IP and per-address limits; one confirmation per address per day.
 - **Welcome** after confirmation. **Unsubscribe** by a link in every email (random per-subscriber token, hashed in D1) that works with one click; a farewell email is optional and sent once. Every newsletter message has `List-Unsubscribe` and `List-Unsubscribe-Post: List-Unsubscribe=One-Click` headers and a visible footer link. A `/newsletter/` built page explains it and holds the confirm/unsubscribe screens (`noindex`).
 - **New-post email.** A Cloudflare Cron Trigger runs once a day, reads `/data/search.json` on the live site, and emails subscribers about posts it has not sent yet (tracked in `newsletter_sent(slug)`). Sends in small batches below Resend's 10 requests a second, stops at the daily budget and continues the next day. A Worker variable `NEWSLETTER_SEND=false` pauses sending without a deploy of code. The owner can also run a dry run from `scripts/newsletter.mjs`.
-- **Capacity limit, to tell the owner plainly.** The free plan allows 100 emails a day. Each subscriber is one email, so a post email reaches at most about 80 subscribers a day (budget above) and larger lists take several days or need a paid plan.
+- **Capacity limit, to tell the owner plainly.** The free plan allows 100 emails a day. Each subscriber is one email, so a post email reaches at most about 27 to 35 subscribers a day (the news slice is 35 a day and confirmations, welcomes and goodbyes share it; the earlier figure of about 80 was wrong) and larger lists take several days or need a paid plan.
 - **Legal.** `privacy-policy.html` lists newsletter data and Resend; `terms`/`cookie` pages checked. The site's AdSense rules apply: no income promises or fake numbers in emails.
 - **Subscriber export and delete.** `scripts/newsletter.mjs list|remove <email>` (admin token) for requests under privacy law.
 

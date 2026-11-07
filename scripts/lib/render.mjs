@@ -285,7 +285,7 @@ export function createRenderer(ctx) {
           <div class="hp" aria-hidden="true"><label>Leave this field empty <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
           <button class="btn btn-primary" type="submit">Subscribe ${icon('arrowRight', 16)}</button>
           <p class="foot-status" role="status"></p>
-          <p class="foot-form-note" id="foot-note">One email when we publish a new article. Stop any time. See our <a href="${u('/privacy-policy/')}">Privacy Policy</a>.</p>
+          <p class="foot-form-note" id="foot-note">One email when we publish a new article. Stop any time. See our <a href="${u('/privacy-policy/#newsletter')}">Privacy Policy</a>.</p>
           <noscript><p class="foot-form-note">The sign-up form needs JavaScript. You can <a href="${u('/rss/')}">follow with RSS</a> instead.</p></noscript>
         </form>`
       : `<a class="btn btn-primary btn-lg" href="${u('/rss/')}">${icon('rss', 18)} Follow with RSS</a>`;

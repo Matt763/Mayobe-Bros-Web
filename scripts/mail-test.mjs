@@ -26,9 +26,9 @@ const TEMPLATES = {
   'owner-contact-failed': ['ownerAlertEmail', { kind: 'contact-failed', reason: 'sample', email: 'sample@example.com', name: 'Sample', body: 'This is a sample message.' }, 'owner'],
   'contact-owner': ['contactOwnerEmail', { name: 'Sample', email: 'sample@example.com', subject: 'Sample subject', message: 'This is a sample contact message.', type: 'editorial', receivedAt: Date.now() }, 'contact'],
   'contact-visitor': ['contactVisitorEmail', { name: 'Sample', subject: 'Sample', type: 'editorial' }, 'contact'],
-  'confirm-subscription': ['confirmSubscriptionEmail', { confirmUrl: `${ORIGIN}/newsletter/#confirm=sample` }, 'news'],
-  'welcome': ['welcomeEmail', { unsubscribeUrl: `${ORIGIN}/v1/newsletter/unsubscribe?t=sample`, latestPosts: [NEWS_POST] }, 'news'],
-  'new-post': ['newPostEmail', { post: NEWS_POST, unsubscribeUrl: `${ORIGIN}/v1/newsletter/unsubscribe?t=sample` }, 'news'],
+  'confirm-subscription': ['confirmSubscriptionEmail', { confirmUrl: `${ORIGIN}/newsletter/#c=sample` }, 'news'],
+  'welcome': ['welcomeEmail', { unsubscribeUrl: `${ORIGIN}/newsletter/#u=sample`, latestPosts: [NEWS_POST] }, 'news'],
+  'new-post': ['newPostEmail', { post: NEWS_POST, unsubscribeUrl: `${ORIGIN}/newsletter/#u=sample` }, 'news'],
   'farewell': ['farewellEmail', { resubscribeUrl: `${ORIGIN}/newsletter/` }, 'news'],
 };
 
