@@ -1,6 +1,6 @@
 # Comment controls, Resend email and newsletter: design
 
-Date: 2026-11-06. Status: Phase 1 (comment edit, delete and likes) is implemented on branch `comment-controls`, pending the owner's deploy. Phase 2 (email) is not built yet.
+Date: 2026-11-06. Status: Phase 1 (comment edit, delete and likes) and Phase 2 (email through Resend) are implemented on branch `comment-controls`, pending the owner's deploy (checklist: `worker/README.md`). Phase 3 (newsletter) is not built.
 
 ## Why
 

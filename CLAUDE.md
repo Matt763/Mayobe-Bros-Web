@@ -132,6 +132,15 @@ links or personal data, and apply `content/pages/comment-policy.html`. Needs the
 and `.admin-token` (git-ignored) or `ADMIN_TOKEN`.
 Readers can edit their own comment for 30 minutes (only while it has no reply; edits are re-checked) and delete it at any time; a deleted comment with replies stays as a "This comment was deleted." note. After a reader deletes a comment that was an answered question, run `node scripts/qa-sync.mjs`, then build and push, so the saved copy in `content/qa.json` is rewritten.
 
+## Email (Resend, sent by the Worker)
+Not a newsletter: comment manage links, reply notices, owner alerts and the contact form only (the newsletter, Phase 3, is not built and the footer form stays off).
+- Sending: `worker/src/mail.js` (`sendMail`, daily budget slices owner 10 / commenter 25 / contact 10 / news 35, suppression list). Templates: `worker/src/mail-templates.js` with colours in `mail-tokens.js`. Lint test: `scripts/tests/email-templates.test.mjs` (contrast, size, forbidden CSS, hostile input).
+- Look at every template before changing one: `node scripts/tools/email-preview.mjs` (writes HTML, text and PNGs to `~/.cache/mayobe-email-preview/`, never into the repo).
+- Rule: text typed by a visitor is never sent to an address that has not been confirmed. The manage-link mail and the contact confirmation carry fixed text only; owner-bound mail may carry escaped visitor text. Every link in an email is on our own origin.
+- A failed or skipped email must never fail a request (`ctx.waitUntil`). Owner addresses are never suppressed.
+- Policies (`content/pages/privacy-policy.html`, `comment-policy.html`, `contact.html`) describe all of this: change them with the code. Do not mention a newsletter until it exists.
+- Owner-run test send: `node scripts/mail-test.mjs <template> <to> --yes` (needs `RESEND_API_KEY` in the environment; never run it without the owner). Setup and limits: "Email setup (owner checklist)" at the end of `worker/README.md`.
+
 ## RSS feed
 `feed.xml` is plain RSS 2.0 for feed readers (the W3C validator passes it). Browsers show it as code, and XSLT styling is being removed from Chrome on 2026-11-17,
 so people are never sent to it: every visible "RSS feed" or "Follow with RSS" link goes to the page `/rss/` (copy button, what RSS is, how to follow,

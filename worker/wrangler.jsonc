@@ -8,7 +8,11 @@
   "observability": { "enabled": true },
   "vars": {
     "ALLOWED_ORIGINS": "https://mayobebros.com,https://www.mayobebros.com",
-    "SITE_ORIGIN": "https://mayobebros.com"
+    "SITE_ORIGIN": "https://mayobebros.com",
+    "MAIL_FROM": "Mayobe Bros <info@mayobebros.com>",
+    "MAIL_FROM_SUPPORT": "Mayobe Bros <support@mayobebros.com>",
+    "OWNER_EMAIL": "info@mayobebros.com",
+    "CONTACT_EMAIL": "info@mayobebros.com"
   },
   "d1_databases": [
     {
@@ -22,4 +26,6 @@
   //   ADMIN_TOKEN       long random string used by scripts/comments.mjs to moderate
   //   HASH_SALT         any long random string (used to hash visitor IPs, rotates daily)
   //   TURNSTILE_SECRET  optional, only if you turn on Cloudflare Turnstile
+  //   RESEND_API_KEY        Resend API key (sending only); without it email is switched off
+  //   RESEND_WEBHOOK_SECRET Resend webhook signing secret (whsec_...); without it the webhook refuses everything
 }
