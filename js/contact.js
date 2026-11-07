@@ -35,16 +35,60 @@
     if (k === 'email') return v.length <= r[1] && EMAIL_RE.test(v);
     return v.length >= r[0] && v.length <= r[1];
   }
-  function fallback(f) {
-    var body = 'Name: ' + f.name.value.trim() + '\nEmail: ' + f.email.value.trim() + '\n\n' + f.message.value.trim();
-    var href = 'mailto:' + mailto + '?subject=' + encodeURIComponent(f.subject.value.trim()) + '&body=' + encodeURIComponent(body);
+  // One random id per form fill. The server uses it to recognise a retry of the same message, so a retry after a timeout is not delivered twice.
+  function newId() {
+    var out = '';
+    try {
+      var a = new Uint8Array(16);
+      window.crypto.getRandomValues(a);
+      for (var i = 0; i < a.length; i++) out += (a[i] < 16 ? '0' : '') + a[i].toString(16);
+    } catch (e) { out = ''; }
+    while (out.length < 32) out += Math.floor(Math.random() * 16).toString(16);
+    return out;
+  }
+  var formId = newId();
+  // encodeURIComponent throws on a lone surrogate half: swap each one for U+FFFD first (real pairs stay)
+  function wellFormed(str) {
+    var out = '';
+    for (var i = 0; i < str.length; i++) {
+      var c = str.charCodeAt(i);
+      if (c >= 0xD800 && c <= 0xDBFF && i + 1 < str.length && str.charCodeAt(i + 1) >= 0xDC00 && str.charCodeAt(i + 1) <= 0xDFFF) { out += str.charAt(i) + str.charAt(i + 1); i++; }
+      else if (c >= 0xD800 && c <= 0xDFFF) out += '�';
+      else out += str.charAt(i);
+    }
+    return out;
+  }
+  // Encodes text for a mailto link but stops once about `max` encoded characters are used, so the link stays short enough for mail apps.
+  var NOTE = '\n\n(message shortened, please paste the rest)';
+  function encodeLimited(text, max) {
+    var out = '', i = 0, cut = false;
+    while (i < text.length) {
+      var cp = text.charCodeAt(i) >= 0xD800 && text.charCodeAt(i) <= 0xDBFF ? 2 : 1;
+      var piece = encodeURIComponent(text.substr(i, cp));
+      if (out.length + piece.length > max) { cut = true; break; }
+      out += piece;
+      i += cp;
+    }
+    return cut ? out + encodeURIComponent(NOTE) : out;
+  }
+  function plainFallback() {
     status.className = 'form-status is-err';
-    status.textContent = 'Sorry, we could not send your message from this page. ';
+    status.textContent = 'Sorry, we could not send your message from this page. Please email us at ' + mailto + '.';
+  }
+  function fallback(f, lead) {
+    var text = 'Name: ' + wellFormed(f.name.value.trim()) + '\nEmail: ' + wellFormed(f.email.value.trim()) + '\n\n' + wellFormed(f.message.value.trim());
+    var href = 'mailto:' + mailto + '?subject=' + encodeURIComponent(wellFormed(f.subject.value.trim()).slice(0, 120)) + '&body=' + encodeLimited(text, 1800);
     var a = doc.createElement('a');
     a.href = href;
-    a.textContent = 'Send it from your own email app instead';
+    a.textContent = 'send it from your own email app';
+    status.className = 'form-status is-err';
+    status.textContent = lead || 'Sorry, we could not send your message from this page. Please ';
     status.appendChild(a);
     status.appendChild(doc.createTextNode(' (it opens with your message filled in), or write to ' + mailto + '.'));
+  }
+  function showFallback(f, lead) {
+    try { fallback(f, lead); } catch (e) { plainFallback(); }
+    try { status.focus(); } catch (e) { /* nothing to do */ }
   }
 
   form.addEventListener('submit', function (e) {
@@ -57,31 +101,33 @@
       if (!ok && !first) first = f[k];
     });
     if (first) { setStatus('err', 'Please check the highlighted fields.'); first.focus(); return; }
-    var payload = { name: f.name.value.trim(), email: f.email.value.trim(), subject: f.subject.value.trim(), message: f.message.value.trim(), website: f.website ? f.website.value : '', ts: loaded };
+    var payload = { name: f.name.value.trim(), email: f.email.value.trim(), subject: f.subject.value.trim(), message: f.message.value.trim(), website: f.website ? f.website.value : '', ts: loaded, id: formId };
     sending = true;
     button.disabled = true;
     setStatus('', 'Sending…');
+    var handle = function (r) {
+      if (r.ok && r.body.ok) {
+        form.reset();
+        loaded = Date.now();
+        formId = newId();
+        setStatus('ok', 'Thank you. Your message was sent. If it needs a reply, we will write to the address you gave.');
+        status.focus();
+      } else if (r.status === 400 && r.body.field && RULES[r.body.field] && r.body.error) {
+        fieldError(r.body.field, r.body.error);
+        setStatus('err', 'Please check the highlighted field.');
+        f[r.body.field].focus();
+      } else if (r.status === 429) {
+        showFallback(f, 'You have sent several messages already. Please try again later, or ');
+      } else {
+        showFallback(f);
+      }
+    };
     fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(payload) })
       .then(function (r) {
         return r.json().catch(function () { return {}; }).then(function (j) { return { status: r.status, ok: r.ok, body: j || {} }; });
       })
-      .then(function (r) {
-        if (r.ok && r.body.ok) {
-          form.reset();
-          loaded = Date.now();
-          setStatus('ok', 'Thank you. Your message was sent. If it needs a reply, we will write to the address you gave.');
-          status.focus();
-        } else if (r.status === 400 && r.body.error) {
-          setStatus('err', r.body.error);
-          status.focus();
-        } else if (r.status === 429) {
-          setStatus('err', 'You have sent several messages already. Please try again later, or email us at ' + mailto + '.');
-          status.focus();
-        } else {
-          fallback(f);
-          status.focus();
-        }
-      }, function () { fallback(f); status.focus(); })
+      .then(handle)
+      .catch(function () { showFallback(f); })
       .then(function () { sending = false; button.disabled = false; });
   });
   form.addEventListener('input', function (e) {

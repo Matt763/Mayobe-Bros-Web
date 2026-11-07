@@ -124,17 +124,17 @@ function cleanComment(rawName, rawBody) {
   if (LINK_RE.test(body) || LINK_RE.test(name)) return { error: 'Links are not allowed in comments.' };
   return { name, body };
 }
-// The contact form: same cleaning, other limits, and links are allowed (the owner email shows them as plain text). Returns { name, email, subject, message, type } or { error }.
+// The contact form: same cleaning, other limits, and links are allowed (the owner email shows them as plain text). Returns { name, email, subject, message, type } or { error, field } (the page marks that field).
 function cleanContact(b) {
   const name = cleanName(b.name);
   const subject = cleanName(String(b.subject ?? '').replace(/[\r\n\t]+/g, ' ')); // one line: no line breaks, no invisible characters
   const message = cleanText(b.message);
   const email = String(b.email ?? '').trim();
-  if (name.length < 2 || name.length > 50) return { error: 'Please enter your name (2 to 50 characters).' };
-  if (email.length > 254 || /\p{Cc}|\p{Cf}/u.test(email) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !validEmail(email)) return { error: 'That email address does not look right.' };
-  if (subject.length < 3 || subject.length > 120) return { error: 'Please enter a subject (3 to 120 characters).' };
-  if (message.length < 10) return { error: 'Your message is too short (10 characters at least).' };
-  if (message.length > 3000) return { error: 'Your message is too long (3,000 characters at most).' };
+  if (name.length < 2 || name.length > 50) return { error: 'Please enter your name (2 to 50 characters).', field: 'name' };
+  if (email.length > 254 || /\p{Cc}|\p{Cf}/u.test(email) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !validEmail(email)) return { error: 'That email address does not look right.', field: 'email' };
+  if (subject.length < 3 || subject.length > 120) return { error: 'Please enter a subject (3 to 120 characters).', field: 'subject' };
+  if (message.length < 10) return { error: 'Your message is too short (10 characters at least).', field: 'message' };
+  if (message.length > 3000) return { error: 'Your message is too long (3,000 characters at most).', field: 'message' };
   return { name, email, subject, message, type: typeof b.type === 'string' && Object.hasOwn(CONTACT_TYPES, b.type) ? b.type : 'general' };
 }
 function isAdmin(request, env) {
@@ -419,22 +419,22 @@ async function handle(request, env, ctx) {
     const b = await readJson(request, 14000); // 3,000 characters can double when quotes and line breaks are escaped
     // bots: a filled hidden field or a form sent faster than a person can type. Pretend it worked; nothing is sent.
     if (b.website || (Number(b.ts) && now() - Number(b.ts) < 2500)) return reply({ ok: true }, 200, cors);
-    if (env.TURNSTILE_SECRET) {
-      const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body: new URLSearchParams({ secret: env.TURNSTILE_SECRET, response: String(b.tt || '') }) });
-      const j = await r.json().catch(() => ({}));
-      if (!j.success) return fail('Please complete the security check and try again.', 400, cors);
-    }
+    // No Turnstile check here on purpose: js/contact.js does not load the widget yet, so asking for a token would reject every message.
+    // Add it back together with the widget in the page.
     const c = cleanContact(b);
-    if (c.error) return fail(c.error, 400, cors);
+    if (c.error) return reply({ error: c.error, field: c.field }, 400, cors);
     const ih = await ipHash(request, env);
     const hour = Math.floor(now() / 3600000);
     if (!(await hit(env, ctx, `ct:${ih}:${hour}`, 3, 3700))) return fail('You have sent several messages already. Please try again later.', 429, cors);
     // the key holds a hash of the address, never the address itself
     if (!(await hit(env, ctx, `cte:${(await sha(`${canonicalEmail(c.email)}|${env.HASH_SALT || 'mayobe'}`)).slice(0, 32)}:${hour}`, 2, 3700))) return fail('You have sent several messages already. Please try again later.', 429, cors);
+    // at most 7 contact notices a day, so a flood leaves 3 of the owner's 10 daily units for held-comment and question alerts
+    const tooMany = !(await hit(env, ctx, `ctday:${utcDay()}`, 7, DAY_TTL));
     const general = env.CONTACT_EMAIL || 'info@mayobebros.com';
     const down = () => fail(`We could not send your message. Please email us at ${general}.`, 503, cors);
-    if (!env.RESEND_API_KEY) return down();
-    const id = crypto.randomUUID(); // a new message every time, so a second send is never swallowed as a repeat
+    if (tooMany || !env.RESEND_API_KEY) return down();
+    // the page sends one id per form fill, so a retry after a timeout reuses the same keys and cannot be delivered twice; without a good id a fresh one is made
+    const id = typeof b.id === 'string' && CID_RE.test(b.id) ? b.id : crypto.randomUUID();
     let owner;
     try {
       const m = contactOwnerEmail({ name: c.name, email: c.email, subject: c.subject, message: c.message, type: c.type, receivedAt: now() }, siteOf(env));
@@ -445,6 +445,8 @@ async function handle(request, env, ctx) {
     if (!owner || !owner.ok) { console.error('contact message could not be emailed to the owner'); return down(); }
     // the visitor's confirmation goes to an address nobody has verified: fixed text only, best effort, after the owner has the message
     later(env, ctx, async () => {
+      // one confirmation per address a day: the address is unverified, so a stranger's inbox is never filled through this form
+      if (!(await hit(env, ctx, `ctack:${(await sha(`${canonicalEmail(c.email)}|${env.HASH_SALT || 'mayobe'}`)).slice(0, 32)}:${utcDay()}`, 1, DAY_TTL))) return;
       const v = contactVisitorEmail({}, siteOf(env));
       await sendMail(env, ctx, { kind: 'contact', to: c.email, ...v, key: `contactack-${id}` });
     });

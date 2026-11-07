@@ -21,7 +21,7 @@ function el(extra = {}) {
   return n;
 }
 
-function setup({ fetchImpl, values = {} } = {}) {
+function setup({ fetchImpl, values = {}, attrs = {}, createElement } = {}) {
   const log = [];
   const f = { name: el(), email: el(), subject: el(), message: el(), website: el() };
   Object.assign(f.name, { name: 'name', value: 'Neema Joseph' });
@@ -32,18 +32,19 @@ function setup({ fetchImpl, values = {} } = {}) {
   const notes = Object.fromEntries(['name', 'email', 'subject', 'message'].map((k) => [k, el({ hidden: true })]));
   const status = el();
   const button = el();
-  const form = el({ attrs: { 'data-mail-api': '', 'data-endpoint': 'https://api.test/v1/contact', 'data-mailto': 'info@mayobebros.com' } });
+  const form = el({ attrs: { 'data-mail-api': '', 'data-endpoint': 'https://api.test/v1/contact', 'data-mailto': 'info@mayobebros.com', ...attrs } });
   form.elements = f;
   form.reset = () => { log.push(['reset']); for (const k of Object.keys(f)) f[k].value = ''; };
   form.querySelector = (s) => (s === '.form-status' ? status : s.startsWith('button') ? button : null);
   const ctx = {
-    document: { getElementById: (id) => (id === 'contact-form' ? form : (id.match(/^cf-(\w+)-err$/) ? notes[id.match(/^cf-(\w+)-err$/)[1]] : null)), createElement: () => el(), createTextNode: (t) => ({ text: t }) },
+    document: { getElementById: (id) => (id === 'contact-form' ? form : (id.match(/^cf-(\w+)-err$/) ? notes[id.match(/^cf-(\w+)-err$/)[1]] : null)), createElement: createElement || (() => el()), createTextNode: (t) => ({ text: t }) },
     fetch: async (url, init) => { log.push(['fetch', url, JSON.parse(init.body), init.headers]); const r = await fetchImpl(url, init); return { ok: r.status >= 200 && r.status < 300, status: r.status, json: async () => { if (r.body === undefined) throw new Error('no json'); return r.body; } }; },
     Date, JSON, encodeURIComponent, Object,
   };
   vm.runInNewContext(SRC, ctx);
+  const input = (name, value) => { f[name].value = value; form.handlers.input({ target: f[name] }); };
   const submit = async () => { form.handlers.submit({ preventDefault: () => log.push(['prevent']) }); await new Promise((r) => setTimeout(r, 20)); };
-  return { f, notes, status, button, form, log, submit };
+  return { f, notes, status, button, form, log, submit, input };
 }
 
 test('a valid form posts JSON with the honeypot and a page-load time, then shows the success text and focuses it', async () => {
@@ -51,7 +52,7 @@ test('a valid form posts JSON with the honeypot and a page-load time, then shows
   await t.submit();
   const call = t.log.find((l) => l[0] === 'fetch');
   assert.equal(call[1], 'https://api.test/v1/contact');
-  assert.deepEqual(Object.keys(call[2]).sort(), ['email', 'message', 'name', 'subject', 'ts', 'website']);
+  assert.deepEqual(Object.keys(call[2]).sort(), ['email', 'id', 'message', 'name', 'subject', 'ts', 'website']);
   assert.equal(call[2].website, '');
   assert.equal(typeof call[2].ts, 'number');
   assert.equal(call[3]['Content-Type'], 'application/json');
@@ -98,27 +99,100 @@ test('503, a network error and an unreadable answer all show the mailto fallback
   }
 });
 
-test('400 shows the server\'s message and 429 asks to try later; the text is kept', async () => {
-  let t = setup({ fetchImpl: async () => ({ status: 400, body: { error: 'That email address does not look right.' } }) });
-  await t.submit();
-  assert.equal(t.status.textContent, 'That email address does not look right.');
-  t = setup({ fetchImpl: async () => ({ status: 429, body: { error: 'x' } }) });
+test('429 says to try later and still offers the mailto link; the text is kept', async () => {
+  const t = setup({ fetchImpl: async () => ({ status: 429, body: { error: 'x' } }) });
   await t.submit();
   assert.match(t.status.textContent, /try again later/);
+  assert.match(t.status.children[0].href, /^mailto:/);
+  assert.equal(t.log.some((l) => l[0] === 'reset'), false);
 });
 
-test('the built contact page has the honeypot, field notes, status and the script, and no JS needed for the mailto fallback', () => {
+const bodyOf = (href) => decodeURIComponent(href.split('&body=')[1]);
+
+test('every send carries one random id per form fill; a retry after a failure keeps it, a new message gets a new one', async () => {
+  let n = 0;
+  const t = setup({ fetchImpl: async () => (++n === 1 ? { status: 503, body: {} } : { status: 200, body: { ok: true } }) });
+  await t.submit();
+  await t.submit();
+  const ids = t.log.filter((l) => l[0] === 'fetch').map((l) => l[2].id);
+  assert.match(ids[0], /^[A-Za-z0-9-]{16,64}$/);
+  assert.equal(ids[1], ids[0], 'same id on retry');
+  t.f.message.value = 'Hello, how do you choose topics?';
+  t.f.name.value = 'Neema Joseph'; t.f.email.value = 'neema@example.com'; t.f.subject.value = 'A question';
+  await t.submit();
+  const ids2 = t.log.filter((l) => l[0] === 'fetch').map((l) => l[2].id);
+  assert.notEqual(ids2[2], ids[0], 'a new id after a successful send');
+});
+
+test('a lone surrogate does not break the fallback: it is replaced, and the button works again', async () => {
+  const t = setup({ fetchImpl: async () => { throw new Error('offline'); }, values: { message: 'Hello \ud800 lone \udc00 pair \ud83d\ude00 ok' } });
+  await t.submit();
+  const a = t.status.children[0];
+  assert.ok(a && a.href.startsWith('mailto:'), 'a mailto link was made');
+  assert.ok(a.href.includes('%EF%BF%BD'), 'U+FFFD in place of the lone surrogates');
+  assert.ok(a.href.includes('%F0%9F%98%80'), 'a real emoji pair is kept');
+  assert.equal(t.button.disabled, false);
+});
+
+test('a huge non-ASCII message gives a short mailto link with a note', async () => {
+  const t = setup({ fetchImpl: async () => ({ status: 503, body: {} }), values: { message: '\u0645'.repeat(3000) } });
+  await t.submit();
+  const href = t.status.children[0].href;
+  assert.ok(href.split('&body=')[1].length <= 1900, `encoded body is ${href.split('&body=')[1].length}`);
+  assert.ok(bodyOf(href).includes('(message shortened, please paste the rest)'));
+  assert.equal(t.button.disabled, false);
+});
+
+test('even if building the fallback throws, the button is enabled again and the user sees a plain message', async () => {
+  const t = setup({ fetchImpl: async () => ({ status: 503, body: {} }), createElement: () => { throw new Error('boom'); } });
+  await t.submit();
+  assert.equal(t.button.disabled, false);
+  assert.notEqual(t.status.textContent, 'Sending…');
+  assert.match(t.status.textContent, /info@mayobebros\.com/);
+});
+
+test('only a 400 that names a field is a field error; any other failure shows the fallback', async () => {
+  let t = setup({ fetchImpl: async () => ({ status: 400, body: { error: 'That email address does not look right.', field: 'email' } }) });
+  await t.submit();
+  assert.equal(t.f.email.attrs['aria-invalid'], 'true');
+  assert.equal(t.notes.email.textContent, 'That email address does not look right.');
+  assert.equal(t.f.email.focused, 1);
+  assert.equal(t.status.children.length, 0, 'no fallback link');
+  for (const resp of [{ status: 400, body: { error: 'Please complete the security check and try again.' } }, { status: 403, body: { error: 'Origin not allowed.' } }, { status: 413, body: {} }, { status: 500, body: {} }, { status: 200, body: {} }]) {
+    t = setup({ fetchImpl: async () => resp });
+    await t.submit();
+    assert.ok(t.status.children[0] && t.status.children[0].href.startsWith('mailto:'), `fallback for ${resp.status} ${JSON.stringify(resp.body)}`);
+    assert.equal(t.button.disabled, false);
+  }
+});
+
+test('typing in a field that is marked wrong clears the mark once it is valid', async () => {
+  const t = setup({ values: { name: 'A' } });
+  await t.submit();
+  assert.equal(t.f.name.attrs['aria-invalid'], 'true');
+  t.input('name', 'A');
+  assert.equal(t.f.name.attrs['aria-invalid'], 'true', 'still too short');
+  t.input('name', 'Asha');
+  assert.equal(t.f.name.attrs['aria-invalid'], 'false');
+  assert.equal(t.notes.name.hidden, true);
+});
+
+test('without an endpoint the script does nothing', () => {
+  const t = setup({ attrs: { 'data-endpoint': '' } });
+  assert.equal(t.form.handlers.submit, undefined);
+});
+
+test('built contact page: markup agrees with the build mode, and render.mjs has both branches', () => {
   const html = fs.readFileSync(path.join(ROOT, 'contact', 'index.html'), 'utf8');
-  const api = /data-mail-api/.test(html);
+  const on = /data-mail-api/.test(html);
   assert.match(html, /id="contact-form"[^>]*data-mailto="[^"]+"/);
   assert.match(html, /class="form-status" role="status"/);
   for (const k of ['name', 'email', 'subject', 'message']) assert.match(html, new RegExp(`id="cf-${k}-err"`));
-  if (api) {
-    assert.match(html, /data-endpoint="https?:\/\/[^"]+\/v1\/contact"/);
-    assert.match(html, /name="website"/);
-    assert.match(html, /js\/contact\.js/);
-  } else {
-    assert.doesNotMatch(html, /js\/contact\.js/);
-    assert.doesNotMatch(html, /name="website"/);
-  }
+  assert.equal(/name="website"/.test(html), on, 'honeypot only with the mail API');
+  assert.equal(/js\/contact\.js/.test(html), on, 'script only with the mail API');
+  assert.equal(/data-endpoint="[^"]*\/v1\/contact"/.test(html), on, 'mail endpoint only with the mail API');
+  const src = fs.readFileSync(path.join(ROOT, 'scripts', 'lib', 'render.mjs'), 'utf8');
+  assert.match(src, /api \? `\$\{api\}\/v1\/contact` : c\.formAction \|\| ''/, 'endpoint with and without the API');
+  assert.match(src, /endpoint \? '<div class="hp"/, 'honeypot is conditional');
+  assert.match(src, /api && meta\.contact/, 'script is conditional');
 });

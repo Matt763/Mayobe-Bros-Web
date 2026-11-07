@@ -105,7 +105,14 @@ comments · requests are accepted only from `mayobebros.com`. Raw IP addresses a
 
 Optional: add Cloudflare Turnstile (free). Create a widget in the Cloudflare dashboard, run
 `npx wrangler secret put TURNSTILE_SECRET`, and put the site key in `site.config.json` as `turnstileSiteKey`.
-If you do, mention Cloudflare Turnstile in the Privacy Policy.
+If you do, mention Cloudflare Turnstile in the Privacy Policy. The contact form (`/v1/contact`) does not check Turnstile yet, because `js/contact.js` does not load the widget; add both together.
+
+## Email budget
+
+The free Resend plan allows 100 emails a day and 3,000 a month. The Worker keeps to 80 a day, split into slices per UTC day:
+owner 10, commenter 25, contact 10, news 35. A full slice never borrows from another. Contact-form notices to the owner are capped at 7 a day
+inside the owner slice (`ctday:` in `hits`), so a flood of contact messages leaves 3 owner emails for held-comment and question alerts; past 7
+the form answers with the "please email us" message. Each visitor confirmation (the `contact` slice) is sent once a day per address.
 
 ## Backups
 

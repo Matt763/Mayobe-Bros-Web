@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import worker from '../../worker/src/index.js';
 import { makeD1 } from '../lib/d1-shim.mjs';
+import { takeBudget } from '../../worker/src/mail.js';
 
 const ORIGIN = 'https://mayobebros.com';
 const CID = 'abcdefabcdefabcdef12';
@@ -1575,12 +1576,6 @@ test('contact: validation matrix', async () => {
   assert.equal((await call('POST', '/v1/contact', { body: null })).status, 400, 'not JSON');
 });
 
-test('contact: a message of 3,000 characters full of quotes and line breaks is still read', async () => {
-  const msg = '"\n'.repeat(1500);
-  const r = await contact({ message: `${msg}end of the text` .slice(-3000) });
-  assert.equal(r.status, 200);
-});
-
 test('contact: links in the message are allowed and arrive as inert text', async () => {
   const r = await contact({ message: 'Please read https://example.com/page?a=1&b=2 and tell me what you think.' });
   assert.equal(r.status, 200);
@@ -1614,19 +1609,30 @@ test('contact: 3 an hour per IP and 2 an hour per address (any spelling), keyed 
   assert.equal(keys.includes('9.9.9.9'), false);
 });
 
-test('contact: a full owner slice answers 503 with the address, while commenter mail still goes out', async () => {
-  for (let i = 0; i < 10; i++) assert.equal((await contact({ email: `flood${i}@example.com` })).status, 200);
+test('contact: at most 7 notices a day, so 3 owner units stay for comment alerts; commenter mail is untouched', async () => {
+  for (let i = 0; i < 7; i++) assert.equal((await contact({ email: `flood${i}@example.com` })).status, 200, `message ${i + 1}`);
   await flushMail();
   const before = sent.length;
   const r = await contact({ email: 'late@example.com' });
   assert.equal(r.status, 503);
   assert.equal(r.json.error, 'We could not send your message. Please email us at info@mayobebros.com.');
   await flushMail();
-  assert.equal(sent.length, before, 'no confirmation for a message nobody received');
-  const c = await post(comment({ email: MAILBOX, notify: true }));
-  assert.equal(c.status, 201);
+  assert.equal(sent.length, before, 'no mail was attempted for the 8th message');
+  // a held comment still alerts the owner (owner slice), and a manage link still goes out (commenter slice)
+  const held = await post(comment({ body: RUDE, cid: CID2, email: MAILBOX, notify: true }));
+  assert.equal(held.status, 202);
   await flushMail();
-  assert.ok(sent.slice(before).some((s) => s.body.to[0] === MAILBOX), 'the manage-link mail still sends');
+  const after = sent.slice(before);
+  assert.ok(after.some((s) => s.body.to[0] === 'info@mayobebros.com' && /held|review|comment/i.test(s.body.subject)), 'owner alert sent');
+  assert.ok(after.some((s) => s.body.to[0] === MAILBOX), 'manage-link mail sent');
+});
+
+test('contact: an owner slice that is already full answers 503 and tries nothing', async () => {
+  for (let i = 0; i < 10; i++) assert.equal(await takeBudget(env, 'owner'), true);
+  const r = await contact();
+  assert.equal(r.status, 503);
+  await flushMail();
+  assert.equal(sent.length, 0);
 });
 
 test('contact: owner mail failing (500, thrown fetch, no key) answers 503 and sends no confirmation', async () => {
@@ -1703,13 +1709,62 @@ test('contact: Origin is required and CORS answers only our site', async () => {
   assert.equal(sent.length, 0);
 });
 
-test('contact: when TURNSTILE_SECRET is set the check runs first', async () => {
+test('contact: TURNSTILE_SECRET does not block the form (the page has no widget yet) and is not called', async () => {
   env.TURNSTILE_SECRET = 'secret';
   const realF = globalThis.fetch;
-  globalThis.fetch = async (u, init) => (String(u).includes('turnstile') ? new Response(JSON.stringify({ success: false })) : realF(u, init));
+  let asked = 0;
+  globalThis.fetch = async (u, init) => { if (String(u).includes('turnstile')) { asked++; return new Response(JSON.stringify({ success: false })); } return realF(u, init); };
   try {
-    assert.equal((await contact()).status, 400);
+    assert.equal((await contact()).status, 200);
     await flushMail();
-    assert.equal(sent.length, 0);
+    assert.equal(asked, 0);
+    assert.equal(sent.length, 2);
   } finally { globalThis.fetch = realF; }
+});
+
+test('contact: validation errors name the field so the page can mark it', async () => {
+  const cases = [[{ name: 'A' }, 'name'], [{ email: 'nope' }, 'email'], [{ subject: 'ab' }, 'subject'], [{ message: 'short' }, 'message']];
+  for (const [over, field] of cases) {
+    const r = await contact(over);
+    assert.equal(r.status, 400);
+    assert.equal(r.json.field, field);
+  }
+});
+
+test('contact: the confirmation goes to one address once a day; the owner notice and the 200 are unchanged', async () => {
+  assert.equal((await contact({ email: 'once@example.com' })).status, 200);
+  assert.equal((await contact({ email: 'Once+again@example.com' })).status, 200);
+  await flushMail();
+  const owners = sent.filter((s) => s.body.to[0] === 'info@mayobebros.com');
+  const acks = sent.filter((s) => s.body.subject === 'We received your message');
+  assert.equal(owners.length, 2);
+  assert.equal(acks.length, 1);
+  assert.equal(/once/i.test(JSON.stringify(env.DB.raw.prepare('SELECT k FROM hits').all())), false, 'no raw address in hits');
+});
+
+test('contact: a browser id makes a retry use the same idempotency keys; a bad id is replaced', async () => {
+  const id = 'abcd1234-abcd-1234-abcd-1234567890ab';
+  await contact({ id, email: 'r1@example.com' });
+  await contact({ id, email: 'r2@example.com' });
+  await flushMail();
+  const own = sent.filter((s) => s.body.to[0] === 'info@mayobebros.com').map((s) => s.headers['Idempotency-Key']);
+  assert.deepEqual(own, [`contact-${id}`, `contact-${id}`]);
+  assert.ok(sent.some((s) => s.headers['Idempotency-Key'] === `contactack-${id}`));
+  sent = [];
+  await contact({ id: 'short', email: 'r3@example.com' });
+  await contact({ id: 'x'.repeat(65), email: 'r4@example.com' });
+  await flushMail();
+  for (const s of sent.filter((x) => x.body.to[0] === 'info@mayobebros.com')) assert.match(s.headers['Idempotency-Key'], /^contact-[0-9a-f-]{36}$/);
+});
+
+test('contact: 3,000 characters of quotes and line breaks arrive whole, escaped, in well-formed bodies', async () => {
+  const msg = ('"\n').repeat(1000) + '<b>x</b>'.repeat(125) + 'END';
+  const r = await contact({ message: msg.slice(0, 3000) });
+  assert.equal(r.status, 200);
+  await flushMail();
+  const own = sent[0];
+  assert.doesNotThrow(() => JSON.parse(own.raw));
+  assert.ok(own.body.html.includes('&quot;'), 'quotes escaped');
+  assert.ok(own.body.html.includes('&lt;b&gt;x&lt;/b&gt;'), 'tags escaped');
+  assert.equal(own.body.html.includes('<b>x</b>'), false);
 });
