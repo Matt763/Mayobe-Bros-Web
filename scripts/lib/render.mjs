@@ -339,7 +339,7 @@ ${body}
 </main>
 ${footer()}
 ${SEARCH_MODAL()}
-<script src="${assetUrl('js/site.js')}" defer></script>${meta.listen ? `\n<script src="${assetUrl('js/listen.js')}" defer></script>` : ''}${body.includes('class="pagination"') || body.includes('hero-listing') ? `\n<script src="${assetUrl('js/pager.js')}" defer></script>` : ''}${api ? `\n<script src="${assetUrl('js/engage.js')}" defer></script>` : ''}${api && meta.contact ? `\n<script src="${assetUrl('js/contact.js')}" defer></script>` : ''}${api && meta.manage ? `\n<script src="${assetUrl('js/manage.js')}" defer></script>` : ''}${newsletter ? `\n<script src="${assetUrl('js/subscribe.js')}" defer></script>` : ''}${newsletter && meta.newsletterPage ? `\n<script src="${assetUrl('js/newsletter.js')}" defer></script>` : ''}${cfToken && !meta.manage && !meta.newsletterPage ?`\n<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${cfToken}"}'></script>` : ''}
+${meta.notFound ? `<script src="${assetUrl('js/notfound.js')}" defer></script>\n` : ''}<script src="${assetUrl('js/site.js')}" defer></script>${meta.listen ? `\n<script src="${assetUrl('js/listen.js')}" defer></script>` : ''}${body.includes('class="pagination"') || body.includes('hero-listing') ? `\n<script src="${assetUrl('js/pager.js')}" defer></script>` : ''}${api ? `\n<script src="${assetUrl('js/engage.js')}" defer></script>` : ''}${api && meta.contact ? `\n<script src="${assetUrl('js/contact.js')}" defer></script>` : ''}${api && meta.manage ? `\n<script src="${assetUrl('js/manage.js')}" defer></script>` : ''}${newsletter ? `\n<script src="${assetUrl('js/subscribe.js')}" defer></script>` : ''}${newsletter && meta.newsletterPage ? `\n<script src="${assetUrl('js/newsletter.js')}" defer></script>` : ''}${cfToken && !meta.manage && !meta.newsletterPage ?`\n<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${cfToken}"}'></script>` : ''}
 </body>
 </html>
 `;
@@ -977,7 +977,7 @@ ${withIds.html}
       [u('/post/'), 'All posts'],
     ];
     return layout(
-      { title: 'Page not found', description: 'The page you were looking for could not be found.', path: '/404.html', noindex: true, noReferrer: true, adKind: 'notfound' },
+      { title: 'Page not found', description: 'The page you were looking for could not be found.', path: '/404.html', noindex: true, noReferrer: true, notFound: true, adKind: 'notfound' },
       {},
       `<section class="nf" data-nf><div class="wrap nf-in">
   <p class="nf-code"><span class="sr-only">Error </span>404</p>
