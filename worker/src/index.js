@@ -28,6 +28,7 @@
 import { screen, looksLikeTeam } from './moderation.js';
 import { looksLikeQuestion } from './question.js';
 import { SLUG_RE, TOKEN_RE, enc, now, reply, fail, sha, ipHash, same, newToken, hit, readJson, siteOrigin, siteOf, canonicalEmail, utcDay, DAY_TTL, later } from './util.js';
+import { newsletterRoute } from './newsletter.js';
 import { sendMail, validEmail } from './mail.js';
 import { manageLinkEmail, replyNoticeEmail, ownerAlertEmail, contactOwnerEmail, contactVisitorEmail, CONTACT_TYPES } from './mail-templates.js';
 
@@ -287,6 +288,9 @@ async function handle(request, env, ctx) {
     const o = request.headers.get('Origin');
     if (!o || !origins(env).includes(o)) return fail('Origin not allowed.', 403, cors);
   }
+
+  const nl = await newsletterRoute(request, env, ctx, path, cors);
+  if (nl) return nl;
 
   let m;
   if (method === 'GET' && path === '/v1/stats') {
