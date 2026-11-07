@@ -892,7 +892,7 @@ button.nav-link { border: 0; background: transparent; line-height: inherit; curs
 .nav-more .submenu { left: auto; right: 0; }
 
 /* 404 page */
-.nf { display: flex; align-items: center; justify-content: center; min-height: calc(100svh - var(--header-h)); padding-block: clamp(2.5rem, 7vw, 5rem); background: linear-gradient(135deg, var(--bg-alt), var(--bg)); }
+.nf { padding-block: clamp(2.5rem, 7vw, 5rem); background: linear-gradient(135deg, var(--bg-alt), var(--bg)); }
 .nf-in { max-width: 42rem; text-align: center; }
 .nf-code { margin: 0; font-size: clamp(4.5rem, 18vw, 8rem); font-weight: 900; line-height: 1; color: var(--link); }
 .nf-badge { display: inline-flex; align-items: center; justify-content: center; width: clamp(4rem, 10vw, 5rem); height: clamp(4rem, 10vw, 5rem); margin: 0.75rem 0 1.25rem; border-radius: 50%; background: var(--soft); color: var(--link); }
@@ -910,17 +910,12 @@ button.nav-link { border: 0; background: transparent; line-height: inherit; curs
 .nf-count { font-size: clamp(2.25rem, 7vw, 3rem); font-weight: 900; line-height: 1.2; color: var(--link); font-variant-numeric: tabular-nums; }
 .nf-card .nf-unit { margin-bottom: 1rem; color: var(--text-3); font-size: 0.9375rem; }
 .nf-timer .btn { min-height: 44px; }
+.nf-more { margin-top: clamp(2rem, 5vw, 3rem); padding-top: clamp(1.5rem, 4vw, 2rem); border-top: 1px solid var(--line-soft); text-align: left; }
+.nf-more-title { text-wrap: balance; margin: 0 0 1.25rem; font-size: clamp(1.25rem, 3vw, 1.625rem); font-weight: 800; text-align: center; }
+.nf-all { margin: 1.5rem 0 0; text-align: center; }
 .nf-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.75rem 1rem; }
-.nf-more { margin-top: clamp(2rem, 5vw, 3rem); padding-top: clamp(1.5rem, 4vw, 2rem); border-top: 1px solid var(--line-soft); }
-.nf-more-title { margin: 0; font-size: 1rem; font-weight: 600; color: var(--text-2); }
-.nf-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6rem; margin: 0; padding: 0; list-style: none; }
-.nf-links .chip { min-height: 44px; }
 @media (prefers-reduced-motion: reduce) { .nf-dot { animation: none; } }
 @media (max-width: 520px) { .nf-actions .btn { width: 100%; justify-content: center; } }
-.nf-search { display: flex; gap: 0.75rem; max-width: 40rem; margin: 1rem auto 1.25rem; }
-.nf-search input { flex: 1; min-width: 0; padding: 0.85rem 1.2rem; border: 2px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--text); font-size: 1.0625rem; }
-.nf-search input:focus { border-color: var(--btn-bg); outline: none; box-shadow: 0 0 0 4px var(--soft); }
-@media (max-width: 520px) { .nf-search { flex-direction: column; } }
 
 /* Desktop header (1280px and up; below that the menu button and drawer are used, because the category links need about 1200px). The logo is centred between the top edge and the bottom line of the whole header. The menu
    has its own full-width row, centred on the page at full size, and sits clear below the logo so nothing overlaps it. */

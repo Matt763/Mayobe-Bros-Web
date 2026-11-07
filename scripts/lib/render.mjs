@@ -339,7 +339,7 @@ ${body}
 </main>
 ${footer()}
 ${SEARCH_MODAL()}
-${meta.notFound ? `<script src="${assetUrl('js/notfound.js')}" defer></script>\n` : ''}<script src="${assetUrl('js/site.js')}" defer></script>${meta.listen ? `\n<script src="${assetUrl('js/listen.js')}" defer></script>` : ''}${body.includes('class="pagination"') || body.includes('hero-listing') ? `\n<script src="${assetUrl('js/pager.js')}" defer></script>` : ''}${api ? `\n<script src="${assetUrl('js/engage.js')}" defer></script>` : ''}${api && meta.contact ? `\n<script src="${assetUrl('js/contact.js')}" defer></script>` : ''}${api && meta.manage ? `\n<script src="${assetUrl('js/manage.js')}" defer></script>` : ''}${newsletter ? `\n<script src="${assetUrl('js/subscribe.js')}" defer></script>` : ''}${newsletter && meta.newsletterPage ? `\n<script src="${assetUrl('js/newsletter.js')}" defer></script>` : ''}${cfToken && !meta.manage && !meta.newsletterPage ?`\n<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${cfToken}"}'></script>` : ''}
+${meta.notFound ? `<script src="${assetUrl('js/notfound.js')}" defer></script>\n<script src="${assetUrl('js/notfound-posts.js')}" defer></script>\n` : ''}<script src="${assetUrl('js/site.js')}" defer></script>${meta.listen ? `\n<script src="${assetUrl('js/listen.js')}" defer></script>` : ''}${body.includes('class="pagination"') || body.includes('hero-listing') ? `\n<script src="${assetUrl('js/pager.js')}" defer></script>` : ''}${api ? `\n<script src="${assetUrl('js/engage.js')}" defer></script>` : ''}${api && meta.contact ? `\n<script src="${assetUrl('js/contact.js')}" defer></script>` : ''}${api && meta.manage ? `\n<script src="${assetUrl('js/manage.js')}" defer></script>` : ''}${newsletter ? `\n<script src="${assetUrl('js/subscribe.js')}" defer></script>` : ''}${newsletter && meta.newsletterPage ? `\n<script src="${assetUrl('js/newsletter.js')}" defer></script>` : ''}${cfToken && !meta.manage && !meta.newsletterPage ?`\n<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${cfToken}"}'></script>` : ''}
 </body>
 </html>
 `;
@@ -971,11 +971,7 @@ ${withIds.html}
      js/notfound.js reveals the right parts. Every address goes through u(), because GitHub Pages serves this file at any missing path. */
   function notFound() {
     const mail = config.contact?.general || '';
-    const pills = [
-      ...categories.filter((c) => !c.empty).map((c) => [u(`/category/${c.slug}/`), c.name]),
-      [u('/popular/'), 'Popular posts'],
-      [u('/post/'), 'All posts'],
-    ];
+    const newest = [...posts].sort((x, y) => y.date - x.date).slice(0, 9);
     return layout(
       { title: 'Page not found', description: 'The page you were looking for could not be found.', path: '/404.html', noindex: true, noReferrer: true, notFound: true, adKind: 'notfound' },
       {},
@@ -996,16 +992,14 @@ ${withIds.html}
   </div>
   <p class="sr-only" role="status" data-nf-status></p>
   <div class="nf-actions"><a class="btn btn-primary btn-lg" href="${u('/')}">${icon('home', 18)} Go to homepage</a><button class="btn btn-outline btn-lg" type="button" data-nf-back hidden>${icon('arrowLeft', 18)} Go back</button></div>
-  <div class="nf-more">
-    <h2 class="nf-more-title">Looking for something specific?</h2>
-    <form class="nf-search" action="${u('/search/')}" method="get" role="search">
-      <label class="sr-only" for="nf-q">Search ${e(config.name)}</label>
-      <input id="nf-q" name="q" type="search" placeholder="Search articles" autocomplete="off">
-      <button class="btn btn-primary" type="submit">${icon('search', 18)} Search</button>
-    </form>
-    <ul class="nf-links">${pills.map(([href, name]) => `<li><a class="chip" href="${href}">${e(name)}</a></li>`).join('')}</ul>
+</div>
+  <div class="wrap nf-more" data-nf-posts data-per="9">
+    <h2 class="nf-more-title">Posts you may be interested in</h2>
+    <div class="grid nf-grid" data-nf-grid>${newest.map((p) => card(p)).join('')}</div>
+    <p class="nf-all" data-nf-all><a class="btn btn-outline" href="${u('/post/')}">More articles ${icon('arrowRight', 16)}</a></p>
+    <div data-nf-pager></div>
   </div>
-</div></section>`,
+</section>`,
     );
   }
 
@@ -1612,7 +1606,7 @@ ${items.map((p) => `  <item>
   function searchIndex() {
     return (
       JSON.stringify(
-        posts.map((p) => ({ t: p.title, u: u(p.path), s: p.slug, e: p.excerpt, c: p.category.name, l: p.label?.name || '', g: p.tags, d: p.date.toISOString().slice(0, 10), i: resolveImage(p.image) || '', x: p.text.slice(0, 700) })),
+        posts.map((p) => ({ t: p.title, u: u(p.path), s: p.slug, e: p.excerpt, c: p.category.name, l: p.label?.name || '', g: p.tags, d: p.date.toISOString().slice(0, 10), i: fallbackImage(p) || '', x: p.text.slice(0, 700) })),
       ) + '\n'
     );
   }

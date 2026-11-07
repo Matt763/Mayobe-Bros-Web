@@ -41,12 +41,29 @@ test('404: no hero, one h1, the big 404, noindex and no-referrer, header and foo
   assert.match(h, /<footer class="site-footer"/);
 });
 
-test('404: pills are the categories with posts, then Popular posts and All posts', () => {
+const POSTS = Array.from({ length: 12 }, (_, i) => ({
+  slug: `p${i}`, title: `Post number ${i}`, excerpt: `Excerpt ${i}`, date: new Date(Date.UTC(2026, 0, i + 1)), updated: null,
+  category: { slug: 'educational', name: 'Education', image: '' }, label: null, path: `/post/educational/p${i}/`, image: '', tags: [], readingMinutes: 3, text: '',
+}));
+const renderWith = (posts, over = {}) => createRenderer({ config: { ...SITE, ...over }, categories: CATS, posts, pages: [], authors: [], versions: {} }).notFound();
+
+test('404: no search box and no category pills; a "Posts you may be interested in" section instead', () => {
   const h = render404();
-  const ul = h.match(/<ul class="nf-links">([\s\S]*?)<\/ul>/);
-  assert.ok(ul, 'no nf-links list');
-  assert.deepEqual(addresses(ul[1]), ['/category/educational/', '/popular/', '/post/']);
-  assert.ok(ul[1].includes('>Education<'));
+  assert.doesNotMatch(mainOf(h), /nf-search|nf-links|Looking for something specific|Search articles/);
+  assert.equal((mainOf(h).match(/<form\b/g) || []).length, 0);
+  assert.match(h, /<h2 class="nf-more-title">Posts you may be interested in<\/h2>/);
+});
+
+test('404: without JavaScript the nine newest posts are real cards, with a More articles link', () => {
+  const h = renderWith(POSTS);
+  const cards = mainOf(h).match(/<article class="card"/g) || [];
+  assert.equal(cards.length, 9);
+  assert.ok(h.indexOf('Post number 11') > -1 && h.indexOf('Post number 3<') > -1 && h.indexOf('Post number 2<') === -1, 'newest nine only');
+  assert.ok(h.indexOf('Post number 11') < h.indexOf('Post number 10'), 'newest first');
+  assert.match(h, /<a class="btn btn-outline" href="\/post\/">More articles/);
+  assert.match(h, /data-nf-posts data-per="9"/);
+  assert.doesNotMatch(h.match(/data-nf-grid[^>]*>/)[0], /data-reveal/);
+  assert.ok(addresses(renderWith(POSTS, { basePath: '/repo' })).every((a) => /^(\/repo\/|https:\/\/|mailto:|#)/.test(a)));
 });
 
 test('404: every address is root-absolute, also under a basePath', () => {
@@ -58,7 +75,6 @@ test('404: without JavaScript nothing pretends to redirect', () => {
   const h = render404();
   for (const attr of ['data-nf-timer', 'data-nf-flow', 'data-nf-back']) assert.ok(openTag(h, attr).includes(' hidden'), `${attr} must start hidden`);
   assert.doesNotMatch(h, /http-equiv="refresh"/i);
-  assert.match(h, /<form class="nf-search" action="\/search\/" method="get" role="search">/);
   assert.match(h, /href="\/"[^>]*>[\s\S]*?Go to homepage/);
 });
 
@@ -274,4 +290,110 @@ test('the built 404.html loads notfound.js with a version and is in no sitemap',
   const maps = fs.readdirSync(ROOT).filter((n) => n === 'sitemap.xml' || /-sitemap\d*\.xml$/.test(n));
   assert.ok(maps.length > 0);
   for (const m of maps) assert.doesNotMatch(fs.readFileSync(path.join(ROOT, m), 'utf8'), /404/, m);
+});
+
+// ---- js/notfound-posts.js: random posts, nine per page, paginated in place ----
+const NP_SRC = () => fs.readFileSync(path.join(ROOT, 'js', 'notfound-posts.js'), 'utf8');
+function runPosts({ data, fail = false, base = '', random = () => 0.5, markup = true } = {}) {
+  const grid = { innerHTML: 'STATIC', querySelectorAll: () => [] };
+  const pager = Object.assign(target(), { innerHTML: '' });
+  const all = { hidden: false };
+  const title = { scrolled: 0, scrollIntoView() { this.scrolled++; } };
+  const current = { focused: 0, offsetParent: {}, focus() { this.focused++; } };
+  const status = { textContent: '', attrs: {}, setAttribute(k, v) { this.attrs[k] = v; } };
+  const box = {
+    getAttribute: (k) => (k === 'data-per' ? '9' : null),
+    querySelector: (s) => ({ '[data-nf-grid]': grid, '[data-nf-pager]': pager, '[data-nf-all]': all, '.nf-more-title': title }[s] || null),
+    appendChild: () => {},
+  };
+  pager.querySelectorAll = (s) => (s === '.page-num.is-current' ? [{ offsetParent: null, focus() { hiddenFocused++; } }, current] : []);
+  let hiddenFocused = 0;
+  const doc = { querySelector: (s) => (markup && s === '[data-nf-posts]' ? box : null), documentElement: { getAttribute: () => base }, createElement: () => status };
+  const fetched = [];
+  const ctx = {
+    document: doc,
+    window: { fetch: true },
+    fetch: (url) => { fetched.push(url); return fail ? Promise.reject(new Error('x')) : Promise.resolve({ ok: true, json: () => Promise.resolve(data) }); },
+    Math: Object.assign(Object.create(Math), { random }),
+    location: { pathname: '/nope/' },
+    history: { replaceState() { throw new Error('address must not change'); }, pushState() { throw new Error('address must not change'); } },
+  };
+  vm.createContext(ctx);
+  vm.runInContext(NP_SRC(), ctx);
+  const click = (n, extra = {}) => {
+    const a = { getAttribute: (k) => (k === 'data-page' ? String(n) : null) };
+    let prevented = false;
+    for (const f of pager.handlers.click || []) f({ target: { closest: () => a }, preventDefault: () => { prevented = true; }, ...extra });
+    return prevented;
+  };
+  return { hidden: () => hiddenFocused, grid, pager, all, title, current, status, fetched, click, settle: () => new Promise((r) => setTimeout(r, 5)) };
+}
+const INDEX = Array.from({ length: 20 }, (_, i) => ({ t: `T${i} <b>`, u: `/post/c/s${i}/`, s: `s${i}`, e: `E${i}`, c: 'Cat', l: '', g: [], d: '2026-01-05', i: `/assets/posts/s${i}.webp`, x: '' }));
+
+test('posts: the whole index is shuffled once and shown nine at a time with the site pagination bar', async () => {
+  const t = runPosts({ data: INDEX });
+  await t.settle();
+  assert.deepEqual(t.fetched, ['/data/search.json']);
+  assert.equal((t.grid.innerHTML.match(/<article class="card"/g) || []).length, 9);
+  assert.match(t.pager.innerHTML, /<nav class="pagination" aria-label="Pagination">/);
+  assert.match(t.pager.innerHTML, /page-btn page-prev is-disabled/);
+  assert.match(t.pager.innerHTML, /class="page-num is-current"[^>]*>1</);
+  assert.match(t.pager.innerHTML, /Page 1 of 3/);
+  assert.equal(t.all.hidden, true);
+  const shown = new Set([...t.grid.innerHTML.matchAll(/href="(\/post\/[^"]+)"/g)].map((m) => m[1]));
+  assert.equal(shown.size, 9);
+  assert.match(t.grid.innerHTML, /width="1400" height="800" loading="lazy"/);
+});
+
+test('posts: a different shuffle gives a different first page (Fisher-Yates over all posts)', async () => {
+  const a = runPosts({ data: INDEX, random: () => 0 });
+  const b = runPosts({ data: INDEX, random: () => 0.999 });
+  await a.settle(); await b.settle();
+  assert.notEqual(a.grid.innerHTML, b.grid.innerHTML);
+});
+
+test('posts: page numbers change the cards in place, announce, move focus, and never touch the address', async () => {
+  const t = runPosts({ data: INDEX });
+  await t.settle();
+  const first = t.grid.innerHTML;
+  assert.equal(t.click(2), true, 'the link is not followed');
+  assert.notEqual(t.grid.innerHTML, first);
+  assert.equal((t.grid.innerHTML.match(/<article class="card"/g) || []).length, 9);
+  assert.equal(t.status.textContent, 'Page 2 of 3');
+  assert.equal(t.status.attrs['aria-live'], 'polite');
+  assert.equal(t.current.focused, 1, 'the visible current page number takes focus');
+  assert.equal(t.hidden(), 0, 'not the hidden copy');
+  assert.ok(t.title.scrolled >= 1);
+  t.click(3);
+  assert.equal((t.grid.innerHTML.match(/<article class="card"/g) || []).length, 2);
+  assert.match(t.pager.innerHTML, /page-btn page-next is-disabled/);
+  assert.equal(t.click(9), true);
+  assert.equal(t.status.textContent, 'Page 3 of 3');
+});
+
+test('posts: a modified click is left to the browser; titles are escaped; under a basePath the index is fetched from the base', async () => {
+  const t = runPosts({ data: INDEX, base: '/repo' });
+  await t.settle();
+  assert.deepEqual(t.fetched, ['/repo/data/search.json']);
+  assert.doesNotMatch(t.grid.innerHTML, /<b>/);
+  assert.equal(t.click(2, { ctrlKey: true }), false);
+  assert.match(t.pager.innerHTML, /Page 1 of 3/);
+});
+
+test('posts: if the index cannot be loaded, or has nothing usable, the built-in posts stay', async () => {
+  const f = runPosts({ fail: true });
+  await f.settle();
+  assert.equal(f.grid.innerHTML, 'STATIC');
+  assert.equal(f.all.hidden, false);
+  const bad = runPosts({ data: [{ t: 'x', u: 'https://evil.example/' }, { t: 'y', u: '//evil.example/' }] });
+  await bad.settle();
+  assert.equal(bad.grid.innerHTML, 'STATIC');
+  const none = runPosts({ markup: false });
+  assert.deepEqual(none.fetched, []);
+});
+
+test('posts: the script is loaded on the 404 and nowhere else', () => {
+  assert.match(render404(), /js\/notfound-posts\.js/);
+  const r = createRenderer({ config: SITE, categories: CATS, posts: [], pages: [], authors: [], versions: {} });
+  assert.doesNotMatch(r.home(), /notfound-posts\.js/);
 });
