@@ -70,3 +70,41 @@ test('pages with comments have a live region and a focusable comments heading', 
   }
   assert.ok(checked > 0, 'no built post page has comments: run node scripts/build.mjs');
 });
+
+// Comment emails: the "email me" checkbox on the form and the /manage/ page that turns an emailed link into the browser's edit token.
+test('the comment form has the email-me checkbox, hidden until an email is typed', () => {
+  let checked = 0;
+  for (const file of postPages()) {
+    const html = fs.readFileSync(file, 'utf8');
+    if (!html.includes('data-comments')) continue;
+    const rel = path.relative(ROOT, file);
+    assert.match(html, /<input[^>]*type="checkbox"[^>]*name="notify"|<input[^>]*name="notify"[^>]*type="checkbox"/, `${rel}: no notify checkbox`);
+    assert.ok(html.includes('Email me a link to edit or delete this comment, and tell me when the team replies'), `${rel}: checkbox label text`);
+    assert.match(html, /data-notify-row[^>]*\bhidden\b/, `${rel}: the checkbox row must start hidden`);
+    assert.match(html, /only for this[^<]*never shown/i, `${rel}: hint that the address is used only for this`);
+    assert.doesNotMatch(html.match(/<input[^>]*name="notify"[^>]*>/)[0], /\bchecked\b/, `${rel}: checkbox must be unchecked by default`);
+    checked++;
+  }
+  assert.ok(checked > 0, 'no built post page has comments');
+});
+
+test('/manage/ is noindex, no-referrer, has one button, and calls the API only from a click', () => {
+  const file = path.join(ROOT, 'manage', 'index.html');
+  assert.ok(fs.existsSync(file), 'manage/index.html missing: run node scripts/build.mjs');
+  const html = fs.readFileSync(file, 'utf8');
+  assert.match(html, /<meta name="robots" content="noindex/);
+  assert.match(html, /<meta name="referrer" content="no-referrer">/);
+  assert.match(html, /<button[^>]*data-manage-go/);
+  assert.match(html, /js\/manage\.js/);
+  assert.doesNotMatch(html, /<script(?![^>]*\bsrc=)[^>]*>[^<]*fetch\(/, 'no inline fetch on the page');
+  assert.doesNotMatch(fs.readFileSync(path.join(ROOT, 'sitemap.xml'), 'utf8') + [...fs.readdirSync(ROOT)].filter((f) => /sitemap\d*\.xml$/.test(f)).map((f) => fs.readFileSync(path.join(ROOT, f), 'utf8')).join(''), /\/manage\//, 'manage must not be in the sitemaps');
+  const js = fs.readFileSync(path.join(ROOT, 'js', 'manage.js'), 'utf8');
+  // every network call must sit inside a function that only a click handler reaches: the one call site is "go()", wired to the button
+  const calls = [...js.matchAll(/\bfetch\(/g)].length;
+  assert.equal(calls, 1, 'exactly one fetch call in manage.js');
+  assert.match(js, /addEventListener\('click',\s*go\)|addEventListener\("click",\s*go\)/, 'the button click must run go()');
+  assert.equal([...js.matchAll(/(?<!function )\bgo\(\)/g)].length, 0, 'go() must never be called directly');
+  assert.match(js, /history\.replaceState/);
+  const footer = html.split('<footer')[1] || '';
+  assert.doesNotMatch(footer, /href="[^"]*\/manage\/"/, 'not linked from the footer');
+});

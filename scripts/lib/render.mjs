@@ -142,7 +142,7 @@ export function createRenderer(ctx) {
 
   // <title> gets the brand when it still fits in search results; og:title and twitter:title never do: WhatsApp's own guide says the title
   // must be "without any branding" (the app prints the domain under it), and it shows at most 2 lines, so the brand would only push words out.
-  function head({ title, description, path, share = '', imageAlt = '', type = 'website', jsonLd = [], noindex = false, article = null, preload = '' }) {
+  function head({ title, description, path, share = '', imageAlt = '', type = 'website', jsonLd = [], noindex = false, article = null, preload = '', noReferrer = false }) {
     // the brand is added only when the whole title still fits in search results (about 60 characters)
     const branded = `${title} | ${config.name}`;
     const fullTitle = title === config.title || branded.length > 62 ? title : branded;
@@ -164,7 +164,7 @@ export function createRenderer(ctx) {
 <title>${e(fullTitle)}</title>
 <meta name="description" content="${e(description)}">
 <link rel="canonical" href="${url}">
-<meta name="robots" content="${robots}">
+<meta name="robots" content="${robots}">${noReferrer ? '\n<meta name="referrer" content="no-referrer">' : ''}
 <meta name="author" content="${e(config.author)}">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
@@ -323,7 +323,7 @@ ${body}
 </main>
 ${footer()}
 ${SEARCH_MODAL()}
-<script src="${assetUrl('js/site.js')}" defer></script>${meta.listen ? `\n<script src="${assetUrl('js/listen.js')}" defer></script>` : ''}${body.includes('class="pagination"') || body.includes('hero-listing') ? `\n<script src="${assetUrl('js/pager.js')}" defer></script>` : ''}${api ? `\n<script src="${assetUrl('js/engage.js')}" defer></script>` : ''}${cfToken ? `\n<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${cfToken}"}'></script>` : ''}
+<script src="${assetUrl('js/site.js')}" defer></script>${meta.listen ? `\n<script src="${assetUrl('js/listen.js')}" defer></script>` : ''}${body.includes('class="pagination"') || body.includes('hero-listing') ? `\n<script src="${assetUrl('js/pager.js')}" defer></script>` : ''}${api ? `\n<script src="${assetUrl('js/engage.js')}" defer></script>` : ''}${api && meta.manage ? `\n<script src="${assetUrl('js/manage.js')}" defer></script>` : ''}${cfToken ? `\n<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${cfToken}"}'></script>` : ''}
 </body>
 </html>
 `;
@@ -938,7 +938,7 @@ ${withIds.html}
     const body = `${hero({ image: heroFor(pg.slug, pg.hero), title: e(pg.heading || pg.title), sub: pg.subtitle })}
 <section class="section">${inner}</section>`;
     return layout(
-      { title: pg.title, description: pg.description, path: `/${pg.slug}/`, noindex: true, adKind: isDoc ? 'legal' : 'page', preload: heroFor(pg.slug, pg.hero), jsonLd: [{ '@context': 'https://schema.org', '@type': pg.slug === 'about' ? 'AboutPage' : pg.slug === 'contact' ? 'ContactPage' : 'WebPage', name: pg.title, description: pg.description, url: abs(`/${pg.slug}/`) }] },
+      { title: pg.title, description: pg.description, path: `/${pg.slug}/`, noindex: true, noReferrer: pg.slug === 'manage', bodyClass: pg.slug === 'manage' ? 'page-manage' : '', manage: pg.slug === 'manage', adKind: isDoc ? 'legal' : 'page', preload: heroFor(pg.slug, pg.hero), jsonLd: [{ '@context': 'https://schema.org', '@type': pg.slug === 'about' ? 'AboutPage' : pg.slug === 'contact' ? 'ContactPage' : 'WebPage', name: pg.title, description: pg.description, url: abs(`/${pg.slug}/`) }] },
       { page: pg.slug },
       body,
     );
@@ -1085,6 +1085,11 @@ ${withIds.html}
       <div class="field"><label for="cm-email">Email <span class="opt">(optional, never shown)</span></label><input id="cm-email" name="email" type="email" maxlength="120" autocomplete="email" placeholder="you@example.com"></div>
     </div>
     <div class="field"><label for="cm-body">Your comment</label><textarea id="cm-body" name="body" rows="4" maxlength="1500" required placeholder="Share your thoughts, question or experience"></textarea></div>
+    <div class="notify-row" data-notify-row hidden>
+      <input id="cm-notify" class="notify-box" type="checkbox" name="notify" value="1" aria-describedby="cm-notify-hint">
+      <label for="cm-notify">Email me a link to edit or delete this comment, and tell me when the team replies</label>
+      <p id="cm-notify-hint" class="notify-hint">We use your address only for this and it is never shown. Reply emails come at most once a day for each comment, and each one has a link to stop them.</p>
+    </div>
     <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
     <input type="hidden" name="parent" value="">
     ${config.turnstileSiteKey ? '<div class="cf-turnstile-slot" data-turnstile-slot></div>' : ''}

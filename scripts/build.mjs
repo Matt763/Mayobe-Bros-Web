@@ -279,7 +279,7 @@ if (errors.length) {
 
 /* ------------------------------------------------------------------ build */
 const hashFile = (f) => (fs.existsSync(path.join(ROOT, f)) ? crypto.createHash('sha1').update(fs.readFileSync(path.join(ROOT, f))).digest('hex').slice(0, 8) : '');
-const versions = { 'css/style.css': hashFile('css/style.css'), 'js/site.js': hashFile('js/site.js'), 'js/engage.js': hashFile('js/engage.js'), 'js/listen.js': hashFile('js/listen.js'), 'js/pager.js': hashFile('js/pager.js') };
+const versions = { 'css/style.css': hashFile('css/style.css'), 'js/site.js': hashFile('js/site.js'), 'js/engage.js': hashFile('js/engage.js'), 'js/manage.js': hashFile('js/manage.js'), 'js/listen.js': hashFile('js/listen.js'), 'js/pager.js': hashFile('js/pager.js') };
 // Topic photographs: assets/img/topics/<name>-<width>.webp -> { name: [1280, 2560, 3840] }
 const heroSets = {};
 const topicsDir = path.join(ROOT, 'assets/img/topics');

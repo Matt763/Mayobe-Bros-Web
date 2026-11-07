@@ -457,6 +457,16 @@
     var status = $('.form-status', form);
     var submit = $('button[type="submit"]', form);
     var setStatus = function (cls, text) { status.className = 'form-status' + (cls ? ' ' + cls : ''); status.textContent = text; };
+    // the "email me" box shows only while the email field holds an address that looks right, and is sent only then
+    var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    var notifyRow = $('[data-notify-row]', form);
+    var syncNotify = function () {
+      if (!notifyRow) return;
+      var ok = EMAIL_RE.test(form.elements.email.value.trim());
+      notifyRow.hidden = !ok;
+      if (!ok) form.elements.notify.checked = false;
+    };
+    if (notifyRow) { form.elements.email.addEventListener('input', syncNotify); form.elements.email.addEventListener('change', syncNotify); syncNotify(); }
     ['focusin'].forEach(function (ev) { form.addEventListener(ev, loadTurnstile, { once: true }); });
     $('[data-cancel-reply]', form).addEventListener('click', function () { form.elements.parent.value = ''; this.hidden = true; setStatus('', ''); });
     form.addEventListener('submit', function (e) {
@@ -469,6 +479,9 @@
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setStatus('is-err', 'That email address does not look right.'); f.email.focus(); return; }
       if (/(https?:\/\/|www\.)/i.test(body)) { setStatus('is-err', 'Links are not allowed in comments.'); f.body.focus(); return; }
       var payload = { name: name, email: email, body: body, parent: f.parent.value || null, cid: cid(), website: f.website.value, ts: pageLoaded };
+      var wantsMail = !!(notifyRow && !notifyRow.hidden && f.notify.checked && EMAIL_RE.test(email));
+      if (wantsMail) payload.notify = true;
+      var mailNote = wantsMail ? ' If the address is right, you will get an email shortly. Check your spam folder too.' : '';
       if (TURNSTILE && window.turnstile && widget) payload.tt = window.turnstile.getResponse(widget);
       submit.disabled = true;
       setStatus('', 'Sending…');
@@ -476,8 +489,9 @@
         try { sessionStorage.removeItem('mb_stats'); } catch (e) {}
         if (j && j.id != null && j.token) ownSet(j.id, j.token); // lets this browser edit or delete the comment later
         f.body.value = ''; f.parent.value = ''; $('[data-cancel-reply]', form).hidden = true;
+        if (f.notify) f.notify.checked = false;
         if (j && j.status === 'approved' && j.comment) {
-          setStatus('is-ok', 'Thank you! Your comment is now live.');
+          setStatus('is-ok', 'Thank you! Your comment is now live.' + mailNote);
           shownTop = Math.max(shownTop, COMMENT_BATCH);
           refresh().then(function () {
             var node = doc.getElementById('comment-' + j.comment.id);
@@ -486,7 +500,7 @@
         } else if (j && j.status === 'duplicate') {
           setStatus('is-ok', 'You already sent this comment.');
         } else {
-          setStatus('is-ok', 'Thank you! Your comment needs a quick check by our team and will appear once it is approved.');
+          setStatus('is-ok', 'Thank you! Your comment needs a quick check by our team and will appear once it is approved.' + mailNote);
         }
         if (TURNSTILE && window.turnstile && widget) window.turnstile.reset(widget);
       }).catch(function (err) {
