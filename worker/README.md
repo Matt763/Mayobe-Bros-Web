@@ -83,11 +83,11 @@ GET  /v1/posts/<slug>?cid=<visitor id>      also returns "liked": the ids of com
 - **Old text of an edit (`prev_body`):** kept only so you can see what was changed. `node scripts/comments.mjs list` prints it under the comment as "edited; before the edit: ...".
   It is never sent to the public, and it is erased when the comment is deleted (by the reader or by you).
 
-**Rollout, in this order** (each step is yours to run; nothing here is automatic):
+**Rollout for comment controls** (the email work adds migrations 0005 and 0006: for the full order see "Email setup (owner checklist)" at the end; apply every pending migration before deploying) (each step is yours to run; nothing here is automatic):
 
 ```bash
 cd worker
-npx wrangler d1 migrations apply mayobe-engage --remote   # 1. applies 0004_comment_controls.sql (new columns and the likes table)
+npx wrangler d1 migrations apply mayobe-engage --remote   # 1. applies 0004_comment_controls.sql (new columns and the likes table); with the email work this also applies 0005 and 0006
 npx wrangler deploy                                       # 2. deploys the new Worker
 cd .. && node scripts/build.mjs                           # 3. rebuild the site, then commit and push
 ```
@@ -149,14 +149,14 @@ Cloudflare account needed.
 Nothing below has been run. Do the steps in order; each one is a single command or click. Run `wrangler` commands inside `worker/` with
 `XDG_CONFIG_HOME=$HOME/.config` and `export PATH=$HOME/tools/node/bin:$PATH`.
 
-0. Ask the assistant for a last review of the code and the policy pages before anything goes live.
+0. Run a last review of the branch (ask your assistant) before deploying.
 1. Confirm `OWNER_EMAIL`, `CONTACT_EMAIL`, `MAIL_FROM` and `MAIL_FROM_SUPPORT` in `wrangler.jsonc` use addresses on the Resend-verified domain `mayobebros.com`, and that `info@` is a mailbox you read.
 2. Check the database: `npx wrangler d1 migrations list mayobe-engage --remote` must show 0001 to 0003 as applied. Then apply 0004, 0005 and 0006: `npx wrangler d1 migrations apply mayobe-engage --remote` (apply all three BEFORE deploying the Worker).
-3. Set the secrets (you paste the value when asked; never type it in a command line or share it): `npx wrangler secret put RESEND_API_KEY` and `npx wrangler secret put RESEND_WEBHOOK_SECRET`. The webhook secret comes from step 6, so do that part after step 6 and deploy again if the webhook is not set yet.
-4. Deploy: `npx wrangler deploy`
-5. Live check on a test comment: edit it once and hide it once with `node scripts/comments.mjs spam <id>` (D1 `RETURNING` and `changes()` inside a batch were only proven on the local SQLite stand-in, so watch for errors), post a comment with the email box ticked and open the emailed link, and send the contact form once.
-6. In Resend: Webhooks, Add endpoint `<worker URL>/v1/webhooks/resend`, events `email.bounced` and `email.complained`; copy the signing secret (`whsec_...`) for `RESEND_WEBHOOK_SECRET`; keep open and click tracking OFF for the domain.
-7. Send each template to your own Gmail (look at it on a phone), an Outlook and a Yahoo address: `RESEND_API_KEY=... node scripts/mail-test.mjs <template> <address> --yes` (`--list` shows the names; without `--yes` it refuses). This also confirms Resend's `reply_to` field (use `contact-owner`) and shows the real error body, which Resend's docs do not show.
+3. In Resend: Webhooks, Add endpoint `<worker URL>/v1/webhooks/resend`, events `email.bounced` and `email.complained`; copy the signing secret (`whsec_...`) for `RESEND_WEBHOOK_SECRET`; keep open and click tracking OFF for the domain. The endpoint can be created before the Worker is deployed; it only starts working after step 5.
+4. Set the secrets (you paste the value when asked; never type it in a command line or share it): `npx wrangler secret put RESEND_API_KEY` and `npx wrangler secret put RESEND_WEBHOOK_SECRET`. The webhook secret is the one you copied in step 3. Secrets take effect without a new deploy.
+5. Deploy: `npx wrangler deploy`
+6. Live check on a test comment: edit it once and hide it once with `node scripts/comments.mjs spam <id>` (D1 `RETURNING` and `changes()` inside a batch were only proven on the local SQLite stand-in, so watch for errors), post a comment with the email box ticked and open the emailed link, and send the contact form once.
+7. Send each template to your own Gmail (look at it on a phone), an Outlook and a Yahoo address: `read -rs RESEND_API_KEY; export RESEND_API_KEY` (paste the key, nothing is shown), then `node scripts/mail-test.mjs <template> <address> --yes`, and `unset RESEND_API_KEY` afterwards (`--list` shows the names; without `--yes` it refuses). This also confirms Resend's `reply_to` field (use `contact-owner`) The first live send confirms the exact error body and the `reply_to` field.
 8. Rebuild with `node scripts/build.mjs`, stage files BY NAME (not `git add -A`: the stray `css/Mayobe AI` file and `.superpowers/` must not go in), commit, and push only when you decide to.
 
 ### Known limits

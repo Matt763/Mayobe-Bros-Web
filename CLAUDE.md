@@ -137,7 +137,7 @@ Not a newsletter: comment manage links, reply notices, owner alerts and the cont
 - Sending: `worker/src/mail.js` (`sendMail`, daily budget slices owner 10 / commenter 25 / contact 10 / news 35, suppression list). Templates: `worker/src/mail-templates.js` with colours in `mail-tokens.js`. Lint test: `scripts/tests/email-templates.test.mjs` (contrast, size, forbidden CSS, hostile input).
 - Look at every template before changing one: `node scripts/tools/email-preview.mjs` (writes HTML, text and PNGs to `~/.cache/mayobe-email-preview/`, never into the repo).
 - Rule: text typed by a visitor is never sent to an address that has not been confirmed. The manage-link mail and the contact confirmation carry fixed text only; owner-bound mail may carry escaped visitor text. Every link in an email is on our own origin.
-- A failed or skipped email must never fail a request (`ctx.waitUntil`). Owner addresses are never suppressed.
+- A failed or skipped email must never fail a request (`ctx.waitUntil`), except the contact form, which answers with the mailto fallback when the owner notice cannot be sent. Owner addresses are never suppressed.
 - Policies (`content/pages/privacy-policy.html`, `comment-policy.html`, `contact.html`) describe all of this: change them with the code. Do not mention a newsletter until it exists.
 - Owner-run test send: `node scripts/mail-test.mjs <template> <to> --yes` (needs `RESEND_API_KEY` in the environment; never run it without the owner). Setup and limits: "Email setup (owner checklist)" at the end of `worker/README.md`.
 
