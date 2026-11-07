@@ -27,21 +27,18 @@
 
 import { screen, looksLikeTeam } from './moderation.js';
 import { looksLikeQuestion } from './question.js';
+import { SLUG_RE, TOKEN_RE, enc, now, reply, fail, sha, ipHash, same, newToken, hit, readJson, siteOrigin, siteOf, canonicalEmail, utcDay, DAY_TTL, later } from './util.js';
 import { sendMail, validEmail } from './mail.js';
 import { manageLinkEmail, replyNoticeEmail, ownerAlertEmail, contactOwnerEmail, contactVisitorEmail, CONTACT_TYPES } from './mail-templates.js';
 
+export { canonicalEmail };
 export const REACTIONS = ['like', 'amazed', 'sad', 'angry'];
 const COL = { like: 'r_like', amazed: 'r_amazed', sad: 'r_sad', angry: 'r_angry' };
-const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const CID_RE = /^[A-Za-z0-9-]{16,64}$/;
 const LINK_RE = /(https?:\/\/|www\.|\b[a-z0-9-]+\.(?:com|net|org|info|biz|xyz|top|click|link|ru|cn|co\.tz|go\.tz|tk|ml|ga|cf|gq)\b|t\.me\/|bit\.ly)/i;
-const MAX_BODY = 4000;
-const TOKEN_RE = /^[A-Za-z0-9_-]{32,64}$/;
 const LINK_DAYS = 7; // an emailed manage link works for this long
 const NOT_FOUND = 'That comment could not be found.'; // the one answer for a wrong token, a missing comment, a team comment and so on, so nothing can be probed
 
-const enc = new TextEncoder();
-const now = () => Date.now();
 
 function origins(env) {
   return String(env.ALLOWED_ORIGINS || 'https://mayobebros.com,https://www.mayobebros.com').split(',').map((s) => s.trim()).filter(Boolean);
@@ -50,36 +47,6 @@ function corsFor(request, env) {
   const o = request.headers.get('Origin');
   if (!o || !origins(env).includes(o)) return {};
   return { 'Access-Control-Allow-Origin': o, Vary: 'Origin', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, Authorization', 'Access-Control-Max-Age': '86400' };
-}
-function reply(body, status, cors, cache) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': cache || 'no-store', 'X-Content-Type-Options': 'nosniff', ...cors },
-  });
-}
-const fail = (msg, status, cors) => reply({ error: msg }, status, cors);
-
-async function sha(text) {
-  const buf = await crypto.subtle.digest('SHA-256', enc.encode(text));
-  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-async function ipHash(request, env) {
-  const ip = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown';
-  const day = new Date().toISOString().slice(0, 10);
-  return (await sha(`${ip}|${env.HASH_SALT || 'mayobe'}|${day}`)).slice(0, 24); // rotates daily; raw IPs are never stored
-}
-function same(a, b) {
-  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
-  let d = 0;
-  for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return d === 0;
-}
-// A random secret for one comment: 24 random bytes as base64url (32 characters, no padding).
-async function newToken() {
-  const bytes = crypto.getRandomValues(new Uint8Array(24));
-  let bin = '';
-  for (const b of bytes) bin += String.fromCharCode(b);
-  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 // The comment with this id, only if `token` is its owner's token and it is still approved or pending; otherwise null.
 // The supplied token is hashed even when the id does not exist, so the time taken does not reveal whether a comment exists.
@@ -141,17 +108,6 @@ function cleanContact(b) {
 function isAdmin(request, env) {
   const t = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
   return !!env.ADMIN_TOKEN && env.ADMIN_TOKEN.length >= 16 && same(t, env.ADMIN_TOKEN);
-}
-async function readJson(request, max = MAX_BODY) {
-  const text = await request.text();
-  if (text.length > max) throw Object.assign(new Error('Request is too large.'), { status: 413 });
-  try {
-    const v = JSON.parse(text || '{}');
-    if (!v || typeof v !== 'object') throw 0;
-    return v;
-  } catch {
-    throw Object.assign(new Error('Invalid JSON.'), { status: 400 });
-  }
 }
 
 // Resend webhooks are signed with Svix: HMAC-SHA256 over `${svix-id}.${svix-timestamp}.${rawBody}`, keyed with the base64-decoded part of
@@ -220,12 +176,6 @@ async function resendWebhook(request, env, cors) {
   return reply({ ok: true }, 200, cors);
 }
 
-// Counts how often a key was used; returns false once the limit for the window is passed.
-async function hit(env, ctx, key, limit, ttlSec) {
-  const row = await env.DB.prepare('INSERT INTO hits(k, n, expires) VALUES(?, 1, ?) ON CONFLICT(k) DO UPDATE SET n = n + 1 RETURNING n').bind(key, now() + ttlSec * 1000).first();
-  if (Math.random() < 0.02 && ctx?.waitUntil) ctx.waitUntil(env.DB.prepare('DELETE FROM hits WHERE expires < ?').bind(now()).run());
-  return (row?.n || 1) <= limit;
-}
 
 // A slug is valid if it is already known, or if the live site lists it (checked once, then remembered).
 async function slugKnown(env, slug) {
@@ -266,30 +216,6 @@ async function postMeta(env, slug) {
 }
 
 /* ------------------------------------------------------------------ email */
-const siteOrigin = (env) => String(env.SITE_ORIGIN || 'https://mayobebros.com').replace(/\/$/, '');
-const siteOf = (env) => ({ origin: siteOrigin(env), logoUrl: `${siteOrigin(env)}/assets/img/icon-192.png` });
-// One inbox, however it is spelled: NFKC, lower case, no trailing dot on the domain, no +tag, and for Gmail no dots and
-// googlemail.com = gmail.com. Used ONLY for rate-limit keys; mail still goes to the address as typed.
-export function canonicalEmail(raw) {
-  const e = String(raw ?? '').normalize('NFKC').trim().toLowerCase();
-  const at = e.lastIndexOf('@');
-  if (at < 1) return e;
-  let local = e.slice(0, at).split('+')[0];
-  let domain = e.slice(at + 1).replace(/\.+$/, '');
-  if (domain === 'googlemail.com') domain = 'gmail.com';
-  if (domain === 'gmail.com') local = local.replace(/\./g, '');
-  return `${local}@${domain}`;
-}
-const utcDay = () => new Date().toISOString().slice(0, 10);
-const DAY_TTL = 90000; // a little over a day, in seconds
-
-// Runs a mail job after the response is decided. Whatever happens inside, it never throws and never changes the answer.
-// Nothing is created or counted when no mail key is set.
-function later(env, ctx, job) {
-  if (!env.RESEND_API_KEY) return;
-  const p = (async () => { try { await job(); } catch (err) { console.error('mail job failed', err && err.message ? err.message : err); } })();
-  try { ctx?.waitUntil?.(p); } catch { /* nothing more to do */ }
-}
 async function addLink(env, kind, commentId, expires) {
   const token = await newToken();
   await env.DB.prepare('INSERT INTO manage_links(hash, comment_id, kind, expires, created) VALUES(?, ?, ?, ?, ?)').bind(await sha(token), commentId, kind, expires, now()).run();
