@@ -22,7 +22,12 @@ const EVIL = `<script>alert(1)</script> "quoted" 'single' & <b>bold</b>\r\nBcc: 
 const NAME = (`"Ann" <script>alert(1)</script> 'O'Neil' &\r\nBcc: x@y.z ` + 'n'.repeat(200)).slice(0, 120);
 const MSG = (EVIL + '\n\n' + 'This is a long message line. '.repeat(80)).slice(0, 2000);
 const U = (p) => `https://mayobebros.com/${p}?a=1&b=2`; // links are emitted normalised (new URL().href), so test URLs are already normal
-const POSTS = [1, 2, 3].map((i) => ({ title: `${EVIL} title ${i}`, url: U(`post/x/p${i}/`), excerpt: MSG.slice(0, 300) }));
+const IMG = (kind, slug, v = '0123abcd') => `${'https://mayobebros.com'}/assets/email/${kind}-${slug}.jpg?v=${v}`;
+const POSTS = [1, 2, 3].map((i) => ({
+  title: `${EVIL} title ${i}`, url: U(`post/x/p${i}/`), excerpt: MSG.slice(0, 300), category: i === 2 ? 'Jobs and Internships' : EVIL,
+  image: IMG('post', `p${i}`), thumb: IMG('thumb', `p${i}`), imageAlt: `${EVIL} alt ${i}`,
+  ...(i === 2 ? { video: { image: IMG('video', `p${i}`, '89abcdef'), url: U(`post/x/p${i}/`) + '#video-1' } } : {}),
+}));
 
 const LONG = {
   manageLinkEmail: { name: NAME, commentExcerpt: MSG, postTitle: EVIL + ' ' + 'Long title '.repeat(10), postUrl: U('post/a/b/'), manageUrl: U('manage/') + '#tok', notifyWanted: true },
@@ -32,7 +37,7 @@ const LONG = {
   contactVisitorEmail: { name: NAME, subject: EVIL + ' ' + 'subject '.repeat(30), type: 'general' },
   confirmSubscriptionEmail: { confirmUrl: U('newsletter/') + '#confirm' },
   welcomeEmail: { unsubscribeUrl: U('v1/newsletter/unsubscribe'), latestPosts: POSTS },
-  newPostEmail: { post: { title: EVIL + ' ' + 'Long title '.repeat(12), url: U('post/x/y/'), excerpt: MSG.slice(0, 400), image: 'https://mayobebros.com/assets/email/post-y.jpg?v=0123abcd', imageAlt: EVIL, category: 'Educational' }, unsubscribeUrl: U('v1/newsletter/unsubscribe') },
+  newPostEmail: { post: { title: EVIL + ' ' + 'Long title '.repeat(12), url: U('post/x/y/'), excerpt: MSG.slice(0, 400), image: IMG('post', 'y'), imageAlt: EVIL, category: 'Educational', video: { image: IMG('video', 'y', '89abcdef'), url: U('post/x/y/') + '#video-1' } }, unsubscribeUrl: U('v1/newsletter/unsubscribe') },
   farewellEmail: { resubscribeUrl: U('newsletter/') },
 };
 const SHORT = {
@@ -42,8 +47,8 @@ const SHORT = {
   contactOwnerEmail: { name: 'Jo', email: 'jo@example.com', subject: '', message: 'Hi', type: '', receivedAt: '2026-11-06T10:00:00Z' },
   contactVisitorEmail: { name: '', subject: '', type: 'technical' },
   confirmSubscriptionEmail: { confirmUrl: 'https://mayobebros.com/newsletter/#c' },
-  welcomeEmail: { unsubscribeUrl: 'https://mayobebros.com/u', latestPosts: [] },
-  newPostEmail: { post: { title: 'Loans', url: 'https://mayobebros.com/post/a/', excerpt: '' }, unsubscribeUrl: 'https://mayobebros.com/u' },
+  welcomeEmail: { unsubscribeUrl: 'https://mayobebros.com/u', latestPosts: [{ title: 'Loans', url: 'https://mayobebros.com/post/a/', thumb: IMG('thumb', 'a') }] },
+  newPostEmail: { post: { title: 'Loans', url: 'https://mayobebros.com/post/a/', excerpt: '', image: IMG('post', 'a') }, unsubscribeUrl: 'https://mayobebros.com/u' },
   farewellEmail: { resubscribeUrl: 'https://mayobebros.com/newsletter/' },
 };
 const BUILDERS = Object.keys(LONG);
@@ -598,4 +603,136 @@ test('siteOf(env) gives the templates an https asset origin and the assets/email
   assert.deepEqual(siteOf({ SITE_ORIGIN: 'http://127.0.0.1:8000' }), { origin: 'http://127.0.0.1:8000', assetOrigin: 'https://mayobebros.com', logoUrl: 'https://mayobebros.com/assets/email/logo.png' });
   // and what the templates make of it
   for (const env of [{}, { SITE_ORIGIN: 'http://127.0.0.1:8000' }, { SITE_ORIGIN: 'https://example.org' }]) assert.deepEqual(T.resolveSite(siteOf(env)), siteOf(env));
+});
+
+/* ------------------------------------------------------------------ article pictures (email redesign, Task 3) */
+
+const imgTags = (html) => html.match(/<img\b[^>]*>/g) || [];
+const srcOf = (t) => decode((t.match(/\ssrc="([^"]*)"/) || [, ''])[1]);
+const altOf = (t) => decode((t.match(/\salt="([^"]*)"/) || [, ''])[1]);
+// [href, inner html] of every <a>
+const anchors = (html) => [...html.matchAll(/<a\b[^>]*\shref="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g)].map((m) => [m[1], m[2]]);
+const PIC_CASES = () => [
+  ['welcomeEmail', LONG.welcomeEmail], ['welcomeEmail', SHORT.welcomeEmail], ['newPostEmail', LONG.newPostEmail], ['newPostEmail', SHORT.newPostEmail],
+  ['newPostEmail', { ...LONG.newPostEmail, post: { ...LONG.newPostEmail.post, video: undefined } }],
+  ['welcomeEmail', { ...LONG.welcomeEmail, latestPosts: [POSTS[1], POSTS[0], POSTS[2]] }],
+];
+
+test('with every <img> removed, the heading, every post title, the button label and every link stay in the html', () => {
+  for (const [name, data] of PIC_CASES()) {
+    const o = T[name](data, SITE);
+    const bare = o.html.replace(/<img\b[^>]*>/g, '');
+    const h1 = o.html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/)[1];
+    assert.ok(h1.trim() && bare.includes(h1), `${name}: heading`);
+    const titles = name === 'welcomeEmail' ? data.latestPosts.map((x) => x.title) : [data.post.title];
+    for (const t of titles) assert.ok(bare.includes(T.esc(T.oneLine(t)).slice(0, 40)), `${name}: title ${t.slice(0, 30)}`);
+    const label = o.html.match(/<a class="mb-btn-a"[^>]*>([^<]*)<\/a>/)[1];
+    assert.ok(bare.includes(`>${label}</a>`), `${name}: button label`);
+    // every address that is linked anywhere is still linked with visible text once the pictures are gone
+    for (const [href] of anchors(o.html)) {
+      assert.ok(anchors(bare).some(([h, inner]) => h === href && inner.replace(/<[^>]*>/g, '').trim()), `${name}: ${href} has no text link`);
+    }
+  }
+});
+
+test('every linked picture has the same href as a text link in the same email', () => {
+  for (const name of BUILDERS) for (const data of [LONG[name], SHORT[name]]) {
+    const o = T[name](data, SITE);
+    const a = anchors(o.html);
+    for (const [href, inner] of a.filter(([, inner]) => /^\s*<img\b/.test(inner))) {
+      if (/alt="Mayobe Bros"/.test(inner)) continue; // the logo links home; the footer has the text link
+      assert.ok(a.some(([h, x]) => h === href && !/<img\b/.test(x) && x.replace(/<[^>]*>/g, '').trim()), `${name}: picture link ${href} without a text link`);
+    }
+    // every picture beyond the logo is inside a link
+    const linked = a.flatMap(([, inner]) => imgTags(inner));
+    for (const t of imgTags(o.html)) assert.ok(linked.includes(t), `${name}: picture not linked: ${t.slice(0, 80)}`);
+  }
+});
+
+test('pictures are dropped unless ownImage accepts them', () => {
+  const bad = ['http://mayobebros.com/assets/email/post-a.jpg', 'https://evil.example/assets/email/post-a.jpg', 'https://mayobebros.com/assets/email/post-a.webp',
+    'https://mayobebros.com/assets/email/post-a.svg', 'https://mayobebros.com/assets/email/post-a.gif', 'data:image/jpeg;base64,AA', '//evil.example/x.jpg',
+    'https://mayobebros.com/assets/share/post-a.jpg', 'https://mayobebros.com/assets/email/post-a.jpg?v=1234567g', 'https://mayobebros.com/assets/email/post-a.jpg?t=abc'];
+  for (const u of bad) {
+    const posts = [0, 1, 2].map((i) => ({ title: `T${i}`, url: `https://mayobebros.com/post/p${i}/`, image: u, thumb: u, video: { image: u, url: `https://mayobebros.com/post/p${i}/#video-1` } }));
+    const outs = [
+      T.welcomeEmail({ unsubscribeUrl: 'https://mayobebros.com/u', latestPosts: posts }, SITE),
+      T.newPostEmail({ post: { ...posts[0] }, unsubscribeUrl: 'https://mayobebros.com/u' }, SITE),
+      T.newPostEmail({ post: { ...posts[0], video: undefined } }, SITE),
+    ];
+    for (const o of outs) {
+      assert.equal(imgTags(o.html).length, 1, `${u}: ${imgTags(o.html).slice(1).join(' ')}`);
+      assert.ok(!o.html.includes('evil.example') && !o.html.includes('/assets/share/') && !o.html.includes('data:image'), u);
+      assert.deepEqual(lint(o, {}, { checkUrls: false, name: o.subject.startsWith('New') ? 'newPostEmail' : 'welcomeEmail' }), [], u);
+    }
+  }
+  // a video link that is not ours drops the video, and the post picture is used instead
+  const o = T.newPostEmail({ post: { title: 'T', url: 'https://mayobebros.com/post/p/', image: IMG('post', 'p'), video: { image: IMG('video', 'p'), url: 'https://evil.example/#video-1' } } }, SITE);
+  assert.deepEqual(imgTags(o.html).slice(1).map(srcOf), [IMG('post', 'p')]);
+  assert.ok(!o.html.includes('evil.example') && !/Watch the video/.test(o.html + o.text));
+});
+
+test('a video post shows one hero, the video picture, links it to #video-1 and says Watch the video in html and text', () => {
+  const o = T.newPostEmail(LONG.newPostEmail, SITE);
+  const pics = imgTags(o.html).slice(1);
+  assert.equal(pics.length, 1, 'one hero');
+  const hero = pics[0];
+  assert.equal(srcOf(hero), IMG('video', 'y', '89abcdef'));
+  for (const a of ['width="600"', 'height="338"']) assert.ok(hero.includes(a), a);
+  assert.ok(hero.includes('max-width:600px') && hero.includes('width:100%'));
+  assert.ok(altOf(hero).startsWith('Watch the video: '), altOf(hero));
+  const vurl = LONG.newPostEmail.post.video.url;
+  const a = anchors(o.html);
+  assert.ok(a.some(([h, inner]) => decode(h) === vurl && inner.includes(hero)), 'the hero links to #video-1');
+  assert.ok(a.some(([h, inner]) => decode(h) === vurl && inner.trim() === 'Watch the video'), 'a text link Watch the video');
+  assert.ok(o.text.includes(`Watch the video: ${vurl}`));
+  // the hero sits above the card body, before the kicker and the heading, in a slot with a background colour
+  assert.ok(o.html.indexOf(hero) < o.html.indexOf('class="mb-kicker"') && o.html.indexOf(hero) < o.html.indexOf('<h1'));
+  assert.match(o.html, new RegExp(`<td class="mb-img"[^>]*style="[^"]*background:${LIGHT.imageBg}`));
+  // without a video: the post picture, linked to the article, alt from the data, no "Watch the video"
+  const plainPost = T.newPostEmail({ ...LONG.newPostEmail, post: { ...LONG.newPostEmail.post, video: undefined } }, SITE);
+  const h2 = imgTags(plainPost.html)[1];
+  assert.equal(srcOf(h2), IMG('post', 'y'));
+  assert.ok(anchors(plainPost.html).some(([h, inner]) => decode(h) === LONG.newPostEmail.post.url && inner.includes(h2)));
+  assert.ok(!/Watch the video/.test(plainPost.html + plainPost.text));
+  assert.ok(altOf(h2).length <= 150 && altOf(h2).startsWith('<script>'), 'alt is the (escaped) data, cut to 150');
+  // no picture at all: no hero, and nothing else changes
+  const none = T.newPostEmail({ ...LONG.newPostEmail, post: { ...LONG.newPostEmail.post, video: undefined, image: undefined } }, SITE);
+  assert.equal(imgTags(none.html).length, 1);
+  assert.ok(!none.html.includes('class="mb-img"'));
+  assert.equal(none.text, plainPost.text);
+  assert.equal(none.html.replace(/<tr><td class="mb-img"[\s\S]*?<\/td><\/tr>\n?/, ''), none.html);
+});
+
+test('welcome shows one lead picture and at most two thumbnails, in the order given', () => {
+  const o = T.welcomeEmail(LONG.welcomeEmail, SITE);
+  const pics = imgTags(o.html).slice(1);
+  // POSTS[0] is the lead (its large picture), then the thumbnails of POSTS[1] (a video post) and POSTS[2]
+  assert.deepEqual(pics.map(srcOf), [IMG('post', 'p1'), IMG('thumb', 'p2'), IMG('thumb', 'p3')]);
+  assert.ok(pics[0].includes('width="520"') && pics[0].includes('height="293"'));
+  for (const t of pics.slice(1)) assert.ok(t.includes('width="112"') && t.includes('height="84"'));
+  assert.match(o.html, /LATEST ARTICLES/);
+  assert.equal((o.html.match(/<h2\b/g) || []).length, 1, 'one lead title');
+  assert.equal((o.html.match(/<h3\b/g) || []).length, 2, 'two row titles');
+  // titles in order, each picture linked to its title's address
+  const at = POSTS.map((x) => o.html.indexOf(`>${T.esc(T.oneLine(x.title))}</a>`));
+  assert.ok(at.every((x) => x > 0) && at[0] < at[1] && at[1] < at[2], 'order kept');
+  for (const [i, t] of pics.entries()) {
+    const href = anchors(o.html).find(([, inner]) => inner.includes(t))[0];
+    assert.equal(decode(href), POSTS[i].url);
+  }
+  // the video post says so on its category line; the text part carries its video link
+  assert.match(o.html, /JOBS AND INTERNSHIPS · VIDEO/);
+  assert.ok(o.text.includes(`Watch the video: ${POSTS[1].video.url}`));
+  // a video post in the lead shows the video picture
+  const lead = T.welcomeEmail({ ...LONG.welcomeEmail, latestPosts: [POSTS[1], POSTS[0], POSTS[2]] }, SITE);
+  assert.deepEqual(imgTags(lead.html).slice(1).map(srcOf), [IMG('video', 'p2', '89abcdef'), IMG('thumb', 'p1'), IMG('thumb', 'p3')]);
+  assert.ok(altOf(imgTags(lead.html)[1]).startsWith('Watch the video: '));
+  // more than three posts: still three; no posts: no list and only the logo
+  const many = T.welcomeEmail({ ...LONG.welcomeEmail, latestPosts: [...POSTS, ...POSTS] }, SITE);
+  assert.equal(imgTags(many.html).length, 4);
+  const empty = T.welcomeEmail({ unsubscribeUrl: 'https://mayobebros.com/u', latestPosts: [] }, SITE);
+  assert.equal(imgTags(empty.html).length, 1);
+  assert.ok(!/LATEST ARTICLES/.test(empty.html));
+  assert.deepEqual(lint(empty, {}, { name: 'welcomeEmail' }), []);
 });

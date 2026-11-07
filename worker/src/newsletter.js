@@ -9,7 +9,7 @@
 //   runNewsletter(env, ctx, opts)  the Cron Trigger job (six runs each morning): seed guard, one email per new article per subscriber, clean-up
 
 import { sendMail, validEmail, CAPS } from './mail.js';
-import { confirmSubscriptionEmail, welcomeEmail, farewellEmail, newPostEmail } from './mail-templates.js';
+import { confirmSubscriptionEmail, welcomeEmail, farewellEmail, newPostEmail, oneLine } from './mail-templates.js';
 import { SLUG_RE, TOKEN_RE, now, reply, fail, sha, ipHash, newToken, hit, readJson, siteOrigin, siteOf, canonicalEmail, utcDay, DAY_TTL, later } from './util.js';
 
 export const NL_UNSUB_NOT_FOUND = 'We could not find that request.';
@@ -73,6 +73,29 @@ async function startSubscription(env, ctx, address) {
   await sendMail(env, ctx, { kind: 'news', to: address, ...m, key: `nl-confirm-${row.id}-${day}` });
 }
 
+// One search.json entry as the data the newsletter templates take. Pictures come from the build's own email JPEGs
+// (assets/email/, drawn by scripts/lib/email-images.mjs) on the https asset origin, never the share card or the WebP
+// cover: post-<s>.jpg and thumb-<s>.jpg only when m (their content hash) is 8 lowercase hex, video-<s>.jpg only when w
+// is. The hash is the same for every reader, so no address carries anything personal. All of it comes from the one
+// search.json fetch already made: no extra subrequest. The templates check every address again (ownImage).
+const HASH_RE = /^[0-9a-f]{8}$/;
+function emailPost(env, p) {
+  const { origin, assetOrigin } = siteOf(env);
+  const title = str(p.t, 200);
+  const url = `${origin}${p.u}`;
+  const slug = typeof p.s === 'string' && p.s.length <= 140 && SLUG_RE.test(p.s) ? p.s : '';
+  const m = slug && typeof p.m === 'string' && HASH_RE.test(p.m) ? p.m : '';
+  const w = slug && typeof p.w === 'string' && HASH_RE.test(p.w) ? p.w : '';
+  const alt = typeof p.a === 'string' ? oneLine(p.a.slice(0, 600)).slice(0, 150) : '';
+  return {
+    title, url, excerpt: str(p.e, 400), category: str(p.c, 40),
+    image: m ? `${assetOrigin}/assets/email/post-${slug}.jpg?v=${m}` : '',
+    thumb: m ? `${assetOrigin}/assets/email/thumb-${slug}.jpg?v=${m}` : '',
+    imageAlt: alt || title,
+    video: w ? { image: `${assetOrigin}/assets/email/video-${slug}.jpg?v=${w}`, url: `${url}#video-1` } : null,
+  };
+}
+
 // Up to 3 of the newest articles already published, from the site's own list (empty when the list cannot be read).
 async function latestPosts(env) {
   try {
@@ -80,12 +103,11 @@ async function latestPosts(env) {
     if (!r.ok) return [];
     const list = await r.json();
     const today = utcDay();
-    const origin = siteOrigin(env);
     return (Array.isArray(list) ? list : [])
       .filter((p) => p && typeof p.t === 'string' && typeof p.u === 'string' && /^\/post\/[a-z0-9/-]*$/.test(p.u) && !p.u.includes('//') && typeof p.d === 'string' && p.d <= today)
       .sort((a, b) => (a.d < b.d ? 1 : a.d > b.d ? -1 : 0))
       .slice(0, 3)
-      .map((p) => ({ title: p.t, url: `${origin}${p.u}`, excerpt: typeof p.e === 'string' ? p.e : '' }));
+      .map((p) => emailPost(env, p));
   } catch {
     return [];
   }
@@ -214,12 +236,7 @@ async function publishedPosts(env, today) {
 
 const str = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
 function postMail(env, p, unsubscribeUrl) {
-  const origin = siteOrigin(env);
-  const title = str(p.t, 200);
-  return newPostEmail({
-    post: { title, url: `${origin}${p.u}`, excerpt: str(p.e, 400), category: str(p.c, 40), image: `${origin}/assets/share/post-${p.s}.jpg`, imageAlt: `Cover picture for: ${title}` },
-    unsubscribeUrl,
-  }, siteOf(env));
+  return newPostEmail({ post: emailPost(env, p), unsubscribeUrl }, siteOf(env));
 }
 
 // Free plan: 50 subrequests per invocation, and every D1 query (a db.batch counts as one) and every fetch is one

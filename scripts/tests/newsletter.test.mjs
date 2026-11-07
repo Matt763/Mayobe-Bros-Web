@@ -11,11 +11,11 @@ import { makeD1 } from '../lib/d1-shim.mjs';
 const ORIGIN = 'https://mayobebros.com';
 const realFetch = globalThis.fetch;
 const FIXTURE = [
-  { s: 'old-one', t: 'Old One', u: '/post/old-one/', e: 'Old excerpt', c: 'Educational', d: '2026-01-01', i: '/assets/posts/a.webp' },
-  { s: 'new-one', t: 'New One', u: '/post/new-one/', e: 'New excerpt', c: 'Educational', d: '2026-10-30', i: '/assets/posts/b.webp' },
-  { s: 'mid-one', t: 'Mid One', u: '/post/mid-one/', e: 'Mid excerpt', c: 'Educational', d: '2026-06-01', i: '/assets/posts/c.webp' },
-  { s: 'older-one', t: 'Older One', u: '/post/older-one/', e: 'Older excerpt', c: 'Educational', d: '2026-03-01', i: '/assets/posts/d.webp' },
-  { s: 'future-one', t: 'Future One', u: '/post/future-one/', e: 'Future excerpt', c: 'Educational', d: '2999-01-01', i: '/assets/posts/e.webp' },
+  { s: 'old-one', t: 'Old One', u: '/post/old-one/', e: 'Old excerpt', c: 'Educational', d: '2026-01-01', i: '/assets/posts/a.webp', m: '0a0a0a0a', a: 'Alt old' },
+  { s: 'new-one', t: 'New One', u: '/post/new-one/', e: 'New excerpt', c: 'Educational', d: '2026-10-30', i: '/assets/posts/b.webp', m: '0b0b0b0b', a: 'Alt new' },
+  { s: 'mid-one', t: 'Mid One', u: '/post/mid-one/', e: 'Mid excerpt', c: 'Jobs and Internships', d: '2026-06-01', i: '/assets/posts/c.webp', m: '0c0c0c0c', w: '1c1c1c1c', a: 'Alt mid' },
+  { s: 'older-one', t: 'Older One', u: '/post/older-one/', e: 'Older excerpt', c: 'Educational', d: '2026-03-01', i: '/assets/posts/d.webp', m: '0d0d0d0d', a: 'Alt older' },
+  { s: 'future-one', t: 'Future One', u: '/post/future-one/', e: 'Future excerpt', c: 'Educational', d: '2999-01-01', i: '/assets/posts/e.webp', m: '0e0e0e0e', a: 'Alt future' },
 ];
 let env;
 let sent = [];
@@ -395,7 +395,7 @@ test('farewell still not resent after Resend fails the first time', async () => 
 
 // ---- Task 3: the daily sender ----
 const dayOf = (offsetDays) => new Date(Date.now() + offsetDays * 86400000).toISOString().slice(0, 10);
-const entry = (s, d, over = {}) => ({ s, t: `Title ${s}`, u: `/post/educational/${s}/`, e: `Excerpt for ${s}`, c: 'Educational', d, i: `/assets/posts/${s}.webp`, ...over });
+const entry = (s, d, over = {}) => ({ s, t: `Title ${s}`, u: `/post/educational/${s}/`, e: `Excerpt for ${s}`, c: 'Educational', d, i: `/assets/posts/${s}.webp`, m: '5eed5eed', a: `Alt for ${s}`, ...over });
 const OLD_LIST = [entry('first-post', dayOf(-40)), entry('second-post', dayOf(-3))];
 let sleeps = [];
 let sleepHook = null;
@@ -488,7 +488,7 @@ test('after the seed, a new post goes once to each active subscriber confirmed b
   assert.equal(postMails().length, 1, 'a second run sends nothing');
 });
 
-test('each post email has the unsubscribe headers, a visible /newsletter/#u= link in html and text, Idempotency-Key nl-post-<slug>-<id>, and the share-card JPEG', async () => {
+test('each post email has the unsubscribe headers, a visible /newsletter/#u= link in html and text, Idempotency-Key nl-post-<slug>-<id>, and the email picture', async () => {
   await seeded();
   sendOn();
   const id = addSub('reader@example.com');
@@ -505,9 +505,9 @@ test('each post email has the unsubscribe headers, a visible /newsletter/#u= lin
   assert.equal(m.body.headers['List-Unsubscribe'], `<https://worker.test/v1/newsletter/one-click?t=${u}>`);
   assert.equal(m.body.headers['List-Unsubscribe-Post'], 'List-Unsubscribe=One-Click');
   assert.equal(rows('SELECT subscriber_id, kind FROM newsletter_tokens WHERE hash = ?', sha(u))[0].subscriber_id, id);
-  assert.ok(m.body.html.includes('src="https://mayobebros.com/assets/share/post-fresh-post.jpg"'));
+  assert.ok(m.body.html.includes('src="https://mayobebros.com/assets/email/post-fresh-post.jpg?v=5eed5eed"'));
   assert.equal(m.body.html.includes('.webp'), false, 'never the WebP cover');
-  assert.ok(m.body.html.includes('alt="Cover picture for: Fresh &amp; New"'));
+  assert.ok(m.body.html.includes('alt="Alt for fresh-post"'));
   assert.ok(m.body.html.includes('https://mayobebros.com/post/educational/fresh-post/'));
   assert.ok(m.body.html.includes('What the reader learns.'));
 });
@@ -1041,4 +1041,153 @@ test('dry run checks the subrequest ceiling before each count', async () => {
   const r = await run({ mode: 'dry', subrequestLimit: 4 }); // list fetch + state read + 2 counts
   assert.equal(r.stopped, 'subrequests');
   assert.equal(r.posts.length, 2);
+});
+
+/* ------------------------------------------------------------------ article pictures (email redesign, Task 3) */
+const imgSrcs = (html) => [...html.matchAll(/<img\b[^>]*\ssrc="([^"]*)"/g)].map((x) => x[1].replace(/&amp;/g, '&'));
+const imgAlts = (html) => [...html.matchAll(/<img\b[^>]*\salt="([^"]*)"/g)].map((x) => x[1]);
+const unesc = (s) => s.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+const LOGO_SRC = 'https://mayobebros.com/assets/email/logo.png';
+
+test('new-post email shows the assets/email picture with the post alt text, never the share card', async () => {
+  await seeded();
+  sendOn();
+  addSub('reader@example.com');
+  searchList = [...OLD_LIST, entry('fresh-post', dayOf(0), { m: '0a1b2c3d', a: 'A "desk" & <laptop>' })];
+  await run();
+  const m = postMails()[0].body;
+  assert.deepEqual(imgSrcs(m.html), [LOGO_SRC, 'https://mayobebros.com/assets/email/post-fresh-post.jpg?v=0a1b2c3d']);
+  assert.equal(imgAlts(m.html)[1], 'A &quot;desk&quot; &amp; &lt;laptop&gt;');
+  assert.equal(m.html.includes('/assets/share/'), false);
+  assert.equal(m.text.includes('/assets/share/'), false);
+  // the picture links to the article
+  assert.match(m.html, /<a\b[^>]*href="https:\/\/mayobebros\.com\/post\/educational\/fresh-post\/"[^>]*>\s*<img\b[^>]*post-fresh-post\.jpg/);
+});
+
+test('a video post (w) gets the video picture linked to #video-1; no a gives the title as alt', async () => {
+  await seeded();
+  sendOn();
+  addSub('reader@example.com');
+  searchList = [...OLD_LIST, entry('video-post', dayOf(0), { m: '0a1b2c3d', w: 'abcdef01', a: undefined, t: 'Video & Talk' })];
+  await run();
+  const m = postMails()[0].body;
+  assert.deepEqual(imgSrcs(m.html), [LOGO_SRC, 'https://mayobebros.com/assets/email/video-video-post.jpg?v=abcdef01']);
+  assert.equal(imgAlts(m.html)[1], 'Watch the video: Video &amp; Talk');
+  assert.match(m.html, /<a\b[^>]*href="https:\/\/mayobebros\.com\/post\/educational\/video-post\/#video-1"[^>]*>\s*<img\b/);
+  assert.ok(m.text.includes('Watch the video: https://mayobebros.com/post/educational/video-post/#video-1'));
+  // without a, the post picture's alt is the title
+  sent = [];
+  searchList = [...OLD_LIST, entry('plain-post', dayOf(0), { a: undefined, t: 'Plain & Simple' })];
+  await run();
+  assert.equal(imgAlts(postMails()[0].body.html)[1], 'Plain &amp; Simple');
+});
+
+test('malformed m or w (a path, upper case, 9 characters, a number) gives no picture; a hostile a is escaped and cut to 150 characters', async () => {
+  await seeded();
+  sendOn();
+  addSub('reader@example.com');
+  const bad = ['../../x', '0A1B2C3D', '0a1b2c3d9', 12345678, '/assets/share/post-x.jpg', '0a1b2c3', '', null, { v: '0a1b2c3d' }];
+  searchList = [...OLD_LIST, ...bad.map((v, i) => entry(`bad-${i}`, dayOf(0), { m: v, w: v }))];
+  await runAll();
+  assert.equal(postMails().length, bad.length);
+  for (const x of postMails()) assert.deepEqual(imgSrcs(x.body.html), [LOGO_SRC], x.body.subject);
+  // hostile alt text
+  sent = [];
+  const hostile = '<img src=x onerror=alert(1)> "q" \r\n‮' + 'long '.repeat(80);
+  searchList = [...OLD_LIST, entry('alt-post', dayOf(0), { a: hostile })];
+  await run();
+  const h = postMails()[0].body.html;
+  assert.equal(imgSrcs(h).length, 2);
+  const alt = imgAlts(h)[1];
+  assert.ok(!/[<>"\r\n‮]/.test(alt), alt.slice(0, 60));
+  assert.ok(unesc(alt).length <= 150, String(unesc(alt).length));
+  assert.ok(unesc(alt).startsWith('<img src=x onerror=alert(1)> "q"'));
+  assert.equal(h.includes('<img src=x'), false);
+  // an a that is not a string is ignored (the title is used)
+  sent = [];
+  searchList = [...OLD_LIST, entry('alt-obj', dayOf(0), { a: { toString: () => 'EVIL' } })];
+  await run();
+  assert.equal(imgAlts(postMails()[0].body.html)[1], 'Title alt-obj');
+});
+
+test('welcome uses lead picture and thumbnails from search.json, newest first', async () => {
+  await confirmed();
+  const m = sent[0].body;
+  // new-one (2026-10-30) leads with its large picture; mid-one (a video post) and older-one follow as thumbnails
+  assert.deepEqual(imgSrcs(m.html), [LOGO_SRC, 'https://mayobebros.com/assets/email/post-new-one.jpg?v=0b0b0b0b',
+    'https://mayobebros.com/assets/email/thumb-mid-one.jpg?v=0c0c0c0c', 'https://mayobebros.com/assets/email/thumb-older-one.jpg?v=0d0d0d0d']);
+  assert.deepEqual(imgAlts(m.html).slice(1), ['Alt new', 'Alt mid', 'Alt older']);
+  assert.match(m.html, /JOBS AND INTERNSHIPS · VIDEO/);
+  assert.ok(m.text.includes('Watch the video: https://mayobebros.com/post/mid-one/#video-1'));
+  assert.equal(m.html.includes('old-one.jpg'), false);
+  assert.equal(m.html.includes('/assets/share/'), false);
+});
+
+test('picture addresses are identical for two subscribers and contain no token', async () => {
+  await seeded();
+  sendOn();
+  addSub('one@example.com');
+  addSub('two@example.com');
+  searchList = [...OLD_LIST, entry('fresh-post', dayOf(0), { w: 'abcdef01' })];
+  await run();
+  const [a, b] = postMails().map((x) => x.body);
+  assert.ok(a && b);
+  assert.deepEqual(imgSrcs(a.html), imgSrcs(b.html));
+  for (const x of [a, b]) {
+    const tok = tokenFrom({ body: x }, 'newsletter/#u=');
+    for (const src of imgSrcs(x.html)) {
+      assert.ok(!src.includes(tok) && !/one@|two@|example\.com/.test(src), src);
+      assert.match(src, /^https:\/\/mayobebros\.com\/assets\/email\/[a-z0-9-]+\.(jpg|png)(\?v=[0-9a-f]{8})?$/);
+    }
+  }
+});
+
+test('with SITE_ORIGIN http://127.0.0.1:8000, links use it and pictures stay on https://mayobebros.com', async () => {
+  env.SITE_ORIGIN = 'http://127.0.0.1:8000';
+  await seeded();
+  sendOn();
+  addSub('reader@example.com');
+  searchList = [...OLD_LIST, entry('fresh-post', dayOf(0), { w: 'abcdef01' })];
+  await run();
+  const m = postMails()[0].body;
+  for (const src of imgSrcs(m.html)) assert.ok(src.startsWith('https://mayobebros.com/assets/email/'), src);
+  assert.ok(m.html.includes('href="http://127.0.0.1:8000/post/educational/fresh-post/"'));
+  assert.ok(m.html.includes('href="http://127.0.0.1:8000/post/educational/fresh-post/#video-1"'));
+  assert.ok(m.text.includes('http://127.0.0.1:8000/newsletter/#u='));
+  // the welcome too
+  sent = [];
+  searchList = FIXTURE;
+  await confirmed('local@example.com');
+  const w = sent[0].body;
+  for (const src of imgSrcs(w.html)) assert.ok(src.startsWith('https://mayobebros.com/assets/email/'), src);
+  assert.ok(w.html.includes('href="http://127.0.0.1:8000/post/new-one/"'));
+});
+
+test('image fields cost no subrequest: with subrequestLimit 20 the same number of emails go out with and without m, w and a', async () => {
+  const perRun = async (fields) => {
+    env = { DB: makeD1(), SITE_ORIGIN: ORIGIN, RESEND_API_KEY: 're_test_key', API_ORIGIN: 'https://worker.test' };
+    sent = [];
+    await seeded();
+    sendOn();
+    for (let i = 1; i <= 12; i++) addSub(`s${i}@example.com`);
+    const strip = (e) => { const { m, w, a, ...rest } = e; return rest; };
+    searchList = [...OLD_LIST, entry('fresh-post', dayOf(0), fields ? { w: 'abcdef01' } : {})].map((e) => (fields ? e : strip(e)));
+    const counts = [];
+    for (let runs = 0; runs < 20; runs++) {
+      const before = postMails().length;
+      const { db, c, base } = limitedDB(20);
+      env.DB = db;
+      const r = await run({ subrequestLimit: 20 });
+      env.DB = base; onFetch = null;
+      assert.equal(c.over, false);
+      counts.push(postMails().length - before);
+      if (r.stopped !== 'subrequests') break;
+    }
+    return counts;
+  };
+  const withFields = await perRun(true);
+  const without = await perRun(false);
+  assert.deepEqual(withFields, without);
+  assert.equal(withFields.reduce((a, b) => a + b, 0), 12);
+  assert.ok(withFields[0] > 0);
 });

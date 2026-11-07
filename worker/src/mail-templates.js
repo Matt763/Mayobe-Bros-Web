@@ -202,6 +202,19 @@ function details(rows) {
 }
 const signoff = () => p('The Mayobe Bros team', { mb: 0 });
 
+// An article picture, linked. src must already have passed ownImage. The slot keeps a tinted background and the alt
+// text is styled, so with pictures blocked (Outlook desktop by default, data-saver apps) the box still reads as a
+// labelled picture. Wider than 200 px: fluid (width:100% up to the file's display width), so phones scale it down and
+// Outlook keeps the width attribute.
+function picture(src, w, h, alt, href, radius = 0) {
+  const size = w > 200 ? `width:100%;max-width:${w}px;` : `width:${w}px;`;
+  return `<a href="${esc(href)}" style="display:block;text-decoration:none;"><img class="mb-img" src="${esc(src)}" width="${w}" height="${h}" alt="${esc(alt)}" style="display:block;border:0;${size}height:auto;${radius ? `border-radius:${radius}px;` : ''}background:${L.imageBg};${SANS}font-size:14px;line-height:1.5;color:${L.imageAlt};"></a>`;
+}
+// A small blue category line above an article title (the site's card kicker).
+const catLine = (text, mb = 8) => `<p class="mb-kicker" style="margin:0 0 ${mb}px;${SANS}font-size:12px;line-height:1.5;font-weight:bold;letter-spacing:1.2px;color:${L.kicker};">${esc(str(text).toUpperCase())}</p>`;
+// An article title as a link in live text: heading colour, no underline, like the titles on the site's cards.
+const titleLink = (tag, url, title, size, mb) => `<${tag} class="mb-heading" style="margin:0 0 ${mb}px;${SANS}font-size:${size}px;line-height:1.3;font-weight:800;letter-spacing:-0.2px;color:${L.heading};"><a class="mb-heading" href="${esc(url)}" style="color:${L.heading};text-decoration:none;">${esc(title)}</a></${tag}>`;
+
 // The site's near-black footer: the name in bold sans ("Bros" in the light blue of the site's hero title), the
 // slogan, why this email came, then each link on its own line, white and underlined.
 export function footer(why, links) {
@@ -224,7 +237,7 @@ body{margin:0;padding:0;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
 // about 21 px of white on each side at display size, so the header is padded 20 px less on the left: the letters of
 // the wordmark then line up with the text below. The header cell has no bgcolor attribute on purpose: a bgcolor cell
 // directly followed by <a> is the lint's button signature.
-export function shell({ title, preheader, bodyHtml, footerHtml, site }) {
+export function shell({ title, preheader, bodyHtml, footerHtml, site, heroHtml = '' }) {
   const s = resolveSite(site);
   const bar = (c) => `<td width="50%" height="4" bgcolor="${c}" style="background:${c};height:4px;line-height:4px;mso-line-height-rule:exactly;">&nbsp;</td>`;
   return `<!DOCTYPE html>
@@ -251,7 +264,7 @@ export function shell({ title, preheader, bodyHtml, footerHtml, site }) {
 <a href="${esc(`${s.origin}/`)}" style="display:inline-block;text-decoration:none;"><img class="mb-logo" src="${esc(s.logoUrl)}" width="212" height="48" alt="${NAME}" style="display:block;border:0;width:100%;max-width:212px;height:auto;${SANS}font-size:20px;line-height:1.2;font-weight:bold;color:${L.logoAlt};"></a>
 </td></tr>
 <tr><td><table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0"><tr>${bar(L.barGreen)}${bar(L.barBlue)}</tr></table></td></tr>
-<tr><td class="mb-card" bgcolor="${L.card}" style="background:${L.card};border-radius:0 0 13px 13px;padding:40px;word-break:break-word;">
+${heroHtml ? `<tr><td class="mb-img" style="background:${L.imageBg};">${heroHtml}</td></tr>\n` : ''}<tr><td class="mb-card" bgcolor="${L.card}" style="background:${L.card};border-radius:0 0 13px 13px;padding:40px;word-break:break-word;">
 ${bodyHtml}
 </td></tr>
 </table>
@@ -278,14 +291,14 @@ function textPart(lines, why, links, origin) {
 const quoteText = (s) => plain(s).trim().split('\n').map((l) => `> ${l}`).join('\n');
 
 // signoff: false for emails to the owner (a team signature on a note to ourselves reads oddly).
-function build({ site, subject, title, preheader, kickerText, heading, html, text, buttonUrl, buttonShown, buttonLabel, fallbackLead, why, links, signoff: sign = true }) {
+function build({ site, subject, title, preheader, kickerText, heading, html, text, buttonUrl, buttonShown, buttonLabel, fallbackLead, why, links, signoff: sign = true, heroHtml = '' }) {
   const s = resolveSite(site);
   const last = !html.after && !sign; // nothing under the link: no extra space above the card's own bottom padding
   const bodyHtml = kicker(kickerText) + h1(heading) + html.before + button(buttonUrl, buttonLabel) + fallback(buttonUrl, buttonShown, fallbackLead, last ? 0 : 24) + (html.after || '') + (sign ? hairline() + signoff() : '');
   const textLines = [heading.text, ...text.before, `${buttonLabel}:\n${buttonUrl}`, ...(text.after || []), sign ? 'The Mayobe Bros team' : null];
   return {
     subject: clip(subject, 140),
-    html: shell({ title: title || clip(subject, 140), preheader: clip(preheader, 130), bodyHtml, footerHtml: footer(why, links), site: s }),
+    html: shell({ title: title || clip(subject, 140), preheader: clip(preheader, 130), bodyHtml, footerHtml: footer(why, links), site: s, heroHtml }),
     text: textPart(textLines.map((l) => (typeof l === 'string' ? l : l?.text)), why, links, s.origin),
   };
 }
@@ -474,6 +487,25 @@ export function contactVisitorEmail(data, site) {
 
 /* ------------------------------------------------------------------ newsletter (sent by Plan 3; never visitor text) */
 
+// One article for the newsletter emails, cleaned: links must be ours (ownUrl), pictures our own email JPEGs (ownImage).
+// video = { image, url } survives only when both pass; a video post without a usable video picture is shown as a
+// normal post. alt: one line, at most 150 characters, else the title.
+function cleanPost(item, origin, assetOrigin, titleMax) {
+  const x = pick(item, ['title', 'url', 'excerpt', 'category', 'image', 'thumb', 'imageAlt', 'video']);
+  const v = pick(x.video, ['image', 'url']);
+  const title = clip(x.title, titleMax);
+  const vImage = ownImage(v.image, assetOrigin);
+  const vUrl = ownUrl(v.url, origin, '');
+  return {
+    title, url: ownUrl(x.url, origin, ''), category: clip(x.category, 40),
+    image: ownImage(x.image, assetOrigin), thumb: ownImage(x.thumb, assetOrigin),
+    alt: clip(x.imageAlt, 150) || title,
+    video: vImage && vUrl ? { image: vImage, url: vUrl, alt: clip(`Watch the video: ${title}`, 150) } : null,
+    rawExcerpt: x.excerpt,
+  };
+}
+const watchLink = (url) => p(link(url, 'Watch the video', 'font-weight:bold;'), { mb: 16 });
+
 export function confirmSubscriptionEmail(data, site) {
   const d = pick(data, ['confirmUrl']);
   const { origin } = resolveSite(site);
@@ -495,59 +527,70 @@ export function confirmSubscriptionEmail(data, site) {
   });
 }
 
-// latestPosts = [{ title, url, excerpt? }] from the site's own data (search.json); at most 3 are shown.
+// latestPosts = [{ title, url, excerpt?, category?, image?, thumb?, imageAlt?, video?: { image, url } }] from the site's
+// own data (search.json, newest first); at most 3 are shown: the first as a lead card with its large picture (or the
+// video picture, linked to the video), the next two as rows with a 112 x 84 thumbnail. Every title is a live-text link
+// and every picture links to an address that also has a text link, so the email works with pictures blocked.
 export function welcomeEmail(data, site) {
   const d = pick(data, ['unsubscribeUrl', 'latestPosts']);
-  const { origin } = resolveSite(site);
+  const { origin, assetOrigin } = resolveSite(site);
   const unsub = ownUrl(d.unsubscribeUrl, origin, `${origin}/contact/`);
   const posts = asList(d.latestPosts)
-    .map((item) => pick(item, ['title', 'url', 'excerpt']))
-    .map((x) => ({ title: clip(x.title, 160), url: ownUrl(x.url, origin, ''), excerpt: clip(x.excerpt, 220) }))
+    .map((item) => cleanPost(item, origin, assetOrigin, 160))
+    .map((x) => ({ ...x, excerpt: clip(x.rawExcerpt, 220) }))
     .filter((x) => x.title && x.url).slice(0, 3);
+  const cat = (x) => [x.category, x.video ? 'Video' : ''].filter(Boolean).join(' · ');
+  const leadHtml = (x) => {
+    const pic = x.video ? picture(x.video.image, 520, 293, x.video.alt, x.video.url, 10) : x.image ? picture(x.image, 520, 293, x.alt, x.url, 10) : '';
+    return `<table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="margin:0 0 8px;">`
+      + (pic ? `<tr><td style="padding:0 0 18px;">${pic}</td></tr>` : '')
+      + '<tr><td>' + (cat(x) ? catLine(cat(x)) : '') + titleLink('h2', x.url, x.title, 22, 8)
+      + (x.excerpt ? p(esc(x.excerpt), { muted: true, size: 15, mb: x.video ? 8 : 16 }) : '') + (x.video ? watchLink(x.video.url) : '') + '</td></tr></table>';
+  };
+  const rowHtml = (x) => `<table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0"><tr>`
+    + (x.thumb ? `<td class="mb-rule" width="128" style="width:128px;padding:16px 16px 16px 0;border-top:1px solid ${L.rule};vertical-align:top;">${picture(x.thumb, 112, 84, x.alt, x.url, 8)}</td>` : '')
+    + `<td class="mb-rule" style="padding:16px 0;border-top:1px solid ${L.rule};vertical-align:top;">${cat(x) ? catLine(cat(x), 6) : ''}${titleLink('h3', x.url, x.title, 17, 0)}</td></tr></table>`;
   const a = 'Thank you for confirming. When we publish a new article, we will send you one short email about it.';
   const b = 'We write clear, honest guides on education, jobs, money and technology for readers in Tanzania.';
   const c = 'You can stop at any time with the unsubscribe link at the bottom of every email.';
-  const list = posts.length
-    ? kicker('Recent articles') + `<table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">`
-      + posts.map((x) => `<tr><td class="mb-rule" style="padding:16px 0;border-top:1px solid ${L.rule};">`
-        + `<p style="margin:0 0 6px;${SANS}font-size:18px;line-height:1.35;font-weight:800;">${link(x.url, esc(x.title))}</p>`
-        + (x.excerpt ? p(esc(x.excerpt), { muted: true, size: 15, mb: 0 }) : '') + '</td></tr>').join('') + '</table>'
-    : '';
+  const list = posts.length ? kicker('Latest articles') + leadHtml(posts[0]) + posts.slice(1).map(rowHtml).join('') + (posts.length > 1 ? hairline(8) : '') : '';
   return build({
     site, subject: 'Welcome to the Mayobe Bros newsletter',
     preheader: 'You are now subscribed to Mayobe Bros. We will email you when a new article is published, and you can stop any time.',
     kickerText: 'Welcome', heading: H('You are subscribed', 'YOU ARE SUBSCRIBED'),
     html: { before: p(esc(a)) + p(esc(b), { mb: posts.length ? 32 : 16 }) + list, after: p(esc(c), { muted: true }) },
-    text: { before: [a, b, posts.length ? 'Recent articles:\n\n' + posts.map((x) => `${plain(x.title)}\n${x.url}`).join('\n\n') : null], after: [c] },
+    text: { before: [a, b, posts.length ? 'Latest articles:\n\n' + posts.map((x) => `${plain(x.title)}\n${x.url}${x.video ? `\nWatch the video: ${x.video.url}` : ''}`).join('\n\n') : null], after: [c] },
     buttonUrl: `${origin}/post/`, buttonLabel: 'Read the latest articles',
     why: 'You got this email because you confirmed a subscription to new articles from mayobebros.com.',
     links: [['Unsubscribe', unsub], ...commonLinks(origin)],
   });
 }
 
-// post = { title, url, excerpt?, image? (same-origin https URL of the 1200 x 630 share card), imageAlt?, category? }
-// Task 3 of the email redesign moves the picture to ownImage() and assets/email/ (search.json m/w/a).
+// post = { title, url, excerpt?, category?, image?, imageAlt?, video?: { image, url } }. image and video.image are our
+// own email JPEGs (ownImage: https, /assets/email/, v=<hash>), never the share card. The picture is a full-bleed hero
+// above the card body (600 x 338), linked to the article; for a video post it is the video picture (our cover with a
+// play disc drawn in), linked to the video on the article page, with a "Watch the video" text link as well.
 export function newPostEmail(data, site) {
   const d = pick(data, ['post', 'unsubscribeUrl']);
-  const { origin } = resolveSite(site);
-  const post = pick(d.post, ['title', 'url', 'excerpt', 'image', 'imageAlt', 'category']);
-  const url = ownUrl(post.url, origin, `${origin}/`);
+  const { origin, assetOrigin } = resolveSite(site);
+  const post = cleanPost(d.post, origin, assetOrigin, 200);
+  const url = post.url || `${origin}/`;
   const unsub = ownUrl(d.unsubscribeUrl, origin, `${origin}/contact/`);
-  const title = clip(post.title, 200) || 'A new article';
-  const excerpt = clip(post.excerpt, 400);
-  const image = ownUrl(post.image, origin, '');
-  const pre = clip(post.excerpt, 130);
+  const title = post.title || 'A new article';
+  const excerpt = clip(post.rawExcerpt, 400);
+  const v = post.video;
+  const heroHtml = v ? picture(v.image, 600, 338, clip(`Watch the video: ${title}`, 150), v.url) : post.image ? picture(post.image, 600, 338, post.alt || title, url) : '';
+  const pre = clip(post.rawExcerpt, 130);
   const c = 'You can stop these emails at any time with the unsubscribe link below.';
   return build({
     site, subject: `New article: ${clip(post.title, 110) || 'Mayobe Bros'}`,
     preheader: pre.length >= 90 ? pre : 'A new article is on Mayobe Bros. Read the short summary here, then open the full article when you are ready.',
-    kickerText: oneLine(post.category) ? `New article · ${clip(post.category, 40)}` : 'New article', heading: H(esc(title), plain(title)),
+    kickerText: post.category ? `New article · ${post.category}` : 'New article', heading: H(esc(title), plain(title)), heroHtml,
     html: {
-      before: (image ? `<img class="mb-img" src="${esc(image)}" width="520" height="273" alt="${esc(clip(post.imageAlt, 200))}" style="display:block;border:0;width:100%;max-width:520px;height:auto;margin:0 0 24px;border-radius:10px;background:${L.imageBg};${SANS}font-size:14px;line-height:1.5;color:${L.imageAlt};">` : '')
-        + (excerpt ? p(esc(excerpt)) : ''),
+      before: (excerpt ? p(esc(excerpt)) : '') + (v ? watchLink(v.url) : ''),
       after: p(esc(c), { muted: true }),
     },
-    text: { before: [excerpt ? plain(excerpt) : null], after: [c] },
+    text: { before: [excerpt ? plain(excerpt) : null, v ? `Watch the video: ${v.url}` : null], after: [c] },
     buttonUrl: url, buttonLabel: 'Read the article',
     why: 'You got this email because you subscribed to new articles from mayobebros.com.',
     links: [['Unsubscribe', unsub], ...commonLinks(origin)],

@@ -4,7 +4,9 @@
 //   <name>.html, <name>.txt, <name>-375-light.png, <name>-375-dark.png, <name>-600-light.png, <name>-600-dark.png
 // It also prints each template's HTML size in bytes and the contrast result for every pair in PAIRS.
 //
-// Usage: node scripts/tools/email-preview.mjs [--no-shots] [--only name,name] [--widths 375,600,720]
+// Usage: node scripts/tools/email-preview.mjs [--no-shots] [--only name,name] [--widths 375,600,720] [--no-images]
+// --no-images also writes <name>-<width>-<mode>-noimg.png with every picture blocked (alt text shown), as Outlook
+// desktop shows mail by default.
 // Chromium is found like scripts/lib/share.mjs does (CHROME_BIN overrides). It is driven over the DevTools protocol
 // with Node's own WebSocket, so dark mode is the real prefers-color-scheme media feature (Emulation.setEmulatedMedia),
 // not --force-dark-mode. No npm packages are needed.
@@ -23,9 +25,10 @@ import * as T from '../../worker/src/mail-templates.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const OUT = path.join(os.homedir(), '.cache', 'mayobe-email-preview');
-const SITE = { origin: 'https://mayobebros.com', logoUrl: 'https://mayobebros.com/assets/img/icon-192.png' };
+const SITE = { origin: 'https://mayobebros.com', assetOrigin: 'https://mayobebros.com' };
 const args = process.argv.slice(2);
 const noShots = args.includes('--no-shots');
+const noImages = args.includes('--no-images');
 const opt = (k) => (args.includes(k) ? args[args.indexOf(k) + 1] || '' : '');
 const only = opt('--only').split(',').filter(Boolean);
 const WIDTHS = (opt('--widths') || '375,600').split(',').map(Number).filter((w) => w >= 200 && w <= 2000);
@@ -43,11 +46,23 @@ const HOSTILE = '<script>alert("hi")</script> "Quotes" & \'apostrophes\'\r\nBcc:
   + '\n\nThank you for writing these guides. They are clear and easy to follow.';
 const LONG_EXCERPT = 'What to prepare, how the Ajira Portal works and which mistakes get a government job application rejected. Plain steps for first-time applicants, '
   + 'with a checklist of documents, the order to fill the profile in, and what to do after you press send, including how to read the status messages.';
-const LATEST = [
-  { title: AJIRA.title, url: AJIRA.url, excerpt: 'What to prepare, how the Ajira Portal works and which mistakes get a government job application rejected.' },
-  { title: 'How to Back Up Your Phone and Move to a New One', url: P('back-up-your-phone-and-move-to-a-new-phone'), excerpt: 'Save your photos, contacts and chats before you change phones, step by step, with free tools.' },
-  { title: 'Branding Basics: Choosing a Name, a Logo and Colours', url: P('branding-basics-name-logo-colours'), excerpt: 'Simple, low-cost steps for a small business to look consistent and trustworthy.' },
-];
+// Article data as the Worker builds it (worker/src/newsletter.js emailPost) from this build's data/search.json, so the
+// pictures are the real assets/email/ files with their real hashes.
+const SEARCH = (() => { try { return JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'search.json'), 'utf8')); } catch { return []; } })();
+const HEX8 = /^[0-9a-f]{8}$/;
+function article(slug) {
+  const e = SEARCH.find((x) => x.s === slug);
+  if (!e) return { title: slug, url: P(slug) };
+  const url = `https://mayobebros.com${e.u}`;
+  const pic = (kind, v) => `https://mayobebros.com/assets/email/${kind}-${e.s}.jpg?v=${v}`;
+  return {
+    title: e.t, url, excerpt: e.e, category: e.c, imageAlt: e.a || e.t,
+    image: HEX8.test(e.m) ? pic('post', e.m) : '', thumb: HEX8.test(e.m) ? pic('thumb', e.m) : '',
+    video: HEX8.test(e.w) ? { image: pic('video', e.w), url: `${url}#video-1` } : null,
+  };
+}
+const VIDEO_POST = article('how-to-find-an-internship-in-tanzania-real-or-fake');
+const LATEST = [article('ajira-portal-how-to-apply-public-service-jobs'), VIDEO_POST, article('back-up-your-phone-and-move-to-a-new-phone')];
 
 const SAMPLES = [
   ['manage-link', 'manageLinkEmail', { name: 'Amani', commentExcerpt: 'Thanks', postTitle: AJIRA.title, postUrl: AJIRA.url, manageUrl: 'https://mayobebros.com/manage/#l=3f9a2c71b0d84e56', notifyWanted: true }],
@@ -62,7 +77,9 @@ const SAMPLES = [
   ['contact-visitor', 'contactVisitorEmail', { name: 'Rehema', subject: 'Suggestion', type: 'editorial' }],
   ['confirm-subscription', 'confirmSubscriptionEmail', { confirmUrl: 'https://mayobebros.com/newsletter/#confirm=7b2e' }],
   ['welcome', 'welcomeEmail', { unsubscribeUrl: 'https://mayobebros.com/v1/newsletter/unsubscribe?t=91aa', latestPosts: LATEST }],
-  ['new-post', 'newPostEmail', { post: { ...AJIRA, excerpt: 'What to prepare, how the Ajira Portal works and which mistakes get a government job application rejected. Plain steps for first-time applicants.', image: 'https://mayobebros.com/assets/share/post-ajira-portal-how-to-apply-public-service-jobs.jpg', imageAlt: 'Hands typing on a white keyboard next to a laptop on a white desk', category: 'Jobs and internships' }, unsubscribeUrl: 'https://mayobebros.com/v1/newsletter/unsubscribe?t=91aa' }],
+  ['welcome-video-lead', 'welcomeEmail', { unsubscribeUrl: 'https://mayobebros.com/v1/newsletter/unsubscribe?t=91aa', latestPosts: [VIDEO_POST, LATEST[0], LATEST[2]] }],
+  ['new-post', 'newPostEmail', { post: LATEST[0], unsubscribeUrl: 'https://mayobebros.com/v1/newsletter/unsubscribe?t=91aa' }],
+  ['new-post-video', 'newPostEmail', { post: VIDEO_POST, unsubscribeUrl: 'https://mayobebros.com/v1/newsletter/unsubscribe?t=91aa' }],
   ['new-post-long', 'newPostEmail', { post: { title: 'Application Letter for a Job in Tanzania: How to Write One That Gets Read, With a Full Example and a Checklist', url: P('application-letter-for-a-job-tanzania-how-to-write'), excerpt: LONG_EXCERPT, category: 'Jobs and internships' }, unsubscribeUrl: 'https://mayobebros.com/v1/newsletter/unsubscribe?t=91aa' }],
   ['farewell', 'farewellEmail', { resubscribeUrl: 'https://mayobebros.com/newsletter/' }],
 ].filter(([name]) => !only.length || only.includes(name));
@@ -145,10 +162,14 @@ try {
     if (cdp) {
       const render = path.join(shotDir, `${name}.html`);
       fs.writeFileSync(render, localAssets(out.html));
+      const blocked = path.join(shotDir, `${name}-noimg.html`);
+      if (noImages) fs.writeFileSync(blocked, out.html.replace(/(<img\b[^>]*\ssrc=")[^"]*"/g, '$1blocked.invalid"'));
       const notes = [];
       for (const width of WIDTHS) for (const dark of [false, true]) {
-        const r = await shoot(cdp, render, path.join(OUT, `${name}-${width}-${dark ? 'dark' : 'light'}.png`), width, dark);
-        if (r.overflow) notes.push(`OVERFLOW ${width}px -> ${r.overflow}px`);
+        for (const [file, suffix] of [[render, ''], ...(noImages ? [[blocked, '-noimg']] : [])]) {
+          const r = await shoot(cdp, file, path.join(OUT, `${name}-${width}-${dark ? 'dark' : 'light'}${suffix}.png`), width, dark);
+          if (r.overflow) notes.push(`OVERFLOW ${width}px${suffix} -> ${r.overflow}px`);
+        }
       }
       note = notes.length ? '  ' + notes.join(', ') : '';
     }
