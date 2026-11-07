@@ -1830,6 +1830,7 @@ test('webhook: temporary and undetermined bounces do not suppress; a payload wit
   env.RESEND_WEBHOOK_SECRET = WH_SECRET;
   assert.equal((await hook(bounce(['t@example.com'], { type: 'Temporary', subType: 'MailboxFull' }))).status, 200);
   assert.equal((await hook(bounce(['u@example.com'], { type: 'Undetermined' }))).status, 200);
+  assert.equal((await hook(bounce(['tr@example.com'], { type: 'Transient', subType: 'General' }))).status, 200);
   assert.deepEqual(suppressedRows(), []);
   assert.equal((await hook(bounce(['n@example.com'], null))).status, 200);
   assert.deepEqual(suppressedRows(), [{ email: 'n@example.com', reason: 'bounce' }]);
@@ -1891,7 +1892,7 @@ test('webhook: old, future, non-integer and missing timestamps and other missing
 test('webhook: a missing, empty or malformed secret fails closed', async () => {
   const p = bounce(['x@example.com']);
   const raw = JSON.stringify(p);
-  for (const secret of [undefined, '', 'whsec_', 'whsec_!!!not-base64!!!', Buffer.from('k').toString('base64'), `whsec_${WH_KEY.toString('base64')}x`]) {
+  for (const secret of [undefined, '', 'whsec_', 'whsec_!!!not-base64!!!', Buffer.from('k').toString('base64') /* no whsec_ prefix */, `whsec_${WH_KEY.toString('base64')}x`]) {
     env.RESEND_WEBHOOK_SECRET = secret;
     const r = await hook(p);
     assert.deepEqual([r.status, r.json], [400, BAD], String(secret));
@@ -1925,7 +1926,9 @@ test('webhook: several signatures where one is valid pass; v2 only, or a v1 look
 test('webhook: oversize body is refused; malformed JSON with a valid signature is 400', async () => {
   env.RESEND_WEBHOOK_SECRET = WH_SECRET;
   const big = JSON.stringify({ type: 'email.delivered', pad: 'y'.repeat(70000) });
-  assert.equal((await hook(big)).status, 413);
+  assert.deepEqual([(await hook(big)).status, (await hook(big)).json], [400, BAD]);
+  const cl = await hook(big, { headers: { 'content-length': '70000' } });
+  assert.deepEqual([cl.status, cl.json], [400, BAD]);
   assert.deepEqual((await hook('{nope')).json, BAD);
 });
 
@@ -1944,4 +1947,43 @@ test('webhook: GET is not the webhook; OPTIONS answers 204 without side effects;
   assert.equal(res.status, 204);
   assert.equal((await call('POST', '/v1/posts/hello-post/react', { body: { cid: CID, type: 'like' }, origin: null })).status, 403);
   assert.deepEqual(suppressedRows(), []);
+});
+
+test('webhook: a valid secret of the wrong key (correct base64) is refused', async () => {
+  env.RESEND_WEBHOOK_SECRET = `whsec_${Buffer.from('a-different-valid-key-000000000').toString('base64')}`;
+  const r = await hook(bounce(['x@example.com']));
+  assert.deepEqual([r.status, r.json], [400, BAD]);
+  assert.deepEqual(suppressedRows(), []);
+});
+
+test('webhook: our own addresses are never suppressed, even mixed with a visitor; owner mail still sends', async () => {
+  env.RESEND_WEBHOOK_SECRET = WH_SECRET;
+  env.OWNER_EMAIL = 'Boss@Example.org';
+  const logs = [];
+  const orig = console.log;
+  console.log = (...a) => logs.push(a.join(' '));
+  try {
+    assert.equal((await hook(bounce(['boss@example.org']))).status, 200);
+    assert.deepEqual(suppressedRows(), []);
+    assert.equal((await hook({ type: 'email.complained', data: { to: ['INFO@mayobebros.com', 'visitor@example.com', 'boss@example.org'] } })).status, 200);
+  } finally { console.log = orig; }
+  assert.deepEqual(suppressedRows(), [{ email: 'visitor@example.com', reason: 'complaint' }]);
+  assert.ok(logs.some((l) => l.includes('owner address reported, not suppressed')));
+  assert.equal(logs.some((l) => /@/.test(l)), false, 'no address in the log');
+  const m = await sendMail(env, { waitUntil() {} }, { kind: 'owner', to: 'boss@example.org', subject: 's', html: '<p>x</p>', text: 'x', key: 'k-own' });
+  assert.equal(m.ok, true);
+});
+
+test('mail: an owner-kind send skipped as suppressed logs one short line without the address', async () => {
+  env.DB.raw.prepare("INSERT INTO suppressed(email, reason, created) VALUES('own@example.org','bounce',1)").run();
+  const errs = [];
+  const orig = console.error;
+  console.error = (...a) => errs.push(a.join(' '));
+  try {
+    const m = await sendMail(env, { waitUntil() {} }, { kind: 'owner', to: 'own@example.org', subject: 's', html: '<p>x</p>', text: 'x', key: 'k-o2' });
+    assert.equal(m.skipped, 'suppressed');
+    await sendMail(env, { waitUntil() {} }, { kind: 'commenter', to: 'own@example.org', subject: 's', html: '<p>x</p>', text: 'x', key: 'k-o3' });
+  } finally { console.error = orig; }
+  assert.equal(errs.length, 1);
+  assert.equal(/own@example/.test(errs[0]), false);
 });

@@ -184,8 +184,12 @@ async function svixValid(request, env, raw) {
 }
 async function resendWebhook(request, env, cors) {
   const bad = () => fail('Invalid webhook.', 400, cors);
+  // Too big is answered like every other failure. The body is read with request.text() and signed as received; a BOM or invalid UTF-8
+  // would only make verification fail, which is failing closed.
+  const declared = Number(request.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > WEBHOOK_MAX) return bad();
   const raw = await request.text();
-  if (raw.length > WEBHOOK_MAX) return fail('Request is too large.', 413, cors);
+  if (raw.length > WEBHOOK_MAX) return bad();
   if (!(await svixValid(request, env, raw))) return bad();
   let ev;
   try {
@@ -200,12 +204,18 @@ async function resendWebhook(request, env, cors) {
   if (reason === 'bounce' && bt !== undefined && bt !== null && String(bt).toLowerCase() !== 'permanent') return reply({ ok: true }, 200, cors);
   const to = ev.data?.to;
   const list = (Array.isArray(to) ? to : [to]).filter((a) => typeof a === 'string').slice(0, 50);
+  // Our own mailboxes are never suppressed: that would silently switch off owner alerts and contact notices.
+  const own = new Set([env.OWNER_EMAIL, env.CONTACT_EMAIL, 'info@mayobebros.com', 'support@mayobebros.com', ...[env.MAIL_FROM, env.MAIL_FROM_SUPPORT].map((f) => /<([^<>]+)>/.exec(String(f || ''))?.[1] || f)]
+    .map((x) => String(x || '').trim().toLowerCase()).filter(Boolean));
   let n = 0;
+  let ownerSeen = false;
   for (const a of list) {
     if (!validEmail(a)) continue;
+    if (own.has(a.trim().toLowerCase())) { ownerSeen = true; continue; }
     await env.DB.prepare('INSERT OR IGNORE INTO suppressed(email, reason, created) VALUES(?, ?, ?)').bind(a.trim().toLowerCase(), reason, now()).run();
     n++;
   }
+  if (ownerSeen) console.log('resend webhook: owner address reported, not suppressed');
   console.log(`resend webhook: ${reason}, ${n} address(es)`);
   return reply({ ok: true }, 200, cors);
 }

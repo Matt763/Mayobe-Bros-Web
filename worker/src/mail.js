@@ -41,7 +41,10 @@ export async function sendMail(env, ctx, msg) {
     }
     const to = String(msg?.to ?? '').trim().toLowerCase();
     if (!to || to.length > 254 || /[\r\n]/.test(String(msg.to)) || !EMAIL_RE.test(to)) return { ok: false, skipped: 'bad-address' };
-    if (await env.DB.prepare('SELECT 1 AS x FROM suppressed WHERE email = ?').bind(to).first()) return { ok: false, skipped: 'suppressed' };
+    if (await env.DB.prepare('SELECT 1 AS x FROM suppressed WHERE email = ?').bind(to).first()) {
+      if (msg.kind === 'owner') console.error('mail: an owner-kind message was skipped because its address is on the suppressed list');
+      return { ok: false, skipped: 'suppressed' };
+    }
 
     if (typeof msg.key !== 'string' || !msg.key.trim()) { logFail('message has no idempotency key; not sent'); return { ok: false, skipped: 'no-key' }; }
 

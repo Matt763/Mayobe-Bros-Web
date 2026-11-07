@@ -121,9 +121,17 @@ Resend tells the Worker when an address bounces or marks a mail as spam, and the
 2. Copy the signing secret (`whsec_...`) and run `npx wrangler secret put RESEND_WEBHOOK_SECRET`.
 
 Every request is checked with the Svix signature (headers `svix-id`, `svix-timestamp`, `svix-signature`, 5-minute window). Without the secret
-the endpoint refuses everything. Only permanent bounces and complaints suppress; temporary bounces do not.
+the endpoint refuses everything. Only permanent bounces and complaints suppress; transient and undetermined bounces do not. Our own addresses (`OWNER_EMAIL`, `CONTACT_EMAIL`, the sender addresses) are never suppressed.
 Keep **click and open tracking OFF** for this domain in Resend: manage links carry their token in the URL fragment (`#l=`, `#u=`) and
 tracking wrappers can break or leak them.
+
+### Recover a wrongly suppressed address
+
+```
+npx wrangler d1 execute mayobe-engage --remote --command "DELETE FROM suppressed WHERE email='<address>'"
+```
+
+Removing an address from Resend's own suppression list in its dashboard does not clear this local table; do both.
 
 ## Backups
 
