@@ -967,29 +967,44 @@ ${withIds.html}
     );
   }
 
+  /* The 404 page: no hero. Everything that needs JavaScript (the countdown card, the email-link notice, "Go back") ships hidden;
+     js/notfound.js reveals the right parts. Every address goes through u(), because GitHub Pages serves this file at any missing path. */
   function notFound() {
+    const mail = config.contact?.general || '';
+    const pills = [
+      ...categories.filter((c) => !c.empty).map((c) => [u(`/category/${c.slug}/`), c.name]),
+      [u('/popular/'), 'Popular posts'],
+      [u('/post/'), 'All posts'],
+    ];
     return layout(
-      { title: 'Page not found', description: 'The page you were looking for could not be found.', path: '/404.html', noindex: true, adKind: 'notfound', preload: heroFor('404') },
+      { title: 'Page not found', description: 'The page you were looking for could not be found.', path: '/404.html', noindex: true, noReferrer: true, adKind: 'notfound' },
       {},
-      `${hero({
-        image: heroFor('404'),
-        kicker: 'Error 404',
-        title: 'Page not found',
-        sub: 'The page you were looking for does not exist or has moved. Search below, pick a category, or read our latest articles.',
-        extra: `<div class="hero-cta"><a class="btn btn-primary btn-lg" href="${u('/')}">${icon('home', 18)} Back to home</a><a class="btn btn-glass btn-lg" href="${u('/post/')}">Browse all posts</a></div>`,
-      })}
-<section class="section"><div class="wrap">
-  <form class="nf-search" action="${u('/search/')}" method="get" role="search">
-    <label class="sr-only" for="nf-q">Search ${e(config.name)}</label>
-    <input id="nf-q" name="q" type="search" placeholder="Search articles" autocomplete="off">
-    <button class="btn btn-primary" type="submit">${icon('search', 18)} Search</button>
-  </form>
-  ${sectionHead('Browse by category', 'All categories', u('/category/'))}
-  <div class="grid grid-tiles">${categories.map(catTile).join('')}</div>
-</div></section>
-<section class="section section-alt"><div class="wrap">
-  ${sectionHead('Latest articles', 'All posts', u('/post/'))}
-  ${grid(posts.slice(0, 3))}
+      `<section class="nf" data-nf><div class="wrap nf-in">
+  <p class="nf-code"><span class="sr-only">Error </span>404</p>
+  <span class="nf-badge" aria-hidden="true">${icon('search', 44)}</span>
+  <h1 class="nf-title">Page not found</h1>
+  <p class="nf-text">We could not find the page you are looking for. It may have moved or been removed, or the address may be wrong.</p>
+  <div class="nf-card nf-timer" data-nf-timer hidden>
+    <p class="nf-timer-head"><span class="nf-dot" aria-hidden="true"></span><span data-nf-text tabindex="-1">Taking you to the home page in</span></p>
+    <p class="nf-count" data-nf-count></p>
+    <p class="nf-unit" data-nf-unit>seconds</p>
+    <button class="btn btn-outline btn-sm" type="button" data-nf-stop>Stop, stay on this page</button>
+  </div>
+  <div class="nf-card nf-flow" data-nf-flow hidden>
+    <h2 class="nf-card-title">This email link is not working right now</h2>
+    <p>You opened a link from one of our emails, but the page it opens is not available at the moment. Nothing has been changed. Please try the link in the email again later. If it still does not work, email us at <a href="mailto:${e(mail)}">${e(mail)}</a> and tell us what you were trying to do.</p>
+  </div>
+  <p class="sr-only" role="status" data-nf-status></p>
+  <div class="nf-actions"><a class="btn btn-primary btn-lg" href="${u('/')}">${icon('home', 18)} Go to homepage</a><button class="btn btn-outline btn-lg" type="button" data-nf-back hidden>${icon('arrowLeft', 18)} Go back</button></div>
+  <div class="nf-more">
+    <h2 class="nf-more-title">Looking for something specific?</h2>
+    <form class="nf-search" action="${u('/search/')}" method="get" role="search">
+      <label class="sr-only" for="nf-q">Search ${e(config.name)}</label>
+      <input id="nf-q" name="q" type="search" placeholder="Search articles" autocomplete="off">
+      <button class="btn btn-primary" type="submit">${icon('search', 18)} Search</button>
+    </form>
+    <ul class="nf-links">${pills.map(([href, name]) => `<li><a class="chip" href="${href}">${e(name)}</a></li>`).join('')}</ul>
+  </div>
 </div></section>`,
     );
   }

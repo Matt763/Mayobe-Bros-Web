@@ -639,11 +639,6 @@ body.no-scroll { overflow: hidden; }
 .faq summary { padding: 1.05rem 0; font-weight: 800; cursor: pointer; }
 .faq p { padding-bottom: 1.1rem; margin: 0; color: var(--text-2); }
 
-.notfound { padding-block: clamp(4rem, 10vw, 8rem); text-align: center; }
-.notfound-code { font-size: clamp(6rem, 20vw, 11rem); font-weight: 900; line-height: 1; color: var(--link); letter-spacing: -0.04em; animation: rise 0.8s var(--ease) both; }
-.notfound h1 { font-size: 2.25rem; font-weight: 900; margin: 0.5rem 0; }
-.notfound p { color: var(--text-2); }
-
 /* ---------------------------------------------------------------- footer */
 .site-footer { background: #060a14; color: #e6ecf6; }
 .foot-cta { background: linear-gradient(120deg, #142a78 0%, #1e3a9e 55%, #2b4fc7 100%); color: #fff; }
@@ -897,7 +892,32 @@ button.nav-link { border: 0; background: transparent; line-height: inherit; curs
 .nav-more .submenu { left: auto; right: 0; }
 
 /* 404 page */
-.nf-search { display: flex; gap: 0.75rem; max-width: 40rem; margin: 0 auto 3rem; }
+.nf { display: flex; align-items: center; justify-content: center; min-height: calc(100svh - var(--header-h)); padding-block: clamp(2.5rem, 7vw, 5rem); background: linear-gradient(135deg, var(--bg-alt), var(--bg)); }
+.nf-in { max-width: 42rem; text-align: center; }
+.nf-code { margin: 0; font-size: clamp(4.5rem, 18vw, 8rem); font-weight: 900; line-height: 1; color: var(--link); }
+.nf-badge { display: inline-flex; align-items: center; justify-content: center; width: clamp(4rem, 10vw, 5rem); height: clamp(4rem, 10vw, 5rem); margin: 0.75rem 0 1.25rem; border-radius: 50%; background: var(--soft); color: var(--link); }
+.nf-title { margin: 0; font-size: clamp(1.5rem, 4vw, 2.25rem); font-weight: 900; }
+.nf-text { max-width: 28rem; margin: 0.75rem auto 2rem; color: var(--text-2); }
+.nf-card { margin-bottom: 2rem; padding: clamp(1.5rem, 4vw, 2rem); background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); }
+.nf-card p { margin: 0; }
+.nf-card-title { margin: 0 0 0.5rem; font-size: 1.25rem; font-weight: 800; }
+.nf-flow p { color: var(--text-2); }
+.nf-timer-head { display: inline-flex; align-items: center; gap: 0.6rem; font-weight: 600; }
+.nf-timer-head [tabindex="-1"]:focus { outline: none; }
+.nf-dot { flex: none; width: 0.75rem; height: 0.75rem; border-radius: 50%; background: var(--btn-bg); animation: nf-dot-pulse 2s ease-in-out infinite; }
+@keyframes nf-dot-pulse { 50% { opacity: 0.35; } }
+.nf-timer.is-stopped .nf-dot { animation: none; }
+.nf-count { font-size: clamp(2.25rem, 7vw, 3rem); font-weight: 900; line-height: 1.2; color: var(--link); font-variant-numeric: tabular-nums; }
+.nf-card .nf-unit { margin-bottom: 1rem; color: var(--text-3); font-size: 0.9375rem; }
+.nf-timer .btn { min-height: 44px; }
+.nf-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.75rem 1rem; }
+.nf-more { margin-top: clamp(2rem, 5vw, 3rem); padding-top: clamp(1.5rem, 4vw, 2rem); border-top: 1px solid var(--line-soft); }
+.nf-more-title { margin: 0; font-size: 1rem; font-weight: 600; color: var(--text-2); }
+.nf-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6rem; margin: 0; padding: 0; list-style: none; }
+.nf-links .chip { min-height: 44px; }
+@media (prefers-reduced-motion: reduce) { .nf-dot { animation: none; } }
+@media (max-width: 520px) { .nf-actions .btn { width: 100%; justify-content: center; } }
+.nf-search { display: flex; gap: 0.75rem; max-width: 40rem; margin: 1rem auto 1.25rem; }
 .nf-search input { flex: 1; min-width: 0; padding: 0.85rem 1.2rem; border: 2px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--text); font-size: 1.0625rem; }
 .nf-search input:focus { border-color: var(--btn-bg); outline: none; box-shadow: 0 0 0 4px var(--soft); }
 @media (max-width: 520px) { .nf-search { flex-direction: column; } }
