@@ -28,7 +28,7 @@
 import { screen, looksLikeTeam } from './moderation.js';
 import { looksLikeQuestion } from './question.js';
 import { SLUG_RE, TOKEN_RE, enc, now, reply, fail, sha, ipHash, same, newToken, hit, readJson, siteOrigin, siteOf, canonicalEmail, utcDay, DAY_TTL, later } from './util.js';
-import { newsletterRoute, runNewsletter } from './newsletter.js';
+import { newsletterRoute, newsletterAdmin, runNewsletter } from './newsletter.js';
 import { sendMail, validEmail } from './mail.js';
 import { manageLinkEmail, replyNoticeEmail, ownerAlertEmail, contactOwnerEmail, contactVisitorEmail, CONTACT_TYPES } from './mail-templates.js';
 
@@ -578,6 +578,8 @@ async function handle(request, env, ctx) {
   /* ------------------------------------------------------------- moderation */
   if (path.startsWith('/v1/admin/')) {
     if (!isAdmin(request, env)) return fail('Unauthorized.', 401, cors);
+    const nla = await newsletterAdmin(request, env, ctx, path, url, cors);
+    if (nla) return nla;
     if (method === 'GET' && path === '/v1/admin/comments') {
       const status = ['pending', 'approved', 'spam'].includes(url.searchParams.get('status')) ? url.searchParams.get('status') : 'pending';
       const limit = Math.min(200, Math.max(1, Number(url.searchParams.get('limit')) || 50));

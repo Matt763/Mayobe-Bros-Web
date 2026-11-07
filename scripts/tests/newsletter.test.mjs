@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, createHmac } from 'node:crypto';
+import { canonicalEmail } from '../../worker/src/util.js';
 import worker from '../../worker/src/index.js';
 import { unsubscribeKit, runNewsletter } from '../../worker/src/newsletter.js';
 import { takeBudget } from '../../worker/src/mail.js';
@@ -881,4 +882,86 @@ test('an address suppressed after the page was read is not claimed or sent', asy
   assert.equal(rows('SELECT 1 FROM newsletter_deliveries WHERE subscriber_id = ?', id).length, 0);
   await run();
   assert.equal(postMails().length, 1, 'never sent later either');
+});
+
+// ---- Task 4: owner tools ----
+const ADMIN = 'admin-token-for-tests-1234';
+async function admin(path, { method = 'GET', body, token = ADMIN } = {}) {
+  env.ADMIN_TOKEN = ADMIN;
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await worker.fetch(new Request(`https://api.test${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined }), env, { waitUntil: (p) => { pendingMail.push(p); } });
+  const text = await res.text();
+  await flushMail();
+  return { status: res.status, json: text ? JSON.parse(text) : null };
+}
+
+test('admin newsletter routes are 401 without the token', async () => {
+  for (const [m, p] of [['GET', '/v1/admin/newsletter'], ['GET', '/v1/admin/newsletter/count'], ['POST', '/v1/admin/newsletter/remove'], ['POST', '/v1/admin/newsletter/run']]) {
+    assert.equal((await admin(p, { method: m, body: m === 'POST' ? { email: 'a@b.co', mode: 'seed' } : undefined, token: null })).status, 401, p);
+    assert.equal((await admin(p, { method: m, body: m === 'POST' ? { email: 'a@b.co', mode: 'seed' } : undefined, token: 'wrong-token-wrong-token' })).status, 401, p);
+  }
+});
+
+test('list never contains hash or token fields and filters by status', async () => {
+  addSub('a@example.com'); addSub('b@example.com', { status: 'pending' }); addSub('c@example.com', { status: 'unsubscribed', unsubscribed: Date.now() });
+  await unsubscribeKit(env, 1);
+  const all = await admin('/v1/admin/newsletter?status=all');
+  assert.equal(all.json.subscribers.length, 3);
+  for (const s of all.json.subscribers) assert.deepEqual(Object.keys(s).sort(), ['confirmed', 'created', 'email', 'id', 'status', 'unsubscribed']);
+  assert.ok(!/hash|token|email_key/i.test(JSON.stringify(all.json)));
+  assert.deepEqual((await admin('/v1/admin/newsletter?status=pending')).json.subscribers.map((s) => s.email), ['b@example.com']);
+  assert.deepEqual((await admin('/v1/admin/newsletter?status=active&limit=1')).json.subscribers.map((s) => s.email), ['a@example.com']);
+});
+
+test('remove by a different spelling of the address deletes the row, its tokens and its deliveries', async () => {
+  const id = addSub('jo.hn@gmail.com');
+  const other = addSub('keep@example.com');
+  await unsubscribeKit(env, id); await unsubscribeKit(env, other);
+  env.DB.raw.exec(`INSERT INTO newsletter_deliveries(slug, subscriber_id, status, at) VALUES('x', ${id}, 'sent', 1), ('x', ${other}, 'sent', 1)`);
+  env.DB.raw.prepare('UPDATE newsletter_subscribers SET email_key = ? WHERE id = ?').run(canonicalEmail('jo.hn@gmail.com'), id);
+  const r = await admin('/v1/admin/newsletter/remove', { method: 'POST', body: { email: ' John+news@GMAIL.com ' } });
+  assert.deepEqual(r.json, { removed: 1 });
+  assert.equal(rows('SELECT 1 FROM newsletter_subscribers WHERE id = ?', id).length, 0);
+  assert.equal(rows('SELECT 1 FROM newsletter_tokens WHERE subscriber_id = ?', id).length, 0);
+  assert.equal(rows('SELECT 1 FROM newsletter_deliveries WHERE subscriber_id = ?', id).length, 0);
+  assert.equal(rows('SELECT 1 FROM newsletter_tokens WHERE subscriber_id = ?', other).length, 1, 'others untouched');
+  assert.equal(rows('SELECT 1 FROM newsletter_deliveries WHERE subscriber_id = ?', other).length, 1);
+  assert.deepEqual((await admin('/v1/admin/newsletter/remove', { method: 'POST', body: { email: 'John@gmail.com' } })).json, { removed: 0 });
+  assert.equal((await admin('/v1/admin/newsletter/remove', { method: 'POST', body: { email: 'nope' } })).status, 400);
+});
+
+test("count reports the queue and today's news units", async () => {
+  await seeded();
+  sendOn();
+  for (let i = 1; i <= 3; i++) addSub(`q${i}@example.com`);
+  addSub('p@example.com', { status: 'pending' });
+  let c = (await admin('/v1/admin/newsletter/count')).json;
+  assert.deepEqual({ pending: c.pending, active: c.active, unsubscribed: c.unsubscribed, newsToday: c.newsToday, newsCap: c.newsCap, paused: c.paused, queue: c.queue }, { pending: 1, active: 3, unsubscribed: 0, newsToday: 0, newsCap: 35, paused: false, queue: [] });
+  searchList = [...OLD_LIST, entry('fresh-post', dayOf(0))];
+  await run({ subrequestLimit: 14 }); // a short run: at least one sent, not all
+  c = (await admin('/v1/admin/newsletter/count')).json;
+  const n = postMails().length;
+  assert.ok(n >= 1 && n < 3, `sent ${n}`);
+  assert.equal(c.newsToday, n);
+  assert.deepEqual(c.queue, [{ slug: 'fresh-post', sent: n, left: 3 - n }]);
+  env.NEWSLETTER_SEND = 'false';
+  assert.equal((await admin('/v1/admin/newsletter/count')).json.paused, true);
+});
+
+test('run dry changes no row and calls Resend never; run seed on an empty table seeds', async () => {
+  searchList = OLD_LIST;
+  addSub('a@example.com');
+  const snap = () => JSON.stringify(['newsletter_sent', 'newsletter_deliveries', 'newsletter_subscribers', 'newsletter_tokens', 'mail_budget'].map((t) => rows(`SELECT * FROM ${t}`)));
+  const before = snap();
+  const d = await admin('/v1/admin/newsletter/run', { method: 'POST', body: { mode: 'dry' } });
+  assert.equal(d.status, 200);
+  assert.deepEqual(d.json.seeded, ['first-post', 'second-post']);
+  assert.equal(snap(), before);
+  assert.equal(sent.length, 0);
+  const s = await admin('/v1/admin/newsletter/run', { method: 'POST', body: { mode: 'seed' } });
+  assert.deepEqual(s.json.seeded, ['first-post', 'second-post']);
+  assert.equal(count('newsletter_sent'), 2);
+  assert.equal(sent.length, 0);
+  assert.equal((await admin('/v1/admin/newsletter/run', { method: 'POST', body: { mode: 'send' } })).status, 400);
 });

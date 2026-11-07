@@ -5,6 +5,8 @@
 // DEV_MAIL_LOG=1 node --no-warnings scripts/dev-api.mjs   also switches mail on with a fake Resend: nothing is sent, and every
 //   message the Worker would send is printed (to, subject, text part) so the emailed links can be copied. Default behaviour is unchanged.
 //   The email templates only accept https links, so in this mode the Worker is told the site is https://mayobebros.com; the printed text
+//   In this mode the newsletter is also on: API_ORIGIN and NEWSLETTER_SEND are set, the [mail] block prints the List-Unsubscribe headers, and
+//   POST /__dev/cron (answered here, not by the Worker) runs the daily newsletter job once and prints its report. The first call seeds.
 //   has that address swapped for the local site (the first site-origin argument), and the article list is read from ./data/search.json.
 import fs from 'node:fs';
 import http from 'node:http';
@@ -18,6 +20,8 @@ const env = { DB: makeD1(), ADMIN_TOKEN: 'dev-admin-token-1234', HASH_SALT: 'dev
 if (process.env.DEV_MAIL_LOG === '1') {
   env.RESEND_API_KEY = 'dev';
   env.SITE_ORIGIN = 'https://mayobebros.com';
+  env.API_ORIGIN = `http://127.0.0.1:${port}`;
+  env.NEWSLETTER_SEND = 'true';
   const realFetch = globalThis.fetch;
   globalThis.fetch = async (url, init = {}) => {
     const target = String(url instanceof Request ? url.url : url);
@@ -25,12 +29,22 @@ if (process.env.DEV_MAIL_LOG === '1') {
     if (!target.startsWith('https://api.resend.com/')) return realFetch(url, init);
     let m = {};
     try { m = JSON.parse(init.body || '{}'); } catch { /* not JSON */ }
-    console.log(`[mail] to=${[].concat(m.to || []).join(',')} subject=${JSON.stringify(m.subject || '')}\n${String(m.text || '').replaceAll('https://mayobebros.com', sites[0])}\n[/mail]`);
+    const hdr = m.headers && typeof m.headers === 'object' ? Object.entries(m.headers).map(([k, v]) => `${k}: ${v}`).join('\n') + '\n' : '';
+    console.log(`[mail] to=${[].concat(m.to || []).join(',')} subject=${JSON.stringify(m.subject || '')}\n${hdr}${String(m.text || '').replaceAll('https://mayobebros.com', sites[0])}\n[/mail]`);
     return new Response(JSON.stringify({ id: `dev-${Date.now()}` }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   };
 }
 
 http.createServer(async (req, res) => {
+  if (req.method === 'POST' && req.url === '/__dev/cron') {
+    if (process.env.DEV_MAIL_LOG !== '1') { res.writeHead(404); return res.end('Only with DEV_MAIL_LOG=1'); }
+    const pending = [];
+    await worker.scheduled({ cron: 'dev', scheduledTime: Date.now() }, env, { waitUntil: (p) => pending.push(p) });
+    const [report] = await Promise.all(pending);
+    console.log(`[cron] ${JSON.stringify(report)}`);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify(report ?? null));
+  }
   const chunks = [];
   for await (const c of req) chunks.push(c);
   const body = chunks.length ? Buffer.concat(chunks) : undefined;

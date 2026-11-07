@@ -407,3 +407,55 @@ async function sendRun(env, ctx, report, list, { t, dry, mode, sleep, meter }) {
     await DB.prepare('UPDATE newsletter_sent SET sent_at = ? WHERE slug = ? AND sent_at IS NULL').bind(now(), p.s).run();
   }
 }
+
+// ---- owner tools (behind isAdmin in index.js) ----
+// Few D1 calls each: the Free plan allows 50 per invocation, and a db.batch counts as one.
+const NL_STATUSES = ['active', 'pending', 'unsubscribed'];
+export async function newsletterAdmin(request, env, ctx, path, url, cors) {
+  const method = request.method;
+  if (!path.startsWith('/v1/admin/newsletter')) return null;
+  const DB = env.DB;
+  if (method === 'GET' && path === '/v1/admin/newsletter') {
+    const s = url.searchParams.get('status');
+    const status = NL_STATUSES.includes(s) ? s : s === 'all' || !s ? 'all' : 'active';
+    const limit = Math.min(500, Math.max(1, Number(url.searchParams.get('limit')) || 100));
+    const where = status === 'all' ? '' : 'WHERE status = ?';
+    const stmt = DB.prepare(`SELECT id, email, status, created, confirmed, unsubscribed FROM newsletter_subscribers ${where} ORDER BY id DESC LIMIT ?`);
+    const rows = await (status === 'all' ? stmt.bind(limit) : stmt.bind(status, limit)).all();
+    return reply({ subscribers: rows.results || [] }, 200, cors);
+  }
+  if (method === 'GET' && path === '/v1/admin/newsletter/count') {
+    const [byStatus, budget, queue] = await DB.batch([
+      DB.prepare('SELECT status, COUNT(*) AS n FROM newsletter_subscribers GROUP BY status'),
+      DB.prepare("SELECT n FROM mail_budget WHERE day = ? AND kind = 'news'").bind(utcDay()),
+      DB.prepare(`SELECT n.slug AS slug,
+        (SELECT COUNT(*) FROM newsletter_deliveries d WHERE d.slug = n.slug AND d.status IN ('claimed','sent')) AS sent,
+        (SELECT COUNT(*) FROM newsletter_subscribers s WHERE s.status = 'active' AND NOT EXISTS (SELECT 1 FROM newsletter_deliveries d WHERE d.slug = n.slug AND d.subscriber_id = s.id)) AS left
+        FROM newsletter_sent n WHERE n.sent_at IS NULL AND n.seeded = 0 ORDER BY n.queued_at LIMIT 50`),
+    ]);
+    const c = Object.fromEntries((byStatus.results || []).map((r) => [r.status, r.n]));
+    return reply({
+      pending: c.pending || 0, active: c.active || 0, unsubscribed: c.unsubscribed || 0,
+      newsToday: budget.results?.[0]?.n || 0, newsCap: CAPS.news, paused: env.NEWSLETTER_SEND !== 'true',
+      queue: (queue.results || []).map((r) => ({ slug: r.slug, sent: r.sent, left: r.left })),
+    }, 200, cors);
+  }
+  if (method === 'POST' && path === '/v1/admin/newsletter/remove') {
+    const b = await readJson(request);
+    const email = String(b?.email ?? '').trim();
+    if (!email || email.length > 254 || !validEmail(email)) return fail('Give the address to remove.', 400, cors);
+    const key = canonicalEmail(email);
+    const out = await DB.batch([
+      DB.prepare('DELETE FROM newsletter_tokens WHERE subscriber_id IN (SELECT id FROM newsletter_subscribers WHERE email_key = ?)').bind(key),
+      DB.prepare('DELETE FROM newsletter_deliveries WHERE subscriber_id IN (SELECT id FROM newsletter_subscribers WHERE email_key = ?)').bind(key),
+      DB.prepare('DELETE FROM newsletter_subscribers WHERE email_key = ? RETURNING id').bind(key),
+    ]);
+    return reply({ removed: (out[2].results || []).length ? 1 : 0 }, 200, cors);
+  }
+  if (method === 'POST' && path === '/v1/admin/newsletter/run') {
+    const b = await readJson(request);
+    if (!b || (b.mode !== 'dry' && b.mode !== 'seed')) return fail('mode must be "dry" or "seed".', 400, cors);
+    return reply(await runNewsletter(env, ctx, { mode: b.mode }), 200, cors);
+  }
+  return null;
+}
