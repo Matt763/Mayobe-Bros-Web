@@ -25,7 +25,7 @@ import { makeD1 } from './lib/d1-shim.mjs';
 
 const port = Number(process.argv[2] || 8787);
 const sites = process.argv.slice(3).length ? process.argv.slice(3) : ['http://127.0.0.1:8000'];
-const env = { DB: makeD1(), ADMIN_TOKEN: 'dev-admin-token-1234', HASH_SALT: 'dev', ALLOWED_ORIGINS: sites.join(','), SITE_ORIGIN: sites[0] };
+const env = { DB: makeD1(), ADMIN_TOKEN: 'dev-admin-token-1234', REVIEW_SECRET: 'dev-review-secret-for-local-tests-only', REVIEW_EMAILS: 'review@example.test', HASH_SALT: 'dev', ALLOWED_ORIGINS: sites.join(','), SITE_ORIGIN: sites[0] };
 const LOG = process.env.DEV_MAIL_LOG === '1';
 const REAL = process.env.DEV_MAIL_REAL === '1';
 const RESEND = 'https://api.resend.com/emails';

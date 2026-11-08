@@ -1329,16 +1329,16 @@ test('owner alerts: held comment with reasons, question, and nothing for an ordi
   assert.equal(sent.length, 0);
 });
 
-test('owner alerts: at most 3 a day; the 4th comment is still saved and listed; contact notices still get their 7', async () => {
-  for (let i = 0; i < 4; i++) {
+test('owner alerts: at most 8 a day; the 9th comment is still saved and listed; contact notices still get their 7', async () => {
+  for (let i = 0; i < 9; i++) {
     const r = await post(comment({ body: `Is question number ${i} answered?`, cid: `visitorid-alert-${i}-123456` }), `7.7.7.${i}`);
     assert.equal(r.status, 201);
   }
   await flushMail();
-  assert.equal(sent.filter((s) => /question/i.test(s.body.subject)).length, 3, 'only 3 alerts');
+  assert.equal(sent.filter((s) => /question/i.test(s.body.subject)).length, 8, 'only 8 alerts');
   const list = await call('GET', '/v1/admin/comments', { auth: env.ADMIN_TOKEN, origin: null });
   assert.equal(list.status, 200);
-  assert.equal(env.DB.raw.prepare("SELECT COUNT(*) AS n FROM comments WHERE body LIKE 'Is question number%'").get().n, 4, 'all 4 saved');
+  assert.equal(env.DB.raw.prepare("SELECT COUNT(*) AS n FROM comments WHERE body LIKE 'Is question number%'").get().n, 9, 'all 9 saved');
   const before = sent.length;
   for (let i = 0; i < 7; i++) assert.equal((await contact({ email: `after${i}@example.com` })).status, 200, `contact ${i + 1}`);
   await flushMail();
@@ -1653,7 +1653,7 @@ test('contact: at most 7 notices a day, so 3 owner units stay for comment alerts
 });
 
 test('contact: an owner slice that is already full answers 503 and tries nothing', async () => {
-  for (let i = 0; i < 10; i++) assert.equal(await takeBudget(env, 'owner'), true);
+  for (let i = 0; i < 24; i++) assert.equal(await takeBudget(env, 'owner'), true);
   const r = await contact();
   assert.equal(r.status, 503);
   await flushMail();

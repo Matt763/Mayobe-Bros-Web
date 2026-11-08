@@ -107,11 +107,21 @@ Optional: add Cloudflare Turnstile (free). Create a widget in the Cloudflare das
 `npx wrangler secret put TURNSTILE_SECRET`, and put the site key in `site.config.json` as `turnstileSiteKey`.
 If you do, mention Cloudflare Turnstile in the Privacy Policy. The contact form (`/v1/contact`) does not check Turnstile yet, because `js/contact.js` does not load the widget; add both together.
 
+## Approve or ignore a held comment from your email
+
+When the automatic screen holds a comment, an email goes to every address in `REVIEW_EMAILS` (`wrangler.jsonc`: `mclean@mayobebros.com` and `mbagamclean@gmail.com`, at most 3). It shows the comment and two buttons:
+- **Approve this comment** publishes it at once. It then shows a green double check and the line "Approved by Admin Mayobe Bros" under the text (migration 0008 stores who approved it; the same mark appears when you approve with `node scripts/comments.mjs approve <id>`). A comment the screen published by itself has no mark, and a reader who edits an approved comment loses it.
+- **Ignore** changes nothing: the comment stays hidden and the Approve button keeps working for 7 days. It is how you tell the team "I saw it".
+
+How it works: each button is a link to `https://mayobebros.com/manage/#r=<id>.<a|i>.<expiry>.<signature>`. The signature is an HMAC made with the secret `REVIEW_SECRET`, so a link cannot be made for another comment or action and stops working after 7 days. The part after `#` never reaches a server by itself; the page sends it to `POST /v1/review` and says what happened. The page answers as soon as it opens (this is the one `/manage/` link that does), because the click on the email button is your click. It waits while the tab is hidden. If a mail scanner that runs JavaScript ever opens the links, a comment could be approved without you: hide it again with `node scripts/comments.mjs spam <id>`. Without `REVIEW_SECRET` the email has no buttons and shows the old terminal command. Without `REVIEW_EMAILS` it goes to `OWNER_EMAIL` only.
+
+Set it up: `npx wrangler d1 migrations apply mayobe-engage --remote` (applies 0008), then make a secret of at least 16 random characters and store it with `npx wrangler secret put REVIEW_SECRET` (paste it when asked; do not put it in a file or a chat), then `npx wrangler deploy`. The `/manage/` page must be live with the new `js/manage.js` (push the site). Test with `node scripts/mail-test.mjs owner-held <address> --yes`: its buttons are samples and say "not valid" on purpose; for a real test, post a rude comment on a test article and press the buttons in the email.
+
 ## Email budget
 
-The free Resend plan allows 100 emails a day and 3,000 a month. The Worker keeps to 80 a day, split into slices per UTC day:
-owner 10, commenter 25, contact 10, news 35. A full slice never borrows from another. Contact-form notices to the owner are capped at 7 a day
-inside the owner slice (`ctday:` in `hits`), so a flood of contact messages leaves 3 owner emails for held-comment and question alerts; past 7
+The free Resend plan allows 100 emails a day and 3,000 a month. The Worker keeps to 94 a day, split into slices per UTC day:
+owner 24, commenter 25, contact 10, news 35. A full slice never borrows from another. Contact-form notices to the owner are capped at 7 a day
+inside the owner slice (`ctday:` in `hits`), so a flood of contact messages leaves 17 owner emails for comment alerts (at most 8 alerts a day, `oaday:` in `hits`; a held comment is mailed to every `REVIEW_EMAILS` address, so it costs one email each); past 7
 the form answers with the "please email us" message. Each visitor confirmation (the `contact` slice) is sent once a day per address.
 Comment alerts to the owner (held comments and questions) are capped at 3 a day (`oaday:` in `hits`), which with the 7 contact notices makes the 10 owner units. After 3 alerts the comments are still saved; you can see every one with `node scripts/comments.mjs list`.
 
@@ -196,7 +206,7 @@ Nothing below has been run. Do the steps in order; each one is a single command 
 
 0. Run a last review of the branch (ask your assistant) before deploying.
 1. Confirm `OWNER_EMAIL`, `CONTACT_EMAIL`, `MAIL_FROM` and `MAIL_FROM_SUPPORT` in `wrangler.jsonc` use addresses on the Resend-verified domain `mayobebros.com`, and that `info@` is a mailbox you read.
-2. Check the database: `npx wrangler d1 migrations list mayobe-engage --remote` must show 0001 to 0003 as applied. Then apply 0004, 0005 and 0006: `npx wrangler d1 migrations apply mayobe-engage --remote` (apply all three BEFORE deploying the Worker).
+2. Check the database: `npx wrangler d1 migrations list mayobe-engage --remote` must show 0001 to 0003 as applied. Then apply 0004, 0005 and 0006 (and 0008 if you want the Approve / Ignore buttons, see "Approve or ignore a held comment from your email"): `npx wrangler d1 migrations apply mayobe-engage --remote` (apply all three BEFORE deploying the Worker).
 3. In Resend: Webhooks, Add endpoint `<worker URL>/v1/webhooks/resend`, events `email.bounced` and `email.complained`; copy the signing secret (`whsec_...`) for `RESEND_WEBHOOK_SECRET`; keep open and click tracking OFF for the domain. The endpoint can be created before the Worker is deployed; it only starts working after step 5.
 4. Set the secrets (you paste the value when asked; never type it in a command line or share it): `npx wrangler secret put RESEND_API_KEY` and `npx wrangler secret put RESEND_WEBHOOK_SECRET`. The webhook secret is the one you copied in step 3. Secrets take effect without a new deploy.
 5. Deploy: `npx wrangler deploy`

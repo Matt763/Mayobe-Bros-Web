@@ -12,6 +12,7 @@
 //   GET  /v1/admin/comments?status=pending  (Authorization: Bearer ADMIN_TOKEN)
 //   POST /v1/admin/comments/:id             { action: "approve" | "spam" | "delete" }
 //   POST /v1/admin/reply                    { parent, body, name? }  a published reply from the team (shows a Team badge)
+//   POST /v1/review                         { r }                 the approve / ignore button of the held-comment email (r = signed token from a /manage/#r= link) -> { ok, result: approved|already|kept, id, path }
 //   POST /v1/manage/exchange                { link }              swap the token from an emailed manage link (kept in the page's #l= fragment) for a device token -> { ok, id, slug, path?, token }
 //   POST /v1/notify/unsubscribe             { token }             stop reply emails for the comment that owns this (#u=) token
 //   POST /v1/webhooks/resend                Resend bounce/complaint events (Svix-signed; no Origin check, the signature is the proof). Adds the addresses to `suppressed`.
@@ -30,6 +31,7 @@ import { looksLikeQuestion } from './question.js';
 import { SLUG_RE, TOKEN_RE, enc, now, reply, fail, sha, ipHash, same, newToken, hit, readJson, siteOrigin, siteOf, canonicalEmail, utcDay, DAY_TTL, later } from './util.js';
 import { newsletterRoute, newsletterAdmin, runNewsletter } from './newsletter.js';
 import { sendMail, validEmail } from './mail.js';
+import { checkReviewToken, reviewLinks } from './review.js';
 import { manageLinkEmail, replyNoticeEmail, ownerAlertEmail, contactOwnerEmail, contactVisitorEmail, CONTACT_TYPES } from './mail-templates.js';
 
 export { canonicalEmail };
@@ -258,12 +260,38 @@ async function mailReplyNotice(env, ctx, r) {
 }
 
 // Alerts to the owner (full content; the template escapes it).
+// Who gets the "comment held" alert: REVIEW_EMAILS (comma separated, at most 3 valid addresses) when set, otherwise OWNER_EMAIL.
+function reviewRecipients(env) {
+  const list = String(env.REVIEW_EMAILS || '').split(',').map((x) => x.trim().toLowerCase()).filter((x) => validEmail(x));
+  const uniq = [...new Set(list)].slice(0, 3);
+  return uniq.length ? uniq : [env.OWNER_EMAIL || 'info@mayobebros.com'];
+}
 async function mailOwner(env, ctx, kind, c, reason) {
-  // Comment alerts get 3 of the 10 daily owner units (contact notices get 7), so questions cannot silence the contact form. The comment is saved either way; `node scripts/comments.mjs list` shows everything.
-  if (!(await hit(env, ctx, `oaday:${utcDay()}`, 3, DAY_TTL))) return;
+  // Comment alerts get 8 a day (a held alert goes to every review address, so up to 16 of the 24 daily owner units; contact notices get 7), so questions cannot silence the contact form. The comment is saved either way; `node scripts/comments.mjs list` shows everything.
+  if (!(await hit(env, ctx, `oaday:${utcDay()}`, 8, DAY_TTL))) return;
   const meta = await postMeta(env, c.slug);
-  const m = ownerAlertEmail({ kind, postUrl: `${siteOrigin(env)}${meta.path}`, postSlug: c.slug, commentId: c.id, name: c.name, body: c.body, reason }, siteOf(env));
-  await sendMail(env, ctx, { kind: 'owner', to: env.OWNER_EMAIL || 'info@mayobebros.com', ...m, key: `alert-${c.id}-${kind}` });
+  const origin = siteOrigin(env);
+  // Held comments carry two buttons (approve, ignore) when REVIEW_SECRET is set. Each link is signed for this one comment and expires in 7 days.
+  const links = kind === 'held' ? await reviewLinks(env, c.id, origin) : null;
+  const m = ownerAlertEmail({ kind, postUrl: `${origin}${meta.path}`, postSlug: c.slug, commentId: c.id, name: c.name, body: c.body, reason, ...(links || {}) }, siteOf(env));
+  const to = kind === 'held' ? reviewRecipients(env) : [env.OWNER_EMAIL || 'info@mayobebros.com'];
+  await Promise.all(to.map((addr, i) => sendMail(env, ctx, { kind: 'owner', to: addr, ...m, key: i === 0 ? `alert-${c.id}-${kind}` : `alert-${c.id}-${kind}-${i}` })));
+}
+
+// Publishes a held (or hidden) comment by hand and marks it "approved by Admin". Returns 'approved' | 'already' | 'deleted' | 'missing'.
+async function approveHeld(env, ctx, row) {
+  if (row.status === 'deleted') return 'deleted';
+  if (row.status === 'approved') return 'already';
+  const done = await env.DB.batch([
+    env.DB.prepare("UPDATE comments SET status = 'approved', approved_by = 'admin', approved_at = ? WHERE id = ? AND status = ? AND status IN ('pending', 'spam') RETURNING id").bind(now(), row.id, row.status),
+    env.DB.prepare('UPDATE post_stats SET comments = comments + 1 WHERE slug = ? AND changes() > 0').bind(row.slug), // must stay right after the row statement
+  ]);
+  if (!(done[0]?.results || []).length) return 'missing'; // it changed or was deleted while we looked
+  if (row.parent_id && row.status === 'pending') { // a held reply is now public: tell the person it answers
+    const rep = await env.DB.prepare('SELECT id, parent_id, name, body, team, cid FROM comments WHERE id = ?').bind(row.id).first();
+    if (rep) later(env, ctx, () => mailReplyNotice(env, ctx, rep));
+  }
+  return 'approved';
 }
 
 const statsOf = (r) => ({ c: r?.comments || 0, r: { like: r?.r_like || 0, amazed: r?.r_amazed || 0, sad: r?.r_sad || 0, angry: r?.r_angry || 0 } });
@@ -295,6 +323,24 @@ async function handle(request, env, ctx) {
   const nl = await newsletterRoute(request, env, ctx, path, cors);
   if (nl) return nl;
 
+  // The approve / ignore buttons of the held-comment email. The signed token is the proof (no admin token in a link); a page
+  // button sends it. Approve publishes the comment and marks it "approved by Admin"; ignore changes nothing (it stays held).
+  if (method === 'POST' && path === '/v1/review') {
+    const b = await readJson(request);
+    const ih = await ipHash(request, env);
+    if (!(await hit(env, ctx, `review:${ih}`, 60, 3600))) return fail('Too many tries. Please wait a little.', 429, cors);
+    const t = await checkReviewToken(env, b.r);
+    if (!t) return fail('This link has expired or is not valid.', 404, cors);
+    const row = await env.DB.prepare('SELECT id, slug, parent_id, status FROM comments WHERE id = ?').bind(t.id).first();
+    if (!row) return fail(NOT_FOUND, 404, cors);
+    const where = async () => ({ path: (await postMeta(env, row.slug)).path, slug: row.slug });
+    if (t.action === 'ignore') return reply({ ok: true, result: row.status === 'approved' ? 'already' : row.status === 'pending' ? 'kept' : row.status, id: row.id, ...(await where()) }, 200, cors);
+    const r = await approveHeld(env, ctx, row);
+    if (r === 'deleted') return fail('That comment was deleted by its author and cannot be approved.', 409, cors);
+    if (r === 'missing') return fail(NOT_FOUND, 404, cors);
+    return reply({ ok: true, result: r, id: row.id, ...(await where()), stats: await getStats(env, row.slug) }, 200, cors);
+  }
+
   let m;
   if (method === 'GET' && path === '/v1/stats') {
     const slugs = (url.searchParams.get('slugs') || '').split(',').map((s) => s.trim()).filter((s) => SLUG_RE.test(s)).slice(0, 60);
@@ -310,12 +356,12 @@ async function handle(request, env, ctx) {
   if ((m = path.match(/^\/v1\/posts\/([^/]+)$/)) && method === 'GET') {
     const slug = m[1];
     if (!(await slugKnown(env, slug))) return fail('Unknown post.', 404, cors);
-    const rows = await env.DB.prepare("SELECT id, parent_id, name, body, created, team, likes, edited_at, status FROM comments WHERE slug = ? AND status IN ('approved', 'deleted') ORDER BY created ASC LIMIT 500").bind(slug).all();
+    const rows = await env.DB.prepare("SELECT id, parent_id, name, body, created, team, likes, edited_at, status, approved_by FROM comments WHERE slug = ? AND status IN ('approved', 'deleted') ORDER BY created ASC LIMIT 500").bind(slug).all();
     const all = rows.results || [];
     // a deleted comment that still has replies stays as a blank tombstone (its text and name were erased when it was deleted)
     const pub = (c) => c.status === 'deleted'
       ? { id: c.id, name: '', body: 'This comment was deleted.', at: c.created, deleted: true, likes: 0 }
-      : { id: c.id, name: c.name, body: c.body, at: c.created, likes: c.likes || 0, ...(c.edited_at ? { edited: c.edited_at } : {}), ...(c.team ? { team: true } : {}) };
+      : { id: c.id, name: c.name, body: c.body, at: c.created, likes: c.likes || 0, ...(c.edited_at ? { edited: c.edited_at } : {}), ...(c.team ? { team: true } : {}), ...(c.approved_by ? { ab: 1 } : {}) };
     const tops = all.filter((c) => !c.parent_id).map((c) => ({ ...pub(c), replies: [] }));
     const byId = Object.fromEntries(tops.map((c) => [c.id, c]));
     for (const c of all) if (c.parent_id && byId[c.parent_id]) byId[c.parent_id].replies.push(pub(c));
@@ -512,7 +558,7 @@ async function handle(request, env, ctx) {
     const t = now();
     // The write is conditional, so a request that raced with a spam/delete, a new reply or another edit changes nothing:
     // it only applies while the row is still approved and has no reply, and the count is lowered only if that row changed.
-    const st = [env.DB.prepare("UPDATE comments SET body = ?, prev_body = ?, edited_at = ?, status = ?, flag = ? WHERE id = ? AND status = 'approved' AND NOT EXISTS (SELECT 1 FROM comments WHERE parent_id = ? AND status IN ('approved', 'pending')) RETURNING id")
+    const st = [env.DB.prepare("UPDATE comments SET body = ?, prev_body = ?, edited_at = ?, status = ?, flag = ?, approved_by = NULL, approved_at = NULL WHERE id = ? AND status = 'approved' AND NOT EXISTS (SELECT 1 FROM comments WHERE parent_id = ? AND status IN ('approved', 'pending')) RETURNING id")
       .bind(clean.body, row.body, t, status, reasons.length ? reasons.join(', ').slice(0, 300) : null, id, id)];
     if (status === 'pending') st.push(env.DB.prepare('UPDATE post_stats SET comments = MAX(0, comments - 1) WHERE slug = ? AND changes() > 0').bind(row.slug));
     const done = await env.DB.batch(st);
@@ -608,18 +654,9 @@ async function handle(request, env, ctx) {
       // changed (changes() of the statement just before), so a request that races with an owner delete cannot count twice.
       const minusChanged = env.DB.prepare('UPDATE post_stats SET comments = MAX(0, comments - changes()) WHERE slug = ? AND changes() > 0').bind(row.slug);
       if (b.action === 'approve') {
-        if (row.status === 'deleted') return fail('That comment was deleted by its author and cannot be approved.', 409, cors);
-        if (row.status !== 'approved') {
-          const done = await env.DB.batch([
-            env.DB.prepare("UPDATE comments SET status = 'approved' WHERE id = ? AND status = ? AND status IN ('pending', 'spam') RETURNING id").bind(id, row.status),
-            env.DB.prepare('UPDATE post_stats SET comments = comments + 1 WHERE slug = ? AND changes() > 0').bind(row.slug), // must stay right after the row statement
-          ]);
-          if (!(done[0]?.results || []).length) return fail('No such comment.', 404, cors); // it changed or was deleted while we looked
-          if (row.parent_id && row.status === 'pending') { // a held reply is now public: tell the person it answers
-            const rep = await env.DB.prepare('SELECT id, parent_id, name, body, team, cid FROM comments WHERE id = ?').bind(id).first();
-            if (rep) later(env, ctx, () => mailReplyNotice(env, ctx, rep));
-          }
-        }
+        const r = await approveHeld(env, ctx, row);
+        if (r === 'deleted') return fail('That comment was deleted by its author and cannot be approved.', 409, cors);
+        if (r === 'missing') return fail('No such comment.', 404, cors);
       } else if (b.action === 'spam') {
         await env.DB.batch([
           env.DB.prepare("UPDATE comments SET status = 'spam' WHERE (id = ? OR parent_id = ?) AND status = 'approved'").bind(id, id),

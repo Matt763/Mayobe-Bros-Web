@@ -24,7 +24,7 @@ function el() {
 
 // fetchImpl(url, init) returns { status, body } or throws; storage: { fail: true } makes localStorage throw
 // timers: pass { setTimeout, clearTimeout } to control the 15 s request timeout
-function setup({ hash = `#l=${TOKEN}`, fetchImpl, storage = {}, preset, timers = {} } = {}) {
+function setup({ hash = `#l=${TOKEN}`, fetchImpl, storage = {}, preset, timers = {}, visibility } = {}) {
   const log = [];
   const nodes = { title: el(), text: el(), go: el(), status: el(), help: el(), next: el() };
   nodes.next.hidden = true;
@@ -36,7 +36,7 @@ function setup({ hash = `#l=${TOKEN}`, fetchImpl, storage = {}, preset, timers =
   const location = { hash, pathname: '/manage/', search: '', assign: (u) => log.push(['assign', u]), reload() {} };
   const window = { addEventListener() {} };
   const ctx = {
-    document: { querySelector: (s) => (s === '[data-manage]' ? box : null), documentElement: { getAttribute: (k) => ({ 'data-api': 'https://api.test', 'data-base': '' })[k] ?? null } },
+    document: { visibilityState: visibility, listeners: {}, addEventListener(t, f) { this.listeners[t] = f; }, removeEventListener(t) { delete this.listeners[t]; }, querySelector: (s) => (s === '[data-manage]' ? box : null), documentElement: { getAttribute: (k) => ({ 'data-api': 'https://api.test', 'data-base': '' })[k] ?? null } },
     location, window, localStorage,
     history: { replaceState: (...a) => log.push(['replaceState', a[2]]) },
     fetch: async (url, init) => {
@@ -49,7 +49,7 @@ function setup({ hash = `#l=${TOKEN}`, fetchImpl, storage = {}, preset, timers =
   };
   vm.createContext(ctx);
   vm.runInContext(SRC, ctx);
-  return { log, nodes, store, location };
+  return { log, nodes, store, location, doc: ctx.document };
 }
 const press = async (t) => { t.nodes.go.handlers.click(); await new Promise((r) => setTimeout(r, 20)); };
 const exchangeOk = (extra = {}) => async (url) => (url.endsWith('/manage/exchange') ? { status: 200, body: { ok: true, id: 7, slug: 'hello-post', token: DEVICE, ...extra } } : { status: 404, body: [] });
@@ -182,4 +182,67 @@ test('next reads appear after reply emails are stopped', async () => {
   await press(gone);
   assert.equal(gone.nodes.next.hidden, false, 'after a 404');
   assert.equal(setup({ hash: '', fetchImpl: exchangeOk() }).nodes.next.hidden, false, 'on the no-link screen');
+});
+
+// ---- the team's Approve / Ignore link (#r=): the press was the click on the email button, so the page answers at once
+const SIG = 'S'.repeat(43);
+const REVIEW = (a) => `12.${a}.abc123.${SIG}`;
+const reviewOk = (result, extra = {}) => async (url) => (url.endsWith('/review') ? { status: 200, body: { ok: true, result, id: 12, path: '/post/a/hello-post/', ...extra } } : { status: 404, body: [] });
+const settle = () => new Promise((r) => setTimeout(r, 30));
+
+test('review link: the secret leaves the address first, then one call to /review with the whole token', async () => {
+  const t = setup({ hash: `#r=${REVIEW('a')}`, fetchImpl: reviewOk('approved') });
+  await settle();
+  assert.deepEqual(t.log[0], ['replaceState', '/manage/']);
+  const f = t.log.filter((e) => e[0] === 'fetch');
+  assert.equal(f.length, 1);
+  assert.equal(f[0][1], 'https://api.test/v1/review');
+  assert.deepEqual(JSON.parse(f[0][2]), { r: REVIEW('a') });
+  assert.equal(t.nodes.title.textContent, 'Comment approved');
+  assert.match(t.nodes.text.textContent, /Approved by Admin Mayobe Bros/);
+  assert.equal(t.nodes.go.textContent, 'View the comment');
+  assert.equal(t.nodes.go.hidden, false);
+  t.nodes.go.handlers.click();
+  assert.deepEqual(t.log.at(-1), ['assign', '/post/a/hello-post/#comment-12']);
+});
+
+test('review link: Ignore, a second press and an expired link each end in a clear sentence', async () => {
+  let t = setup({ hash: `#r=${REVIEW('i')}`, fetchImpl: reviewOk('kept') });
+  await settle();
+  assert.equal(t.nodes.title.textContent, 'Left as it is');
+  t = setup({ hash: `#r=${REVIEW('a')}`, fetchImpl: reviewOk('already') });
+  await settle();
+  assert.equal(t.nodes.title.textContent, 'Already approved');
+  t = setup({ hash: `#r=${REVIEW('a')}`, fetchImpl: async () => ({ status: 404, body: { error: 'x' } }) });
+  await settle();
+  assert.equal(t.nodes.title.textContent, 'This link has expired or is not valid');
+  assert.equal(t.nodes.go.hidden, true);
+  t = setup({ hash: `#r=${REVIEW('a')}`, fetchImpl: async () => ({ status: 409, body: { error: 'x' } }) });
+  await settle();
+  assert.equal(t.nodes.title.textContent, 'The author deleted this comment');
+});
+
+test('review link: a network failure offers Try again, and the second press works', async () => {
+  let n = 0;
+  const t = setup({ hash: `#r=${REVIEW('a')}`, fetchImpl: async (u) => { if (n++ === 0) throw new Error('offline'); return reviewOk('approved')(u); } });
+  await settle();
+  assert.equal(t.nodes.go.textContent, 'Try again');
+  assert.equal(t.nodes.go.hidden, false);
+  await press(t);
+  assert.equal(t.nodes.title.textContent, 'Comment approved');
+});
+
+test('review link: a hidden tab waits until it is shown; a cut-short or foreign token never calls the API', async () => {
+  const t = setup({ hash: `#r=${REVIEW('a')}`, fetchImpl: reviewOk('approved'), visibility: 'hidden' });
+  await settle();
+  assert.equal(t.log.filter((e) => e[0] === 'fetch').length, 0, 'nothing while hidden');
+  t.doc.visibilityState = 'visible';
+  t.doc.listeners.visibilitychange();
+  await settle();
+  assert.equal(t.log.filter((e) => e[0] === 'fetch').length, 1);
+  for (const hash of [`#r=${REVIEW('a').slice(0, -3)}`, '#r=12.x.abc.' + SIG, '#r=../etc']) {
+    const b = setup({ hash, fetchImpl: reviewOk('approved') });
+    await settle();
+    assert.equal(b.log.filter((e) => e[0] === 'fetch').length, 0, hash);
+  }
 });

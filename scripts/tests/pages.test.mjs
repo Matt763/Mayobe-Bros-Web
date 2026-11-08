@@ -108,7 +108,12 @@ test('/manage/ is noindex, no-referrer, has one button, and calls the API only f
   const calls = [...js.matchAll(/\bfetch\(/g)].length;
   assert.equal(calls, 1, 'exactly one fetch call in manage.js');
   assert.match(js, /addEventListener\('click',\s*go\)|addEventListener\("click",\s*go\)/, 'the button click must run go()');
-  assert.equal([...js.matchAll(/(?<!function )\bgo\(\)/g)].length, 0, 'go() must never be called directly');
+  // The one exception is the team's own Approve / Ignore link (#r=): pressing the email button is the click, so the page answers at once.
+  // Both direct calls sit in the `kind === 'r'` block and wait while the tab is hidden; edit-code (#l=) and stop-emails (#u=) links never run on load.
+  const direct = [...js.matchAll(/^.*(?<!function )\bgo\(\).*$/gm)].map((m) => m[0]);
+  assert.equal(direct.length, 2, 'go() is called directly only for the review link');
+  assert.ok(direct.every((l) => /visibilityState/.test(l)), 'only behind the visibility check');
+  assert.match(js, /if \(kind === 'r'\) \{\n\s*var runReview/, 'and only in the review block');
   assert.match(js, /history\.replaceState/);
   const footer = html.split('<footer')[1] || '';
   assert.doesNotMatch(footer, /href="[^"]*\/manage\/"/, 'not linked from the footer');

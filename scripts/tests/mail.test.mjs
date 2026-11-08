@@ -54,22 +54,22 @@ test('no key = skipped, no fetch', async () => {
   assert.equal(calls.length, 0);
 });
 
-test('budget: 11th owner mail in a day is skipped, commenter slice unaffected, next UTC day resets', async () => {
-  assert.deepEqual(CAPS, { owner: 10, commenter: 25, contact: 10, news: 35 });
+test('budget: 25th owner mail in a day is skipped, commenter slice unaffected, next UTC day resets', async () => {
+  assert.deepEqual(CAPS, { owner: 24, commenter: 25, contact: 10, news: 35 });
   env.MAIL_TEST_DAY = '2026-01-01';
-  for (let i = 0; i < 10; i++) assert.equal((await sendMail(env, ctx, msg({ key: `o${i}` }))).ok, true);
-  assert.deepEqual(await sendMail(env, ctx, msg({ key: 'o10' })), { ok: false, skipped: 'budget' });
-  assert.equal(calls.length, 10);
+  for (let i = 0; i < 24; i++) assert.equal((await sendMail(env, ctx, msg({ key: `o${i}` }))).ok, true);
+  assert.deepEqual(await sendMail(env, ctx, msg({ key: 'o24' })), { ok: false, skipped: 'budget' });
+  assert.equal(calls.length, 24);
   assert.equal((await sendMail(env, ctx, msg({ kind: 'commenter', key: 'c1' }))).ok, true);
   env.MAIL_TEST_DAY = '2026-01-02';
-  assert.equal((await sendMail(env, ctx, msg({ key: 'o11' }))).ok, true);
+  assert.equal((await sendMail(env, ctx, msg({ key: 'o25' }))).ok, true);
 });
 
 test('concurrent sends cannot exceed a slice', async () => {
-  const rs = await Promise.all(Array.from({ length: 15 }, (_, i) => sendMail(env, ctx, msg({ key: `p${i}` }))));
-  assert.equal(calls.length, 10);
-  assert.equal(rs.filter((r) => r.ok).length, 10);
-  assert.equal(rs.filter((r) => r.skipped === 'budget').length, 5);
+  const rs = await Promise.all(Array.from({ length: 30 }, (_, i) => sendMail(env, ctx, msg({ key: `p${i}` }))));
+  assert.equal(calls.length, 24);
+  assert.equal(rs.filter((r) => r.ok).length, 24);
+  assert.equal(rs.filter((r) => r.skipped === 'budget').length, 6);
 });
 
 test('a suppressed address is never mailed (case-insensitive) and costs no budget', async () => {

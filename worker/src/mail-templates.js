@@ -173,6 +173,13 @@ export function button(url, label) {
     + `<a class="mb-btn-a" href="${esc(url)}" style="display:inline-block;padding:14px 32px;${SANS}font-size:16px;line-height:20px;font-weight:bold;color:${L.buttonText};text-decoration:none;border-radius:24px;">${esc(label)}</a>`
     + '</td></tr></table>';
 }
+// A quiet second button for the other choice (an outlined pill, no fill), used only where one email offers two actions.
+// It has no background colour on purpose: the lint test counts filled buttons, and an email has one primary action.
+export function secondaryButton(url, label) {
+  return `<table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin:0 0 16px;"><tr><td class="mb-btn2" style="border:2px solid ${L.link};border-radius:24px;mso-padding-alt:12px 30px;">`
+    + `<a class="mb-btn2-a" href="${esc(url)}" style="display:inline-block;padding:12px 30px;${SANS}font-size:16px;line-height:20px;font-weight:bold;color:${L.link};text-decoration:none;border-radius:24px;">${esc(label)}</a>`
+    + '</td></tr></table>';
+}
 // The same address as a plain text link under the button, for clients that hide or break buttons. `lead` replaces
 // the default sentence (fixed text only, never visitor text).
 function fallback(url, shown, lead, mb = 24) {
@@ -234,7 +241,7 @@ const PREHEADER_FILL = '&#847;&zwnj;&nbsp;'.repeat(30);
 const CSS = `:root{color-scheme:light dark;supported-color-schemes:light dark}
 body{margin:0;padding:0;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
 @media (max-width:620px){.mb-wrap{width:100%!important}.mb-outer{padding:0 0 24px!important}.mb-frame{border-width:0 0 1px!important;border-radius:0!important}.mb-head,.mb-card{border-radius:0!important}.mb-footband{padding:0!important}.mb-head{padding:12px 28px 12px 8px!important}.mb-card{padding:28px 28px 32px!important}.mb-foot{padding:32px 28px 40px!important}.mb-h1{font-size:24px!important}.mb-dt,.mb-dd{display:block!important;width:auto!important}.mb-dt{padding:12px 0 0!important}.mb-dd{border-top:0!important;padding:0 0 12px!important}}
-@media (prefers-color-scheme: dark){.mb-page{background:${D.page}!important}.mb-frame{background:${D.card}!important;border-color:${D.border}!important}.mb-head{background:${D.header}!important}.mb-card{background:${D.card}!important}.mb-heading{color:${D.heading}!important}.mb-body{color:${D.body}!important}.mb-muted{color:${D.muted}!important}.mb-kicker{color:${D.kicker}!important}.mb-link{color:${D.link}!important}.mb-btn{background:${D.button}!important}.mb-btn-a{color:${D.buttonText}!important}.mb-quote{background:${D.quote}!important;border-left-color:${D.quoteRule}!important}.mb-rule{border-color:${D.rule}!important}.mb-logo{color:${D.logoAlt}!important}.mb-img{background:${D.imageBg}!important;color:${D.imageAlt}!important}}`;
+@media (prefers-color-scheme: dark){.mb-page{background:${D.page}!important}.mb-frame{background:${D.card}!important;border-color:${D.border}!important}.mb-head{background:${D.header}!important}.mb-card{background:${D.card}!important}.mb-heading{color:${D.heading}!important}.mb-body{color:${D.body}!important}.mb-muted{color:${D.muted}!important}.mb-kicker{color:${D.kicker}!important}.mb-link{color:${D.link}!important}.mb-btn{background:${D.button}!important}.mb-btn-a{color:${D.buttonText}!important}.mb-btn2{border-color:${D.link}!important}.mb-btn2-a{color:${D.link}!important}.mb-quote{background:${D.quote}!important;border-left-color:${D.quoteRule}!important}.mb-rule{border-color:${D.rule}!important}.mb-logo{color:${D.logoAlt}!important}.mb-img{background:${D.imageBg}!important;color:${D.imageAlt}!important}}`;
 
 // Layout: the page colour, then one 600 px column holding the card (white header with the linked wordmark, the
 // green/blue bar, the body), then a full-width near-black footer band like the site's. On phones the card runs edge to
@@ -297,11 +304,11 @@ function textPart(lines, why, links, origin) {
 const quoteText = (s) => plain(s).trim().split('\n').map((l) => `> ${l}`).join('\n');
 
 // signoff: false for emails to the owner (a team signature on a note to ourselves reads oddly).
-function build({ site, subject, title, preheader, kickerText, heading, html, text, buttonUrl, buttonShown, buttonLabel, fallbackLead, why, links, signoff: sign = true, heroHtml = '' }) {
+function build({ site, subject, title, preheader, kickerText, heading, html, text, buttonUrl, buttonShown, buttonLabel, fallbackLead, secondary, why, links, signoff: sign = true, heroHtml = '' }) {
   const s = resolveSite(site);
   const last = !html.after && !sign; // nothing under the link: no extra space above the card's own bottom padding
-  const bodyHtml = kicker(kickerText) + h1(heading) + html.before + button(buttonUrl, buttonLabel) + fallback(buttonUrl, buttonShown, fallbackLead, last ? 0 : 24) + (html.after || '') + (sign ? hairline() + signoff() : '');
-  const textLines = [heading.text, ...text.before, `${buttonLabel}:\n${buttonUrl}`, ...(text.after || []), sign ? 'The Mayobe Bros team' : null];
+  const bodyHtml = kicker(kickerText) + h1(heading) + html.before + button(buttonUrl, buttonLabel) + (secondary ? secondaryButton(secondary.url, secondary.label) : '') + fallback(buttonUrl, buttonShown, fallbackLead, last ? 0 : 24) + (html.after || '') + (sign ? hairline() + signoff() : '');
+  const textLines = [heading.text, ...text.before, `${buttonLabel}:\n${buttonUrl}`, secondary ? `${secondary.label}:\n${secondary.url}` : null, ...(text.after || []), sign ? 'The Mayobe Bros team' : null];
   return {
     subject: clip(subject, 140),
     html: shell({ title: title || clip(subject, 140), preheader: clip(preheader, 130), bodyHtml, footerHtml: footer(why, links), site: s, heroHtml }),
@@ -383,7 +390,9 @@ const ALERTS = {
     subject: (d) => `Comment held for review (#${clip(d.commentId, 20)})`,
     preheader: 'A new comment was held by the automatic screen and is waiting for you. The reason and the full text are inside.',
     kicker: 'Moderation', heading: 'A comment is waiting for review',
-    lead: () => 'The automatic screen held this comment, so it is not on the site yet. To approve or remove it, run this on your computer:',
+    lead: (hasEmail, review) => review
+      ? 'The automatic screen held this comment, so it is not on the site yet. Read it below, then press Approve to publish it, or Ignore to leave it hidden. The buttons work for 7 days.'
+      : 'The automatic screen held this comment, so it is not on the site yet. To approve or remove it, run this on your computer:',
     command: 'node scripts/comments.mjs list',
   },
   question: {
@@ -403,27 +412,34 @@ const ALERTS = {
 
 // Owner only: full content, escaped. data.email is used by kind 'contact-failed' (the visitor's address).
 export function ownerAlertEmail(data, site) {
-  const d = pick(data, ['kind', 'postUrl', 'email', 'reason', 'postSlug', 'commentId', 'name', 'body']);
+  const d = pick(data, ['kind', 'postUrl', 'email', 'reason', 'postSlug', 'commentId', 'name', 'body', 'approveUrl', 'ignoreUrl']);
   const { origin } = resolveSite(site);
   const kind = typeof d.kind === 'string' && Object.prototype.hasOwnProperty.call(ALERTS, d.kind) ? d.kind : 'held';
   const a = ALERTS[kind];
   const postUrl = ownUrl(d.postUrl, origin, '');
   const email = kind === 'contact-failed' ? clip(d.email, 254) : '';
-  const lead = a.lead(!!email);
+  const approveUrl = kind === 'held' ? ownUrl(d.approveUrl, origin, '') : '';
+  const ignoreUrl = kind === 'held' ? ownUrl(d.ignoreUrl, origin, '') : '';
+  const review = !!(approveUrl && ignoreUrl);
+  const cmd = review ? '' : a.command;
+  const lead = a.lead(!!email, review);
   const rows = [['Reason', clip(d.reason, 300)], ['Article', clip(d.postSlug, 200)], ['Comment ID', clip(d.commentId, 20)], ['Name', clip(d.name, 120)], ['Email', email]];
   const body = clipText(d.body, TEXT_MAX);
-  const btn = email ? { buttonUrl: mailto(email, 'Re: your message to Mayobe Bros'), buttonShown: email, buttonLabel: 'Reply to the visitor' }
+  // A held comment with review links: the primary button approves it, the quiet one leaves it held. Both open our own /manage/ page.
+  const btn = review ? { buttonUrl: approveUrl, buttonLabel: 'Approve this comment', secondary: { url: ignoreUrl, label: 'Ignore' },
+      fallbackLead: 'If the buttons do not work, open this link to approve the comment:' }
+    : email ? { buttonUrl: mailto(email, 'Re: your message to Mayobe Bros'), buttonShown: email, buttonLabel: 'Reply to the visitor' }
     : { buttonUrl: postUrl || `${origin}/`, buttonLabel: postUrl ? 'Open the article' : 'Open the website' };
   return build({
     site, subject: a.subject(d), preheader: a.preheader, kickerText: a.kicker, heading: H(esc(a.heading), a.heading.toUpperCase()),
     signoff: false,
-    html: { before: p(esc(lead), { mb: a.command ? 8 : 16 }) + (a.command ? `<p style="margin:0 0 24px;line-height:2;">${code(a.command)}</p>` : '') + details(rows.map(([k, v]) => [k, esc(v)])) + (body ? quote(longHtml(body), 'What they wrote:') : '') },
+    html: { before: p(esc(lead), { mb: cmd ? 8 : 16 }) + (cmd ? `<p style="margin:0 0 24px;line-height:2;">${code(cmd)}</p>` : '') + details(rows.map(([k, v]) => [k, esc(v)])) + (body ? quote(longHtml(body), 'What they wrote:') : '') },
     text: {
-      before: [a.command ? `${lead}\n\n    ${a.command}` : lead, rows.filter(([, v]) => v).map(([k, v]) => `${k}: ${plain(v)}`).join('\n') || null,
+      before: [cmd ? `${lead}\n\n    ${cmd}` : lead, rows.filter(([, v]) => v).map(([k, v]) => `${k}: ${plain(v)}`).join('\n') || null,
         body ? `What they wrote:\n${quoteText(body)}` : null, postUrl && email ? `Article: ${postUrl}` : null],
     },
     ...btn,
-    why: 'You got this alert because this address is set as OWNER_EMAIL for the Mayobe Bros comments Worker.',
+    why: 'You got this alert because this address is set to receive comment alerts for the Mayobe Bros comments Worker.',
     links: [['Visit Mayobe Bros', `${origin}/`], ['Comment policy', `${origin}/comment-policy/`]],
   });
 }

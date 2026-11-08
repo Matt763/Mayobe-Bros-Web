@@ -308,6 +308,14 @@ test('contact-failed alert states facts and offers a reply to the visitor', () =
   assert.ok(o.text.includes('My question'));
   assert.deepEqual(lint(o, {}, { checkUrls: false }), []);
 });
+test('a held comment with review links passes the same lint: one filled button, a quiet second one, both links in the text part', () => {
+  const o = T.ownerAlertEmail({ ...SHORT.ownerAlertEmail, kind: 'held', approveUrl: `${SITE.origin}/manage/#r=1.a.x.${'A'.repeat(43)}`, ignoreUrl: `${SITE.origin}/manage/#r=1.i.x.${'A'.repeat(43)}` }, SITE);
+  assert.deepEqual(lint(o, {}, { checkUrls: false }), []);
+  assert.match(o.html, /Approve this comment/);
+  assert.match(o.html, /class="mb-btn2-a"/);
+  assert.ok(o.text.includes('#r=1.a.x.') && o.text.includes('#r=1.i.x.'));
+  assert.ok(!/mb-btn2[^"]*"[^>]*bgcolor/.test(o.html), 'the quiet button has no fill');
+});
 test('no reply-time promises and no claims beyond site.config.json anywhere', () => {
   for (const name of BUILDERS) for (const data of [LONG[name], SHORT[name]]) {
     for (const kind of name === 'ownerAlertEmail' ? ['held', 'question', 'contact-failed'] : [undefined]) {

@@ -370,12 +370,19 @@
       head.appendChild(badge);
       wrap.classList.add('is-team');
     }
+    if (c.ab && !gone && !c.team) { // approved by hand by the team after the automatic screen held it: a green double check, public
+      var ok = el('span', 'approved-mark');
+      ok.title = 'Approved by Admin Mayobe Bros';
+      ok.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2 13l4 4L16 7"/><path d="M10 16l1 1L22 7"/></svg>';
+      head.appendChild(ok);
+    }
     var t = el('time', 'comment-time', ago(c.at));
     t.setAttribute('datetime', new Date(c.at).toISOString());
     head.appendChild(t);
     if (c.edited && !gone) { var ed = el('span', 'comment-edited', 'edited'); ed.title = 'Edited ' + ago(c.edited); head.appendChild(ed); }
     main.appendChild(head);
     main.appendChild(el('p', 'comment-body', c.body)); // text only, never HTML
+    if (c.ab && !gone && !c.team) main.appendChild(el('p', 'approved-by', 'Approved by Admin Mayobe Bros'));
     var hasReplies = !!(c.replies && c.replies.length);
     if (!gone) {
       var tools = el('div', 'comment-tools');

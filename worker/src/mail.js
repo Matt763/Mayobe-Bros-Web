@@ -4,8 +4,8 @@
 const API = 'https://api.resend.com/emails';
 const DEFAULT_FROM = 'Mayobe Bros <info@mayobebros.com>';
 const DEFAULT_FROM_SUPPORT = 'Mayobe Bros <support@mayobebros.com>';
-// Free plan: 100 a day. 80 are used, split by kind; a full slice never borrows from another.
-export const CAPS = { owner: 10, commenter: 25, contact: 10, news: 35 };
+// Free plan: 100 a day. 94 are used, split by kind; a full slice never borrows from another.
+export const CAPS = { owner: 24, commenter: 25, contact: 10, news: 35 };
 const EMAIL_RE = /^[^\s@<>(),;:"\\]+@[^\s@<>(),;:"\\]+\.[^\s@<>(),;:"\\.]{2,}$/;
 
 const warnedNoKey = new WeakSet(); // log the missing key once per env (per isolate in production)

@@ -12,6 +12,8 @@
     "MAIL_FROM": "Mayobe Bros <info@mayobebros.com>",
     "MAIL_FROM_SUPPORT": "Mayobe Bros <support@mayobebros.com>",
     "OWNER_EMAIL": "info@mayobebros.com",
+    // Who gets the "comment held" email with the Approve / Ignore buttons (comma separated, at most 3). Needs the secret REVIEW_SECRET for the buttons.
+    "REVIEW_EMAILS": "mclean@mayobebros.com,mbagamclean@gmail.com",
     "CONTACT_EMAIL": "info@mayobebros.com",
     // Newsletter: new-article emails go out only when this is exactly "true". Seeding and the daily clean-up run either way.
     "NEWSLETTER_SEND": "false",
