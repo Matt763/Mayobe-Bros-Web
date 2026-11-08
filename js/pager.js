@@ -1,7 +1,9 @@
 /* Mayobe Bros: moving around the lists without reloading the page.
    Two kinds of change, both with a fade and no page reload:
-     A. Page numbers (Newer, Older, 1 2 3...): the old cards fade out, only the cards and the page-number bar are swapped, and the new
-        cards slide in one after the other.
+     A. Page numbers (Newer, Older, 1 2 3...): the old cards stay (dimmed if the page is slow) until the new page is here, then fade
+        out; only the cards and the page-number bar are swapped, the page glides to the top of the list (js/motion.js, window.MBMotion:
+        the far part of a long trip is one jump while the cards are hidden), the new cards rise in one after the other and keyboard
+        focus moves to the first new article.
      B. Another category or label (the label buttons in the big picture, the menu, the category tiles): the title, the description,
         the buttons and the content fade out; the picture at the top cross-fades into the next one; then the new text and cards rise in.
    In both cases the address bar, page title and Back / Forward buttons follow, and the header and footer never move or flash.
@@ -18,7 +20,7 @@
 
   var mqReduce = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
   var animated = function () { return root.classList.contains('js-ready') && !(mqReduce && mqReduce.matches); };
-  var LEAVE_MS = 240;
+  var LEAVE_MS = 240; // category / label switch: the words and content fade out (main.is-switching)
   var each = function (list, fn) { Array.prototype.forEach.call(list, fn); };
 
   /* ----------------------------------------------------- the parts of a list page */
@@ -37,16 +39,17 @@
 
   /* ------------------------------------------------------------- fetching */
   var cache = {};
+  var ready = {}; // pages already here: no slow-load dim for them
   function load(href) {
     if (!cache[href]) {
       var p = new Promise(function (resolve, reject) {
         var timer = setTimeout(function () { reject(new Error('timeout')); }, 12000);
         fetch(href, { credentials: 'same-origin' })
           .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
-          .then(function (html) { clearTimeout(timer); resolve(new DOMParser().parseFromString(html, 'text/html')); },
+          .then(function (html) { clearTimeout(timer); ready[href] = true; resolve(new DOMParser().parseFromString(html, 'text/html')); },
             function (err) { clearTimeout(timer); reject(err); });
       });
-      p['catch'](function () { delete cache[href]; });
+      p['catch'](function () { delete cache[href]; delete ready[href]; });
       cache[href] = p;
     }
     return cache[href];
@@ -150,41 +153,71 @@
   var busy = false, queued = null;
   var shownPath = location.pathname; // the address of what is on screen (during Back / Forward the address bar is already the new one)
   var strip = function (p) { return p.replace(/page\/\d+\/$/, ''); };
+  var motion = function () { return window.MBMotion || null; }; // js/motion.js (loaded first); without it every change is instant
+  // the heading right above the cards (author pages, section heads), else the grid itself: where a new page starts
+  function listTopOf(grid) {
+    var prev = grid.previousElementSibling;
+    return prev && prev.matches('.ap-list-head, .section-head') ? prev : grid;
+  }
+  function headerBottom() {
+    var m = motion();
+    if (m) return m.headerBottom();
+    var h = doc.querySelector('.site-header');
+    return h ? Math.max(0, Math.round(h.getBoundingClientRect().bottom)) : 0;
+  }
+  // While pager.js owns the history entries the browser must not restore the scroll position itself (that caused a
+  // Back "yo-yo"). It is handed back on pagehide, so a normal Back from an article still lands where the reader was.
+  function ownScroll() { if ('scrollRestoration' in history) history.scrollRestoration = 'manual'; }
+  window.addEventListener('pagehide', function () { if ('scrollRestoration' in history) history.scrollRestoration = 'auto'; });
+  window.addEventListener('pageshow', function () { if (history.state && history.state.mbPager) ownScroll(); });
+
+  // the cheap header and the pressed button stay until the glide has ended, unless another change has started
+  function settle() {
+    if (busy) return;
+    root.classList.remove('is-paging');
+    each(doc.querySelectorAll('.page-num.is-pressed, .page-btn.is-pressed'), function (a) { a.classList.remove('is-pressed'); });
+  }
 
   function go(href, key, push, chip) {
     if (new URL(href, location.href).origin !== location.origin) { location.href = href; return; } // only ever fetch our own pages
     if (busy) { queued = { href: href, key: key, push: push, chip: chip }; return; }
-    if (push && href === location.href) return;
+    if (push && href === location.href) { settle(); return; }
     busy = true;
     root.classList.add('is-paging');
     here = partsOf(doc);
     var target = new URL(href, location.href);
     var kindPage = !!(here.nav && here.grid && strip(target.pathname) === strip(shownPath)); // same list, another page number
     if (kindPage && (key == null || key === 'section')) { var pm = /page\/(\d+)\/$/.exec(target.pathname); key = pm ? Number(pm[1]) : 1; }
+    var fail = function () { location.href = href; }; // anything unexpected: do a normal page load
+    var m = motion();
     if (kindPage) {
+      // the old cards stay (dimmed if the page is slow) until the new page is here; only then do they fade out
+      var grid = here.grid;
       markPage(here.nav, key);
       here.nav.classList.add('is-loading');
-      here.grid.setAttribute('aria-busy', 'true');
-    } else if (chip) markChip(chip);
+      grid.setAttribute('aria-busy', 'true');
+      if (m && !ready[href]) m.wait(grid, true);
+      load(href).then(function (next) {
+        return (m ? m.leave(grid) : Promise.resolve()).then(function () { return next; });
+      }).then(function (next) { swap(next, href, key, push, chip); })['catch'](fail);
+      return;
+    }
+    if (chip) markChip(chip);
     var leave = new Promise(function (resolve) {
       if (!animated()) { resolve(); return; }
-      if (kindPage) here.grid.classList.add('is-leaving'); else main.classList.add('is-switching');
+      main.classList.add('is-switching');
       setTimeout(resolve, LEAVE_MS);
     });
-    Promise.all([load(href), leave]).then(function (r) {
-      swap(r[0], href, key, push, chip);
-    })['catch'](function () {
-      location.href = href; // anything unexpected: do a normal page load
-    });
+    Promise.all([load(href), leave]).then(function (r) { swap(r[0], href, key, push, chip); })['catch'](fail);
   }
 
-  function finish() {
+  function finish(moved) {
     busy = false;
     main.classList.remove('is-switching');
-    setTimeout(function () { if (!busy) root.classList.remove('is-paging'); }, 1100); // keep the cheap header until the glide has ended
     var p = partsOf(doc);
     if (p.nav) p.nav.classList.remove('is-loading');
     if (p.grid) p.grid.removeAttribute('aria-busy');
+    Promise.resolve(moved).then(settle, settle);
     if (queued) { var q = queued; queued = null; go(q.href, q.key, q.push, q.chip); }
   }
 
@@ -197,6 +230,7 @@
 
     // address bar, title and canonical address follow the page
     if (push) {
+      ownScroll();
       if (!(history.state && history.state.mbPager)) history.replaceState({ mbPager: true }, '', location.href);
       history.pushState({ mbPager: true }, '', href);
     }
@@ -205,54 +239,49 @@
     menuSync(next);
 
     var fx = animated();
-    if (sameList) swapPage(cur, n, key, fx); else swapSection(cur, n, next, chip, fx);
-    finish();
+    finish(sameList ? swapPage(cur, n, push, fx) : swapSection(cur, n, chip, fx));
   }
 
-  // A. same list, other page number: only the cards and the number bar change
-  function swapPage(cur, n, key, fx) {
+  // A. same list, other page number: only the cards and the number bar change, all in this one task (no layout shift)
+  function swapPage(cur, n, push, fx) {
+    var m = motion();
     var grid = cur.grid, nav = cur.nav;
-    var oldH = grid.offsetHeight;
-    grid.classList.remove('is-visible', 'is-leaving', 'is-entering');
-    fill(grid, n.grid);
-    each(grid.children, function (c, i) { c.style.setProperty('--i', Math.min(i, 8)); });
+    var listTop = listTopOf(grid);
+    var wasAbove = listTop.getBoundingClientRect().top < headerBottom();
+    var target = m ? m.topOf(listTop) : 0; // read before the swap, while the old cards still hold the page
+
+    fill(grid, n.grid); // the grid keeps is-visible, so the reveal system leaves the new cards alone
+    grid.classList.add('is-visible');
     prepImages(grid);
-    if (fx) {
-      grid.style.minHeight = oldH + 'px'; // the page eases to its new height instead of jumping
-      void grid.offsetHeight; // the new cards start hidden...
-      grid.classList.add('is-entering', 'is-visible'); // ...and then fade in one by one
-      grid.style.transition = 'min-height 0.55s cubic-bezier(0.22, 1, 0.36, 1)';
-      grid.style.minHeight = '0px';
-      setTimeout(function () { grid.classList.remove('is-entering'); grid.style.transition = ''; grid.style.minHeight = ''; }, 1000);
-    } else {
-      grid.classList.add('is-visible');
-    }
+    if (m) m.enter(grid.children, grid); else grid.classList.remove('mo-wait');
     doc.dispatchEvent(new CustomEvent('mb:content', { detail: { root: grid } })); // lets js/engage.js fill in comment counts
 
-    // the page-number bar: the highlighted number pops, changed numbers fade in
+    // the page-number bar: the highlighted number pops, changed numbers fade in; the note (role="status") says the page once
     var bar = nav.querySelector('.pagination-bar'), note = nav.querySelector('.pagination-note');
     var nextBar = n.nav.querySelector('.pagination-bar'), nextNote = n.nav.querySelector('.pagination-note');
     if (bar && nextBar) fill(bar, nextBar);
     if (note && nextNote) note.textContent = nextNote.textContent;
     if (fx) { nav.classList.add('is-updating'); setTimeout(function () { nav.classList.remove('is-updating'); }, 800); }
 
-    // bring the top of the list into view, then keep keyboard focus where the reader was
-    var hh = (doc.querySelector('.site-header') || { getBoundingClientRect: function () { return { height: 0 }; } }).getBoundingClientRect().height;
-    grid.style.scrollMarginTop = '1rem';
-    if (grid.getBoundingClientRect().top < hh + 8) grid.scrollIntoView({ behavior: fx ? 'smooth' : 'auto', block: 'start' });
-    var keep = null;
-    if (key === 'prev' || key === 'next') keep = nav.querySelector('a.page-' + key);
-    else if (typeof key === 'number') keep = nav.querySelector('.page-num[aria-label="Page ' + key + '"]');
-    keep = keep || nav.querySelector('.page-num.is-current');
-    if (keep && doc.activeElement && (doc.activeElement === doc.body || !doc.body.contains(doc.activeElement) || nav.contains(doc.activeElement))) keep.focus({ preventScroll: true });
-    announce((nav.querySelector('.pagination-note') || {}).textContent || '');
+    // focus follows the reader to the first new article, when the change came from the page-number bar
+    var ae = doc.activeElement;
+    if (push && (!ae || ae === doc.body || !doc.body.contains(ae) || nav.contains(ae))) {
+      var first = grid.querySelector('a.card-link');
+      if (first) first.focus({ preventScroll: true });
+    }
+
+    // bring the top of the list into view: the cards are hidden at this moment, so the far part of the trip is one jump
+    if (!wasAbove) return null;
+    if (m) return m.glide(target, { covered: true });
+    listTop.scrollIntoView({ block: 'start' });
+    return null;
   }
 
   // B. another category or label: the picture cross-fades, the text and the content are replaced
-  function swapSection(cur, n, next, chip, fx) {
+  function swapSection(cur, n, chip, fx) {
+    var m = motion();
     var hero = cur.hero, inner = hero.querySelector('.hero-inner'), wrap = cur.wrap;
     var nextInner = n.hero.querySelector('.hero-inner');
-    var oldH = wrap.offsetHeight;
 
     // the picture: the new one fades in on top of the old one, which is then removed
     var oldImg = hero.querySelector('.hero-img'), newSrc = n.hero.querySelector('.hero-img');
@@ -273,29 +302,19 @@
     }
 
     // the words and buttons in the picture, then the content below it
+    var farDown = window.scrollY > hero.offsetHeight; // read before the swap
     main.classList.remove('is-switching');
     fill(inner, nextInner);
     fill(wrap, n.wrap);
-    each(wrap.children, function (c, i) { c.style.setProperty('--i', Math.min(i, 6)); if (!c.classList.contains('grid')) c.classList.add('is-new'); });
+    each(wrap.children, function (c, i) { if (!c.classList.contains('grid')) { c.style.setProperty('--i', Math.min(i, 6)); c.classList.add('is-new'); } });
     var grid = wrap.querySelector(':scope > .grid');
     if (grid) {
-      grid.classList.remove('is-visible', 'is-leaving', 'is-entering');
-      each(grid.children, function (c, i) { c.style.setProperty('--i', Math.min(i, 8)); });
+      grid.classList.add('is-visible');
       prepImages(grid);
+      if (m) m.enter(grid.children, grid);
     }
-    if (fx) {
-      wrap.style.minHeight = oldH + 'px'; // the page eases to its new height instead of jumping
-      void wrap.offsetHeight;
-      if (grid) grid.classList.add('is-entering', 'is-visible');
-      wrap.style.transition = 'min-height 0.6s cubic-bezier(0.22, 1, 0.36, 1)';
-      wrap.style.minHeight = '0px';
-      setTimeout(function () { wrap.style.transition = ''; wrap.style.minHeight = ''; if (grid) grid.classList.remove('is-entering'); each(wrap.querySelectorAll('.is-new'), function (c) { c.classList.remove('is-new'); }); }, 1200);
-    } else if (grid) grid.classList.add('is-visible');
+    if (fx) setTimeout(function () { each(wrap.querySelectorAll('.is-new'), function (c) { c.classList.remove('is-new'); }); }, 1200);
     doc.dispatchEvent(new CustomEvent('mb:content', { detail: { root: wrap } })); // lets js/engage.js fill in comment counts
-
-    // if the reader had scrolled far down, bring them back to the start of the new list
-    var hh = (doc.querySelector('.site-header') || { getBoundingClientRect: function () { return { height: 0 }; } }).getBoundingClientRect().height;
-    if (wrap.getBoundingClientRect().top < hh - 40 && window.scrollY > hero.offsetHeight) window.scrollTo({ top: Math.max(0, hero.offsetTop), behavior: fx ? 'smooth' : 'auto' });
 
     // keep keyboard focus on the button that was chosen
     var title = (inner.querySelector('.hero-title') || {}).textContent || '';
@@ -306,6 +325,12 @@
     var drawerClose = doc.querySelector('.drawer[aria-hidden="false"] [data-drawer-close]');
     if (drawerClose) drawerClose.click(); // the phone menu closes after a choice
     announce(title + '. ' + ((inner.querySelector('.hero-count') || {}).textContent || ''));
+
+    // if the reader had scrolled far down, bring them back to the top of the new page (the content is hidden: covered)
+    if (!farDown) return null;
+    if (m) return m.glide(0, { covered: true });
+    hero.scrollIntoView({ block: 'start' });
+    return null;
   }
 
   /* ------------------------------------------------------------- the events */
@@ -317,7 +342,7 @@
     if (!kind) return;
     e.preventDefault();
     if (a.classList.contains('is-current')) return;
-    if (kind === 'page') go(a.href, keyOf(a), true, null);
+    if (kind === 'page') { a.classList.add('is-pressed'); go(a.href, keyOf(a), true, null); }
     else go(a.href, 'section', true, a.classList.contains('chip') ? a : null);
   }, true);
   // Back and Forward move through the pages the reader already opened, also without a reload

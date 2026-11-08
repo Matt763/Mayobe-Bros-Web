@@ -329,7 +329,9 @@ body.no-scroll { overflow: hidden; }
 .grid-tiles { grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); }
 .card { position: relative; display: flex; flex-direction: column; overflow: hidden; background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--radius); box-shadow: var(--shadow-sm); transition: transform 0.35s var(--ease), box-shadow 0.35s, border-color 0.25s; }
 .card:hover { transform: translateY(-6px); box-shadow: var(--shadow-lg); border-color: var(--line); }
-.card:focus-within { outline: 3px solid var(--btn-bg); outline-offset: 2px; }
+/* the ring shows for keyboard focus only: after a page-number click js/pager.js moves focus to the first new card, and mouse users should not see a ring */
+.card:has(:focus-visible) { outline: 3px solid var(--btn-bg); outline-offset: 2px; }
+@supports not selector(:has(*)) { .card:focus-within { outline: 3px solid var(--btn-bg); outline-offset: 2px; } }
 .card-link { text-decoration: none; }
 .card-link::after { content: ""; position: absolute; inset: 0; }
 .card-link:focus-visible { outline: none; }
@@ -1144,11 +1146,7 @@ html.is-listening .site-header { backdrop-filter: none; -webkit-backdrop-filter:
 .comments-more { display: flex; margin: 1.25rem auto 0; }
 
 /* ======================================================= changing page without a reload (js/pager.js) */
-/* old cards fade up and out */
-.js-ready [data-reveal-stagger].is-leaving > * { opacity: 0; transform: translateY(-14px) scale(0.985); transition: opacity 0.22s ease, transform 0.22s ease; transition-delay: 0s; }
-/* new cards rise in one after the other (a little quicker than the first-visit reveal) */
-.js-ready [data-reveal-stagger].is-entering > * { transition-duration: 0.55s, 0.55s; transition-delay: calc(var(--i, 0) * 60ms); }
-/* the page-number bar */
+/* the cards' fade out and rise in are the shared mo-* states at the end of this file (js/motion.js); the page-number bar: */
 @keyframes pager-in { from { opacity: 0; transform: translateY(6px); } }
 @keyframes page-pop { 0% { transform: scale(0.78); } 55% { transform: scale(1.14); } 100% { transform: scale(1); } }
 @keyframes page-pulse { 50% { transform: scale(0.92); } }

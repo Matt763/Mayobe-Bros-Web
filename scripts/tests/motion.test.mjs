@@ -317,3 +317,11 @@ test('built pages carry a versioned motion.js', () => {
     assert.ok(/js\/motion\.js\?v=[a-f0-9]+/.test(fs.readFileSync(p, 'utf8')), `${f} has no versioned js/motion.js: run node scripts/build.mjs first`);
   }
 });
+
+test('pager.js: shared motion, no native smooth scroll, restoration handed back on pagehide', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'js', 'pager.js'), 'utf8');
+  assert.match(src, /MBMotion/);
+  assert.match(src, /scrollRestoration = 'manual'/);
+  assert.match(src, /pagehide[\s\S]{0,200}scrollRestoration = 'auto'/);
+  assert.doesNotMatch(src, /scrollIntoView\(\{ behavior|behavior: fx \? 'smooth'|minHeight|is-entering|announce\(\(nav/);
+});
