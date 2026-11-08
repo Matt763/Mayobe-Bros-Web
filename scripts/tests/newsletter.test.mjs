@@ -1116,7 +1116,7 @@ test('welcome uses lead picture and thumbnails from search.json, newest first', 
   // new-one (2026-10-30) leads with its large picture; mid-one (a video post) and older-one follow as thumbnails
   assert.deepEqual(imgSrcs(m.html), [LOGO_SRC, 'https://mayobebros.com/assets/email/post-new-one.jpg?v=0b0b0b0b',
     'https://mayobebros.com/assets/email/thumb-mid-one.jpg?v=0c0c0c0c', 'https://mayobebros.com/assets/email/thumb-older-one.jpg?v=0d0d0d0d']);
-  assert.deepEqual(imgAlts(m.html).slice(1), ['Alt new', 'Alt mid', 'Alt older']);
+  assert.deepEqual(imgAlts(m.html).slice(1), ['Alt new', 'Mid One', 'Older One'], 'the lead keeps the cover alt; thumbnails are named by their title');
   assert.match(m.html, /JOBS AND INTERNSHIPS · VIDEO/);
   assert.ok(m.text.includes('Watch the video: https://mayobebros.com/post/mid-one/#video-1'));
   assert.equal(m.html.includes('old-one.jpg'), false);

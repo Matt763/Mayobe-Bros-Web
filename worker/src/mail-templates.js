@@ -204,10 +204,15 @@ const signoff = () => p('The Mayobe Bros team', { mb: 0 });
 
 // An article picture, linked. src must already have passed ownImage. The slot keeps a tinted background and the alt
 // text is styled, so with pictures blocked (Outlook desktop by default, data-saver apps) the box still reads as a
-// labelled picture. Wider than 200 px: fluid (width:100% up to the file's display width), so phones scale it down and
-// Outlook keeps the width attribute.
-function picture(src, w, h, alt, href, radius = 0) {
-  const size = w > 200 ? `width:100%;max-width:${w}px;` : `width:${w}px;`;
+// labelled picture. w and h are what Outlook desktop shows (it uses the attributes), so w must equal the width of the
+// cell the picture sits in. Wider than 200 px: fluid, width:100% up to `max` (the widest that cell gets on a phone), and
+// the alt text is indented so a blocked picture's label does not touch the left edge.
+// Cell widths: the card is 600 px with a 1 px border (inner 598); its body is padded 40 px (518). Phones (max-width
+// 620 px, see CSS) drop the border and pad the body 28 px, so the hero can reach 620 px and the body 564 px.
+const HERO = { w: 598, h: 336, max: 620 };
+const LEAD = { w: 518, h: 291, max: 564 };
+function picture(src, w, h, alt, href, radius = 0, max = w) {
+  const size = w > 200 ? `width:100%;max-width:${max}px;text-indent:12px;` : `width:${w}px;`;
   return `<a href="${esc(href)}" style="display:block;text-decoration:none;"><img class="mb-img" src="${esc(src)}" width="${w}" height="${h}" alt="${esc(alt)}" style="display:block;border:0;${size}height:auto;${radius ? `border-radius:${radius}px;` : ''}background:${L.imageBg};${SANS}font-size:14px;line-height:1.5;color:${L.imageAlt};"></a>`;
 }
 // A small blue category line above an article title (the site's card kicker).
@@ -241,7 +246,7 @@ export function shell({ title, preheader, bodyHtml, footerHtml, site, heroHtml =
   const s = resolveSite(site);
   const bar = (c) => `<td width="50%" height="4" bgcolor="${c}" style="background:${c};height:4px;line-height:4px;mso-line-height-rule:exactly;">&nbsp;</td>`;
   return `<!DOCTYPE html>
-<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -251,6 +256,7 @@ export function shell({ title, preheader, bodyHtml, footerHtml, site, heroHtml =
 <meta name="color-scheme" content="light dark">
 <meta name="supported-color-schemes" content="light dark">
 <title>${esc(title)}</title>
+<!--[if gte mso 9]><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml><![endif]-->
 <style>${CSS}</style>
 </head>
 <body class="mb-page" style="margin:0;padding:0;background:${L.page};">
@@ -541,14 +547,14 @@ export function welcomeEmail(data, site) {
     .filter((x) => x.title && x.url).slice(0, 3);
   const cat = (x) => [x.category, x.video ? 'Video' : ''].filter(Boolean).join(' · ');
   const leadHtml = (x) => {
-    const pic = x.video ? picture(x.video.image, 520, 293, x.video.alt, x.video.url, 10) : x.image ? picture(x.image, 520, 293, x.alt, x.url, 10) : '';
+    const pic = x.video ? picture(x.video.image, LEAD.w, LEAD.h, x.video.alt, x.video.url, 10, LEAD.max) : x.image ? picture(x.image, LEAD.w, LEAD.h, x.alt, x.url, 10, LEAD.max) : '';
     return `<table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="margin:0 0 8px;">`
       + (pic ? `<tr><td style="padding:0 0 18px;">${pic}</td></tr>` : '')
       + '<tr><td>' + (cat(x) ? catLine(cat(x)) : '') + titleLink('h2', x.url, x.title, 22, 8)
       + (x.excerpt ? p(esc(x.excerpt), { muted: true, size: 15, mb: x.video ? 8 : 16 }) : '') + (x.video ? watchLink(x.video.url) : '') + '</td></tr></table>';
   };
   const rowHtml = (x) => `<table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0"><tr>`
-    + (x.thumb ? `<td class="mb-rule" width="128" style="width:128px;padding:16px 16px 16px 0;border-top:1px solid ${L.rule};vertical-align:top;">${picture(x.thumb, 112, 84, x.alt, x.url, 8)}</td>` : '')
+    + (x.thumb ? `<td class="mb-rule" width="128" style="width:128px;padding:16px 16px 16px 0;border-top:1px solid ${L.rule};vertical-align:top;">${picture(x.thumb, 112, 84, x.title, x.url, 8)}</td>` : '')
     + `<td class="mb-rule" style="padding:16px 0;border-top:1px solid ${L.rule};vertical-align:top;">${cat(x) ? catLine(cat(x), 6) : ''}${titleLink('h3', x.url, x.title, 17, 0)}</td></tr></table>`;
   const a = 'Thank you for confirming. When we publish a new article, we will send you one short email about it.';
   const b = 'We write clear, honest guides on education, jobs, money and technology for readers in Tanzania.';
@@ -568,7 +574,7 @@ export function welcomeEmail(data, site) {
 
 // post = { title, url, excerpt?, category?, image?, imageAlt?, video?: { image, url } }. image and video.image are our
 // own email JPEGs (ownImage: https, /assets/email/, v=<hash>), never the share card. The picture is a full-bleed hero
-// above the card body (600 x 338), linked to the article; for a video post it is the video picture (our cover with a
+// above the card body (598 x 336, up to 620 px wide on a phone), linked to the article; for a video post it is the video picture (our cover with a
 // play disc drawn in), linked to the video on the article page, with a "Watch the video" text link as well.
 export function newPostEmail(data, site) {
   const d = pick(data, ['post', 'unsubscribeUrl']);
@@ -579,7 +585,7 @@ export function newPostEmail(data, site) {
   const title = post.title || 'A new article';
   const excerpt = clip(post.rawExcerpt, 400);
   const v = post.video;
-  const heroHtml = v ? picture(v.image, 600, 338, clip(`Watch the video: ${title}`, 150), v.url) : post.image ? picture(post.image, 600, 338, post.alt || title, url) : '';
+  const heroHtml = v ? picture(v.image, HERO.w, HERO.h, clip(`Watch the video: ${title}`, 150), v.url, 0, HERO.max) : post.image ? picture(post.image, HERO.w, HERO.h, post.alt || title, url, 0, HERO.max) : '';
   const pre = clip(post.rawExcerpt, 130);
   const c = 'You can stop these emails at any time with the unsubscribe link below.';
   return build({

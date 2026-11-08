@@ -25,7 +25,7 @@ import * as T from '../../worker/src/mail-templates.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const OUT = path.join(os.homedir(), '.cache', 'mayobe-email-preview');
-const SITE = { origin: 'https://mayobebros.com', assetOrigin: 'https://mayobebros.com' };
+const SITE = { origin: 'https://mayobebros.com', assetOrigin: 'https://mayobebros.com', logoUrl: 'https://mayobebros.com/assets/email/logo.png' };
 const args = process.argv.slice(2);
 const noShots = args.includes('--no-shots');
 const noImages = args.includes('--no-images');

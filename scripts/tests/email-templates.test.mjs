@@ -15,6 +15,9 @@ const LOGO = `${ASSET}/assets/email/logo.png`;
 // Pictures allowed per email: the logo everywhere; welcome adds a lead picture and two thumbnails, new article a hero.
 const MAX_IMG = { welcomeEmail: 4, newPostEmail: 2 };
 // Classes that only carry layout (padding, width, stacking): everything else must be restyled by the dark block.
+// The card is 600 px with a 1 px border, so its inner width is 598; on phones (up to 620 px wide) it runs edge to edge.
+const MAX_CELL = 598, PHONE_MAX = 620;
+const MSO_DPI = '<!--[if gte mso 9]><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml><![endif]-->';
 const LAYOUT_CLASSES = new Set(['mb-wrap', 'mb-outer', 'mb-foot', 'mb-footband', 'mb-dt', 'mb-dd', 'mb-h1']);
 
 // Hostile pieces: markup, both quote kinds, an ampersand and a header-injection attempt.
@@ -80,12 +83,18 @@ function lint(out, data, { checkUrls = true, name = '' } = {}) {
     const st = (t.match(/\sstyle="([^"]*)"/) || [, ''])[1];
     for (const rule of ['display:block', 'border:0', 'height:auto']) if (!st.includes(rule)) errs.push(`img without ${rule}: ${t}`);
     const w = Number((t.match(/\swidth="(\d+)"/) || [, 0])[1]);
-    if (w > 200 && (!st.includes('width:100%') || !st.includes(`max-width:${w}px`))) errs.push(`img wider than 200 without width:100%;max-width:${w}px: ${t}`);
+    // fluid: width:100% up to a max-width between the width attribute (what Outlook desktop uses) and the widest the cell gets on a phone
+    const mw = Number((st.match(/max-width:(\d+)px/) || [, 0])[1]);
+    if (w > 200 && (!st.includes('width:100%') || mw < w || mw > PHONE_MAX)) errs.push(`img wider than 200 without width:100%;max-width:${w}-${PHONE_MAX}px: ${t}`);
+    if (w > MAX_CELL) errs.push(`img width attribute ${w} wider than the card's inner width ${MAX_CELL}: ${t}`);
   }
   if (imgs.length > (MAX_IMG[name] || 1)) errs.push(`img count ${imgs.length} > ${MAX_IMG[name] || 1}`);
   // the first picture is the wordmark logo, once
   if (!imgs.length || !/\salt="Mayobe Bros"/.test(imgs[0]) || !imgs[0].includes(`src="${LOGO}`)) errs.push('first img is not the logo');
   if (n(/<img\b[^>]*\salt="Mayobe Bros"/g) !== 1) errs.push('logo count ' + n(/<img\b[^>]*\salt="Mayobe Bros"/g));
+  // Outlook desktop on a high-DPI screen scales pictures unless the document says 96 pixels per inch
+  if (!html.includes(MSO_DPI)) errs.push('no Outlook PixelsPerInch block');
+  if (!/<html\b[^>]*\sxmlns:o="urn:schemas-microsoft-com:office:office"/.test(html)) errs.push('no xmlns:o on <html>');
   if (!html.includes('<meta name="color-scheme" content="light dark">')) errs.push('color-scheme meta');
   if (!html.includes('<meta name="supported-color-schemes" content="light dark">')) errs.push('supported-color-schemes meta');
   if (!/@media \(prefers-color-scheme: dark\)/.test(html)) errs.push('no dark block');
@@ -622,8 +631,9 @@ test('with every <img> removed, the heading, every post title, the button label 
   for (const [name, data] of PIC_CASES()) {
     const o = T[name](data, SITE);
     const bare = o.html.replace(/<img\b[^>]*>/g, '');
-    const h1 = o.html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/)[1];
-    assert.ok(h1.trim() && bare.includes(h1), `${name}: heading`);
+    const heading = (bare.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/) || [, ''])[1].replace(/<[^>]*>/g, '').trim();
+    const want = name === 'welcomeEmail' ? 'You are subscribed' : T.esc(T.oneLine(data.post.title)).slice(0, 40);
+    assert.ok(heading && heading.startsWith(want), `${name}: heading "${heading.slice(0, 60)}" is not live text starting "${want}"`);
     const titles = name === 'welcomeEmail' ? data.latestPosts.map((x) => x.title) : [data.post.title];
     for (const t of titles) assert.ok(bare.includes(T.esc(T.oneLine(t)).slice(0, 40)), `${name}: title ${t.slice(0, 30)}`);
     const label = o.html.match(/<a class="mb-btn-a"[^>]*>([^<]*)<\/a>/)[1];
@@ -678,8 +688,8 @@ test('a video post shows one hero, the video picture, links it to #video-1 and s
   assert.equal(pics.length, 1, 'one hero');
   const hero = pics[0];
   assert.equal(srcOf(hero), IMG('video', 'y', '89abcdef'));
-  for (const a of ['width="600"', 'height="338"']) assert.ok(hero.includes(a), a);
-  assert.ok(hero.includes('max-width:600px') && hero.includes('width:100%'));
+  for (const a of ['width="598"', 'height="336"']) assert.ok(hero.includes(a), a);
+  assert.ok(hero.includes('max-width:620px') && hero.includes('width:100%'));
   assert.ok(altOf(hero).startsWith('Watch the video: '), altOf(hero));
   const vurl = LONG.newPostEmail.post.video.url;
   const a = anchors(o.html);
@@ -709,7 +719,7 @@ test('welcome shows one lead picture and at most two thumbnails, in the order gi
   const pics = imgTags(o.html).slice(1);
   // POSTS[0] is the lead (its large picture), then the thumbnails of POSTS[1] (a video post) and POSTS[2]
   assert.deepEqual(pics.map(srcOf), [IMG('post', 'p1'), IMG('thumb', 'p2'), IMG('thumb', 'p3')]);
-  assert.ok(pics[0].includes('width="520"') && pics[0].includes('height="293"'));
+  assert.ok(pics[0].includes('width="518"') && pics[0].includes('height="291"'));
   for (const t of pics.slice(1)) assert.ok(t.includes('width="112"') && t.includes('height="84"'));
   assert.match(o.html, /LATEST ARTICLES/);
   assert.equal((o.html.match(/<h2\b/g) || []).length, 1, 'one lead title');
@@ -735,4 +745,34 @@ test('welcome shows one lead picture and at most two thumbnails, in the order gi
   assert.equal(imgTags(empty.html).length, 1);
   assert.ok(!/LATEST ARTICLES/.test(empty.html));
   assert.deepEqual(lint(empty, {}, { name: 'welcomeEmail' }), []);
+});
+
+/* ------------------------------------------------------------------ review fixes after Tasks 2-3 */
+
+test('picture width attributes equal the cell they sit in (Outlook desktop uses the attribute); CSS lets them fill a phone', () => {
+  const hero = imgTags(T.newPostEmail(LONG.newPostEmail, SITE).html)[1];
+  // the hero spans the card's inner width: 600 minus the 1 px border on each side; on a phone the card is up to 620 px wide
+  for (const a of ['width="598"', 'height="336"', 'width:100%', 'max-width:620px']) assert.ok(hero.includes(a), `hero ${a}`);
+  const w = T.welcomeEmail(LONG.welcomeEmail, SITE).html;
+  const lead = imgTags(w)[1];
+  // the lead sits in the card body: 598 minus 40 px padding each side = 518; phones pad 28 px, so up to 620 - 56 = 564
+  for (const a of ['width="518"', 'height="291"', 'width:100%', 'max-width:564px']) assert.ok(lead.includes(a), `lead ${a}`);
+  assert.ok(!/max-width:520px/.test(w), 'the old 520 px cap is gone');
+  assert.match(w, /<td class="mb-card"[^>]*padding:40px;/);
+  assert.match(w, /@media \(max-width:620px\)\{[^\n]*\.mb-card\{padding:28px 28px 32px!important\}/);
+  assert.match(w, /@media \(max-width:620px\)\{[^\n]*\.mb-frame\{border-width:0 0 1px!important/);
+  assert.match(w, /<td class="mb-frame"[^>]*border:1px solid/);
+  // the head carries the Outlook 96 dpi block and the Office namespace
+  assert.ok(w.indexOf(MSO_DPI) > w.indexOf('<head>') && w.indexOf(MSO_DPI) < w.indexOf('</head>'));
+});
+
+test('a thumbnail is named by the post title; the hero and the lead keep the cover description; wide pictures indent their alt text', () => {
+  const o = T.welcomeEmail(LONG.welcomeEmail, SITE);
+  const [lead, ...thumbs] = imgTags(o.html).slice(1);
+  assert.equal(altOf(lead), T.oneLine(POSTS[0].imageAlt).slice(0, 150));
+  thumbs.forEach((t, i) => assert.equal(altOf(t), T.oneLine(POSTS[i + 1].title).slice(0, 160)));
+  const hero = imgTags(T.newPostEmail({ ...LONG.newPostEmail, post: { ...LONG.newPostEmail.post, video: undefined } }, SITE).html)[1];
+  assert.equal(altOf(hero), T.oneLine(LONG.newPostEmail.post.imageAlt).slice(0, 150));
+  // with pictures blocked the alt text of a wide picture does not touch the left edge
+  for (const t of [lead, hero]) assert.match(t, /text-indent:\d+px/);
 });

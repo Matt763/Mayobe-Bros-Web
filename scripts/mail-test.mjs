@@ -13,7 +13,7 @@ import { sendMail } from '../worker/src/mail.js';
 import * as T from '../worker/src/mail-templates.js';
 
 const ORIGIN = 'https://mayobebros.com';
-const SITE = { origin: ORIGIN, logoUrl: `${ORIGIN}/assets/img/icon-192.png` };
+const SITE = { origin: ORIGIN, logoUrl: `${ORIGIN}/assets/email/logo.png` };
 const POST = { title: 'Ajira Portal: How to Apply for Public Service Jobs Step by Step', url: `${ORIGIN}/post/ajira-portal-how-to-apply-public-service-jobs/` };
 const NEWS_POST = { ...POST, excerpt: 'What to prepare, how the Ajira Portal works and which mistakes get a job application rejected.', category: 'Jobs and internships' };
 
