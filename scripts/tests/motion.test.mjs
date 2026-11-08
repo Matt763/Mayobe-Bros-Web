@@ -148,6 +148,29 @@ test('glide follows the curve, ends exactly on the target, and tidies up', async
   assert.equal(t.listeners(), 0);
 });
 
+// Measured in Chromium (Task 4): the first frame after a swap can take 150 ms (laying out and painting 15 new cards), more on a slow
+// phone. If the glide's clock ran on, the next frame leapt 96 px at once (5.75 px/ms). A frame now moves the glide at most 34 ms worth.
+test('a long frame does not make the glide leap; it ends a little later instead', async () => {
+  const t = load({ scrollY: 1240 });
+  const p = t.M.glide(600); // 640 px, 449 ms
+  t.frames(1, 300); // the first frame, then 300 ms until the next one
+  t.frames(60, 17);
+  const ys = t.calls;
+  // easeInOutCubic peaks at 1.5 x the average speed: 1.5 * 640 / 449 = 2.14 px/ms, so 34 ms of motion is at most 73 px
+  for (let i = 1; i < ys.length; i++) assert.ok(Math.abs(ys[i] - ys[i - 1]) <= 73, `leap of ${ys[i - 1] - ys[i]} px at call ${i}`);
+  assert.ok(Math.abs(ys[1] - ys[0]) <= 2, `the frame after the long one moved ${ys[0] - ys[1]} px`);
+  assert.equal(ys[ys.length - 1], 600);
+  assert.equal(await p, 'done');
+});
+
+test('a page that keeps stalling still ends the glide within twice its duration', async () => {
+  const t = load({ scrollY: 1240 });
+  const p = t.M.glide(600); // 449 ms
+  t.frames(4, 300); // frames at 0, 300, 600 and 900 ms
+  assert.equal(t.calls[t.calls.length - 1], 600, `ended at ${t.calls[t.calls.length - 1]}`);
+  assert.equal(await p, 'done');
+});
+
 test('a covered glide jumps once first, then glides', async () => {
   const t = load({ scrollY: 8000 });
   const p = t.M.glide(600, { covered: true });
@@ -294,6 +317,33 @@ test('style.css: unique keyframes, the motion block and its reduced-motion switc
   assert.match(css, /\.mo-enter\s*\{[^}]*animation:\s*mo-in 0\.4s var\(--ease\) both;[^}]*animation-delay:\s*calc\(var\(--mo-i, 0\) \* 35ms\)/);
   assert.match(css, /\.mo-leave > \*\s*\{\s*animation:\s*mo-out 0\.16s ease-in both;/);
   assert.match(css, /\.mo-wait > \*\s*\{\s*animation:\s*mo-dim 0\.3s ease 0\.15s both;/);
+});
+
+// A transform, filter, contain or will-change on <html> or <body> makes it the containing block of every position: fixed
+// element, so the Listen bar, the mini player, the cookie notice and back-to-top jump to the bottom of the whole page
+// (measured in Chromium: a bottom-fixed box went from 770 px to 8,918 px below the top of the screen during body.is-leaving).
+test('style.css: no rule puts a transform, filter, contain or will-change on html or body', () => {
+  const css = CSS().replace(/\/\*[\s\S]*?\*\//g, '');
+  const bad = [];
+  for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const sels = m[1].split(',').map((s) => s.trim());
+    if (!sels.some((s) => /^(html|body|:root)([.:[#][^\s>+~]*)?$/.test(s))) continue;
+    for (const d of m[2].split(';')) {
+      const kv = /^\s*(transform|filter|backdrop-filter|perspective|contain|will-change)\s*:\s*(.+?)\s*$/.exec(d);
+      if (kv && !/^(none|auto|normal)$/.test(kv[2])) bad.push(`${m[1].trim()} { ${kv[1]}: ${kv[2]} }`);
+    }
+  }
+  assert.deepEqual(bad, []);
+});
+
+// Measured in Chromium (Task 4): on a slow connection the comment/reaction counts (js/engage.js) arrived ~850 ms after "Older";
+// un-hiding them added a second meta line to every card at 360 px and shifted the cards below by 31 px (CLS 0.0105 to 0.013,
+// no recent input). The same happens on a first page load. While hidden they now keep their place, invisibly.
+test('card counts keep their place while hidden, so their arrival shifts nothing', () => {
+  const css = CSS();
+  assert.match(css, /\.card-stats\[hidden\]\s*\{[^}]*display:\s*inline-flex !important;[^}]*visibility:\s*hidden;/);
+  const at = css.indexOf('.card-stats[hidden]');
+  assert.ok(at < css.indexOf('.next-reads .card-stats { display: none !important; }'), 'stays before the next-reads rule, which must still win');
 });
 
 test('every page loads js/motion.js first', () => {

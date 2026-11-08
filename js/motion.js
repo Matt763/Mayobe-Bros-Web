@@ -15,6 +15,7 @@
   var ENTER_FALLBACK = 1000; // remove mo-enter even if animationend never comes
   var GAP = 16;            // landing distance under the sticky header, px
   var STAGGER_CAP = 6;     // items after the 7th rise together
+  var MAX_STEP = 34;       // ms of glide one frame may cover (two frames at 60 Hz), so a long frame never makes it leap
   var STOP_EVENTS = ['wheel', 'touchstart', 'pointerdown', 'keydown'];
   var active = null;       // the glide in flight: { stop: function (result) }
 
@@ -89,11 +90,15 @@
     for (var i = 0; i < STOP_EVENTS.length; i++) window.addEventListener(STOP_EVENTS[i], onInput, listenOpts);
     if (plan.jumpTo !== null) window.scrollTo(0, plan.jumpTo);
 
-    var t0 = null;
+    // the clock advances at most MAX_STEP per frame: after a long frame (new cards being laid out, a slow phone) the glide
+    // goes on from where it was instead of leaping ahead, and ends a little later; never later than twice its duration
+    var t0 = null, last = null, elapsed = 0;
     function frame(ts) {
       if (settled) return;
-      if (t0 === null) t0 = ts;
-      var p = plan.duration ? Math.min(1, (ts - t0) / plan.duration) : 1;
+      if (t0 === null) t0 = last = ts;
+      elapsed = Math.max(elapsed + Math.min(MAX_STEP, Math.max(0, ts - last)), ts - t0 - plan.duration);
+      last = ts;
+      var p = plan.duration ? Math.min(1, elapsed / plan.duration) : 1;
       var y = plan.start + (plan.to - plan.start) * easeInOutCubic(p);
       window.scrollTo(0, p >= 1 ? plan.to : Math.round(y));
       if (p >= 1) stop('done');

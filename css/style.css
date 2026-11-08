@@ -152,7 +152,8 @@ button { cursor: pointer; }
 ::view-transition-new(root) { animation: vt-in 0.4s var(--ease) both; }
 @keyframes vt-out { to { opacity: 0; transform: translateY(-8px); } }
 @keyframes vt-in { from { opacity: 0; transform: translateY(14px); } }
-body.is-leaving { opacity: 0; transform: translateY(-6px); transition: opacity 0.18s ease, transform 0.18s ease; }
+/* opacity only: a transform on body would pin every position: fixed element (Listen bar, mini player) to the page bottom */
+body.is-leaving { opacity: 0; transition: opacity 0.18s ease; }
 
 /* --------------------------------------------------------------- buttons */
 .btn {
@@ -349,6 +350,8 @@ body.no-scroll { overflow: hidden; }
 .card-meta { margin-top: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 1rem; font-size: 0.9375rem; color: var(--text-3); }
 .meta-item { display: inline-flex; align-items: center; gap: 0.35rem; }
 .card-stats { display: inline-flex; gap: 0.8rem; margin-left: auto; position: relative; z-index: 2; }
+/* counts not loaded yet (js/engage.js): keep their place invisibly, so their arrival moves no card (CLS) */
+.card-stats[hidden] { display: inline-flex !important; visibility: hidden; }
 .stat { display: inline-flex; align-items: center; gap: 0.3rem; font-weight: 700; color: var(--text-2); }
 .card-h { flex-direction: row; gap: 1rem; padding: 1rem; }
 .card-thumb { position: relative; flex: none; width: 7rem; height: 5.5rem; border-radius: 10px; overflow: hidden; background: var(--surface-2); }
