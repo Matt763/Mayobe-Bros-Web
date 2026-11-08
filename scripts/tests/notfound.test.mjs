@@ -294,12 +294,21 @@ test('the built 404.html loads notfound.js with a version and is in no sitemap',
 
 // ---- js/notfound-posts.js: random posts, nine per page, paginated in place ----
 const NP_SRC = () => fs.readFileSync(path.join(ROOT, 'js', 'notfound-posts.js'), 'utf8');
-function runPosts({ data, fail = false, base = '', random = () => 0.5, markup = true } = {}) {
+function runPosts({ data, fail = false, base = '', random = () => 0.5, markup = true, motion = true } = {}) {
   const imgs = [];
-  const grid = { innerHTML: 'STATIC', querySelectorAll: () => imgs };
+  const link = { focused: 0, focus(o) { this.focused++; this.opts = o; } };
+  const grid = { innerHTML: 'STATIC', querySelectorAll: () => imgs, querySelector: (s) => (s === 'a.card-link' ? link : null), children: ['c1', 'c2'] };
   const pager = Object.assign(target(), { innerHTML: '' });
   const all = { hidden: false };
-  const title = { scrolled: 0, scrollIntoView() { this.scrolled++; } };
+  const title = { scrolled: 0, scrollIntoView() { this.scrolled++; }, getBoundingClientRect: () => ({ top: -400 }) };
+  const log = [];
+  const M = {
+    leave: (box) => { log.push('leave'); assert.equal(box, grid); return Promise.resolve(); },
+    enter: (nodes, box) => { log.push('enter'); assert.equal(box, grid); assert.equal(nodes, grid.children); },
+    glide: (to, opts) => { log.push(['glide', to, opts]); return Promise.resolve('done'); },
+    topOf: (el) => { assert.equal(el, title); return 1234; },
+    headerBottom: () => 67,
+  };
   const current = { focused: 0, offsetParent: {}, focus() { this.focused++; } };
   const status = { textContent: '' };
   const box = {
@@ -313,7 +322,7 @@ function runPosts({ data, fail = false, base = '', random = () => 0.5, markup = 
   const fetched = [];
   const ctx = {
     document: doc,
-    window: { fetch: true },
+    window: motion ? { fetch: true, MBMotion: M } : { fetch: true },
     fetch: (url) => { fetched.push(url); return fail ? Promise.reject(new Error('x')) : Promise.resolve({ ok: true, json: () => Promise.resolve(data) }); },
     Math: Object.assign(Object.create(Math), { random }),
     location: { pathname: '/nope/' },
@@ -327,7 +336,7 @@ function runPosts({ data, fail = false, base = '', random = () => 0.5, markup = 
     for (const f of pager.handlers.click || []) f({ target: { closest: () => a }, preventDefault: () => { prevented = true; }, ...extra });
     return prevented;
   };
-  return { imgs, hidden: () => hiddenFocused, grid, pager, all, title, current, status, fetched, click, settle: () => new Promise((r) => setTimeout(r, 5)) };
+  return { imgs, hidden: () => hiddenFocused, grid, link, log, pager, all, title, current, status, fetched, click, settle: () => new Promise((r) => setTimeout(r, 5)) };
 }
 const INDEX = Array.from({ length: 20 }, (_, i) => ({ t: `T${i} <b>`, u: `/post/c/s${i}/`, s: `s${i}`, e: `E${i}`, c: 'Cat', l: '', g: [], d: '2026-01-05', i: `/assets/posts/s${i}.webp`, x: '' }));
 
@@ -353,22 +362,49 @@ test('posts: a different shuffle gives a different first page (Fisher-Yates over
   assert.notEqual(a.grid.innerHTML, b.grid.innerHTML);
 });
 
-test('posts: page numbers change the cards in place, announce, move focus, and never touch the address', async () => {
+test('posts: page numbers fade the cards out, swap, rise in, glide to the heading, announce, focus the first card, never touch the address', async () => {
   const t = runPosts({ data: INDEX });
   await t.settle();
   const first = t.grid.innerHTML;
   assert.equal(t.click(2), true, 'the link is not followed');
+  await t.settle();
+  assert.deepEqual(JSON.parse(JSON.stringify(t.log)), ['leave', 'enter', ['glide', 1234, { covered: true }]]);
   assert.notEqual(t.grid.innerHTML, first);
   assert.equal((t.grid.innerHTML.match(/<article class="card"/g) || []).length, 9);
   assert.equal(t.status.textContent, 'Page 2 of 3');
-  assert.equal(t.current.focused, 1, 'the visible current page number takes focus');
-  assert.equal(t.hidden(), 0, 'not the hidden copy');
-  assert.ok(t.title.scrolled >= 1);
+  assert.equal(t.link.focused, 1, 'the first new card link takes focus');
+  assert.equal(t.link.opts.preventScroll, true);
+  assert.equal(t.current.focused, 0, 'not the page number');
+  assert.equal(t.hidden(), 0);
   t.click(3);
+  await t.settle();
   assert.equal((t.grid.innerHTML.match(/<article class="card"/g) || []).length, 2);
   assert.match(t.pager.innerHTML, /page-btn page-next is-disabled/);
   assert.equal(t.click(9), true);
+  await t.settle();
   assert.equal(t.status.textContent, 'Page 3 of 3');
+});
+
+test('posts: fast clicks: the last page asked for wins', async () => {
+  const t = runPosts({ data: INDEX });
+  await t.settle();
+  t.click(2);
+  t.click(3);
+  await t.settle();
+  assert.match(t.pager.innerHTML, /Page 3 of 3/);
+  assert.equal(t.status.textContent, 'Page 3 of 3');
+  assert.ok(t.log.filter((x) => x === 'leave').length <= 2);
+});
+
+test('posts: without MBMotion the swap is instant and the heading is scrolled into view', async () => {
+  const t = runPosts({ data: INDEX, motion: false });
+  await t.settle();
+  const first = t.grid.innerHTML;
+  t.click(2);
+  assert.notEqual(t.grid.innerHTML, first);
+  assert.ok(t.title.scrolled >= 1);
+  assert.equal(t.link.focused, 1);
+  assert.equal(t.status.textContent, 'Page 2 of 3');
 });
 
 test('posts: a modified click is left to the browser; titles are escaped; under a basePath the index is fetched from the base', async () => {
@@ -435,6 +471,7 @@ test('posts: pictures fade in when loaded or failed, and at once when already co
   const done = mk(true), late = mk(false), broken = mk(false);
   t.imgs.push(done, late, broken);
   t.click(2);
+  await t.settle();
   assert.ok(done.classes.has('is-loaded'));
   assert.ok(!late.classes.has('is-loaded'));
   late.handlers.load();

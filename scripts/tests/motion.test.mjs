@@ -325,3 +325,16 @@ test('pager.js: shared motion, no native smooth scroll, restoration handed back 
   assert.match(src, /pagehide[\s\S]{0,200}scrollRestoration = 'auto'/);
   assert.doesNotMatch(src, /scrollIntoView\(\{ behavior|behavior: fx \? 'smooth'|minHeight|is-entering|announce\(\(nav/);
 });
+
+test('Show more buttons use the shared glide and never scroll by focus', () => {
+  const site = fs.readFileSync(path.join(ROOT, 'js', 'site.js'), 'utf8');
+  // `reduce \?` (the home button's flag), not the mini player's own "Back to the video" (reduceMotion), which is not a Show more flow
+  assert.doesNotMatch(site, /focus\(\{ preventScroll: false \}\)|scrollIntoView\(\{ behavior: reduce \?/);
+  assert.match(site, /MBMotion/);
+  const engage = fs.readFileSync(path.join(ROOT, 'js', 'engage.js'), 'utf8');
+  const at = engage.indexOf('comments-more');
+  assert.ok(at > 0, 'engage.js has the comments-more button');
+  const handler = engage.slice(at, engage.indexOf('list.appendChild', at));
+  assert.doesNotMatch(handler, /renderComments\(/, 'Show more comments appends the next batch, it does not re-render the list');
+  assert.match(engage, /MBMotion/);
+});

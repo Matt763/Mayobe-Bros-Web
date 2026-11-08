@@ -104,22 +104,49 @@
     lazy();
   }
 
-  // the full and the compact number lists both hold the current page; only one of them is shown
-  function visible(nodes) {
-    for (var i = 0; i < nodes.length; i++) if (nodes[i].offsetParent !== null) return nodes[i];
-    return nodes[0] || null;
+  // After a page change, focus goes to the first new card (its name is the article title), never scrolling by itself.
+  function focusFirst() {
+    var a = grid.querySelector ? grid.querySelector('a.card-link') : null;
+    if (a && a.focus) a.focus({ preventScroll: true });
   }
-  function go(n, userMoved) {
-    if (n < 1 || n > total || n === page) return;
-    page = n;
-    draw();
-    announce('Page ' + page + ' of ' + total);
-    if (userMoved) {
-      var keep = visible(pager.querySelectorAll('.page-num.is-current'));
-      var top = box.querySelector('.nf-more-title');
-      if (top && top.scrollIntoView) top.scrollIntoView({ block: 'start' });
-      if (keep && keep.focus) keep.focus({ preventScroll: true });
+  // With window.MBMotion (js/motion.js) the cards fade out, are swapped, rise in, and the page glides to the heading.
+  // While that runs only the latest page asked for is remembered. Without it the swap is instant.
+  var busy = false;
+  var want = 0;
+  function go(n, userMoved, pressed) {
+    if (n < 1 || n > total) return;
+    if (busy) { want = n; return; }
+    if (n === page) return;
+    var M = window.MBMotion;
+    var title = box.querySelector('.nf-more-title');
+    if (!M) {
+      page = n;
+      draw();
+      announce('Page ' + page + ' of ' + total);
+      if (userMoved) {
+        if (title && title.scrollIntoView) title.scrollIntoView({ block: 'start' });
+        focusFirst();
+      }
+      return;
     }
+    busy = true;
+    if (pressed && pressed.classList) pressed.classList.add('is-pressed'); // the bar is redrawn after the swap, so this goes with it
+    M.leave(grid).then(function () {
+      page = n;
+      draw();
+      M.enter(grid.children, grid);
+      announce('Page ' + page + ' of ' + total);
+      if (userMoved) {
+        focusFirst();
+        if (title && title.getBoundingClientRect().top < M.headerBottom()) M.glide(M.topOf(title), { covered: true });
+      }
+    })['catch'](function () { if (grid.classList) grid.classList.remove('mo-leave', 'mo-wait'); }) // never leave the cards hidden
+      .then(function () {
+        busy = false;
+        var next = want;
+        want = 0;
+        if (next && next !== page) go(next, userMoved);
+      });
   }
 
   pager.addEventListener('click', function (ev) {
@@ -127,7 +154,7 @@
     var a = t && t.closest ? t.closest('a[data-page]') : null;
     if (!a || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.button > 0) return;
     ev.preventDefault();
-    go(parseInt(a.getAttribute('data-page'), 10), true);
+    go(parseInt(a.getAttribute('data-page'), 10), true, a);
   });
 
   fetch(BASE + '/data/search.json')

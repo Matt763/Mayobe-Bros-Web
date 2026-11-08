@@ -212,6 +212,16 @@
     else if (e.key === 'Escape') { closeSearch(); setDrawer(false); }
   });
 
+  // "Show more": focus the first new item without letting the browser scroll, then glide to it when it sits low on the screen
+  // (js/motion.js). Without MBMotion: one plain jump.
+  function bringIn(first) {
+    if (!first) return;
+    first.focus({ preventScroll: true });
+    if (first.getBoundingClientRect().top <= 0.6 * window.innerHeight) return;
+    var M = window.MBMotion;
+    if (M) M.glide(M.topOf(first)); else first.scrollIntoView({ block: 'start' });
+  }
+
   var pageInput = $('#search-page-input');
   if (pageInput) {
     var pageResults = $('#search-page-results');
@@ -228,9 +238,12 @@
         var shown = 0, BATCH = 15, more = null;
         var showNext = function () {
           if (more) { more.remove(); more = null; }
-          var firstNew = null;
-          list.slice(shown, shown + BATCH).forEach(function (p) { var n = resultNode(p, terms); if (!firstNew) firstNew = n; pageResults.appendChild(n); });
-          if (shown && firstNew) firstNew.focus({ preventScroll: false }); // keyboard users land on the first new result
+          var batch = [];
+          list.slice(shown, shown + BATCH).forEach(function (p) { var n = resultNode(p, terms); batch.push(n); pageResults.appendChild(n); });
+          if (shown && batch.length) { // the button was pressed: the new results rise in and the reader lands on the first one
+            bringIn(batch[0]); // measured before the rise, which starts 16 px lower
+            if (window.MBMotion) window.MBMotion.enter(batch);
+          }
           shown = Math.min(list.length, shown + BATCH);
           if (shown < list.length) {
             more = el('button', 'btn btn-outline search-more', 'Show more results (' + (list.length - shown) + ' left)');
@@ -983,19 +996,28 @@
     if (btn.disabled) return;
     btn.disabled = true; btn.setAttribute('aria-busy', 'true');
     getPool().then(function (list) {
-      var batch = list.splice(0, STEP), first = null;
+      var batch = list.splice(0, STEP), first = null, added = [];
       batch.forEach(function (c, i) {
         var n = document.importNode(c, true);
         Array.prototype.forEach.call(n.querySelectorAll('script, iframe, object, embed, link, style'), function (x) { x.remove(); });
         n.style.setProperty('--i', i);
-        if (!reduce) n.classList.add('is-new');
         Array.prototype.forEach.call(n.querySelectorAll('img.lazyfade'), function (img) { img.classList.add('is-loaded'); });
         grid.appendChild(n);
+        added.push(n);
         if (!first) first = n;
       });
       setLabel();
       document.dispatchEvent(new CustomEvent('mb:content', { detail: { root: grid } })); // fills in comment counts when they are on
-      if (first) { var a = first.querySelector('a.card-link'); if (a) a.focus({ preventScroll: true }); first.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'nearest' }); }
+      var a = first && first.querySelector('a.card-link');
+      if (a) { // focus the first new card without letting the browser scroll; glide to it when it sits low on the screen (js/motion.js)
+        a.focus({ preventScroll: true });
+        if (first.getBoundingClientRect().top > 0.6 * window.innerHeight) {
+          var M = window.MBMotion;
+          if (M) M.glide(M.topOf(first)); else first.scrollIntoView({ block: 'start' });
+        }
+      }
+      // the rise starts 26 px lower, so it is added only after the cards were measured (same frame, nothing is painted between)
+      if (!reduce) added.forEach(function (n) { n.classList.add('is-new'); });
       if (!reduce) setTimeout(function () { Array.prototype.forEach.call(grid.querySelectorAll('.is-new'), function (x) { x.classList.remove('is-new'); }); }, 1400);
     })['catch'](function () { location.href = link.href; }).then(function () { btn.disabled = false; btn.removeAttribute('aria-busy'); });
   });

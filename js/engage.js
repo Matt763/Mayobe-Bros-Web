@@ -418,12 +418,39 @@
     if (!items.length) { list.appendChild(el('p', 'comment-empty', 'No comments yet. Be the first to share your thoughts.')); return; }
     items.slice(0, shownTop).forEach(function (c) { list.appendChild(commentNode(c, true)); });
     if (items.length > shownTop) {
-      var left = items.slice(shownTop).reduce(function (n, c) { return n + 1 + (c.replies ? c.replies.length : 0); }, 0);
-      var more = el('button', 'btn btn-outline comments-more', 'Show more comments (' + left + ' left)');
+      var more = el('button', 'btn btn-outline comments-more', moreText());
       more.type = 'button';
-      more.addEventListener('click', function () { shownTop += COMMENT_BATCH; renderComments(allComments); });
+      // only the next batch is added (before the button), so the comments already shown do not replay their entrance
+      more.addEventListener('click', function () {
+        var from = shownTop, first = null;
+        shownTop += COMMENT_BATCH;
+        allComments.slice(from, shownTop).forEach(function (c) {
+          var n = commentNode(c, true);
+          if (!first) first = n;
+          list.insertBefore(n, more);
+        });
+        if (allComments.length > shownTop) more.textContent = moreText(); else more.remove();
+        bringIn(first);
+      });
       list.appendChild(more);
     }
+  }
+  function moreText() {
+    var left = allComments.slice(shownTop).reduce(function (n, c) { return n + 1 + (c.replies ? c.replies.length : 0); }, 0);
+    return 'Show more comments (' + left + ' left)';
+  }
+  // the new comments rise in on their own (.comment in css/style.css); focus the first one without letting the browser scroll
+  // and glide to it when it sits low on the screen (js/motion.js). Without MBMotion: one plain jump.
+  function bringIn(node) {
+    if (!node) return;
+    node.focus({ preventScroll: true });
+    var M = window.MBMotion;
+    node.style.animation = 'none'; // measure where the comment will rest, not where its rise starts (26 px lower); never painted
+    var low = node.getBoundingClientRect().top > 0.6 * window.innerHeight;
+    var to = low && M ? M.topOf(node) : 0;
+    node.style.animation = '';
+    if (!low) return;
+    if (M) M.glide(to); else node.scrollIntoView({ block: 'start' });
   }
   function startReply(c) {
     form.elements.parent.value = c.id;
