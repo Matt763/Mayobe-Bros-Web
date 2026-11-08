@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Renders every email template (worker/src/mail-templates.js) to HTML, plain text and PNG screenshots, so a person can
 // look at them before anything is sent. Output goes to $HOME/.cache/mayobe-email-preview/ (never into the repo):
-//   <name>.html, <name>.txt, <name>-375-light.png, <name>-375-dark.png, <name>-600-light.png, <name>-600-dark.png
+//   <name>.html, <name>.txt, <name>-360-light.png, <name>-360-dark.png, <name>-600-light.png, <name>-600-dark.png
 // It also prints each template's HTML size in bytes and the contrast result for every pair in PAIRS.
 //
 // Usage: node scripts/tools/email-preview.mjs [--no-shots] [--only name,name] [--widths 375,600,720] [--no-images]
@@ -31,7 +31,7 @@ const noShots = args.includes('--no-shots');
 const noImages = args.includes('--no-images');
 const opt = (k) => (args.includes(k) ? args[args.indexOf(k) + 1] || '' : '');
 const only = opt('--only').split(',').filter(Boolean);
-const WIDTHS = (opt('--widths') || '375,600').split(',').map(Number).filter((w) => w >= 200 && w <= 2000);
+const WIDTHS = (opt('--widths') || '360,600').split(',').map(Number).filter((w) => w >= 200 && w <= 2000);
 
 if (OUT.startsWith(ROOT + path.sep)) throw new Error('preview output must not be inside the repo');
 
@@ -132,6 +132,16 @@ async function shoot(cdp, file, png, width, dark) {
 
 /* ------------------------------------------------------------------ run */
 fs.mkdirSync(OUT, { recursive: true });
+for (const f of fs.readdirSync(OUT)) if (/\.(png|html|txt)$/.test(f)) fs.rmSync(path.join(OUT, f)); // no stale renders from older runs
+// Sum of the local picture files a mail references (what a recipient with images on downloads from us).
+function pictureBytes(html) {
+  const seen = new Set();
+  for (const m of html.matchAll(/https:\/\/mayobebros\.com\/(assets\/[A-Za-z0-9/._-]+)/g)) seen.add(m[1]);
+  let total = 0;
+  for (const rel of seen) { try { total += fs.statSync(path.join(ROOT, rel)).size; } catch { /* not a local file */ } }
+  return total;
+}
+let overBudget = 0;
 const localAssets = (html) => html.replace(/https:\/\/mayobebros\.com\/(assets\/[A-Za-z0-9/._-]+)/g, (m, rel) => {
   const f = path.join(ROOT, rel);
   return fs.existsSync(f) ? pathToFileURL(f).href : m;
@@ -173,7 +183,10 @@ try {
       }
       note = notes.length ? '  ' + notes.join(', ') : '';
     }
-    console.log(`  ${name.padEnd(30)} ${String(size).padStart(6)} bytes ${size < 40000 ? '' : 'OVER 40,000'}${note}`);
+    const pics = pictureBytes(out.html);
+    const limit = /^welcome/.test(name) ? 170 * 1024 : /^new-post/.test(name) ? 130 * 1024 : Infinity;
+    const budget = pics > limit ? (overBudget++, ` OVER PICTURE BUDGET ${limit}`) : '';
+    console.log(`  ${name.padEnd(30)} ${String(size).padStart(6)} bytes, pictures ${String(pics).padStart(6)} bytes ${size < 40000 ? '' : 'OVER 40,000'}${budget}${note}`);
     console.log(`    subject: ${out.subject}`);
   }
 } finally {
@@ -181,4 +194,4 @@ try {
   fs.rmSync(shotDir, { recursive: true, force: true });
 }
 console.log(`\nWritten to ${OUT}`);
-if (failed) process.exitCode = 1;
+if (failed || overBudget) process.exitCode = 1;
