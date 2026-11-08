@@ -19,8 +19,21 @@ export async function sha(text) {
   const buf = await crypto.subtle.digest('SHA-256', enc.encode(text));
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
+// One visitor, however the address is written. An IPv6 visitor controls a whole /64 (2^64 addresses), so only the first four groups
+// are used: rotating inside a /64 gives no new identity. IPv4 and anything else is used as it is.
+export function visitorNet(raw) {
+  const ip = String(raw || 'unknown').trim().toLowerCase();
+  if (!ip.includes(':')) return ip;
+  const v4tail = /^(.*:)(\d+\.\d+\.\d+\.\d+)$/.exec(ip); // ::ffff:1.2.3.4 style: the IPv4 part is the identity
+  if (v4tail && /^::ffff:$/.test(v4tail[1])) return v4tail[2];
+  const [head, tail = null] = ip.split('::');
+  const a = head ? head.split(':') : [];
+  const z = tail === null ? [] : tail ? tail.split(':') : [];
+  const groups = tail === null ? a : [...a, ...Array(Math.max(0, 8 - a.length - z.length)).fill('0'), ...z];
+  return `v6:${groups.slice(0, 4).map((g) => g.padStart(4, '0')).join(':')}`;
+}
 export async function ipHash(request, env) {
-  const ip = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown';
+  const ip = visitorNet(request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown');
   const day = new Date().toISOString().slice(0, 10);
   return (await sha(`${ip}|${env.HASH_SALT || 'mayobe'}|${day}`)).slice(0, 24); // rotates daily; raw IPs are never stored
 }
@@ -38,6 +51,9 @@ export async function newToken() {
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 export async function readJson(request, max = MAX_BODY) {
+  // a body that announces itself as huge is refused before it is read (4 bytes per character is the most UTF-8 can use)
+  const len = Number(request.headers.get('Content-Length'));
+  if (Number.isFinite(len) && len > max * 4) throw Object.assign(new Error('Request is too large.'), { status: 413 });
   const text = await request.text();
   if (text.length > max) throw Object.assign(new Error('Request is too large.'), { status: 413 });
   try {

@@ -132,6 +132,17 @@ button, input, textarea, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
 [hidden] { display: none !important; }
 :focus-visible { outline: 3px solid var(--ring, #2f6bff); outline-offset: 3px; border-radius: 6px; }
+/* Fields (text, email, search, textarea, select): no blue ring. A focused field gets a crisp 2px edge in the text colour (near-black on
+   light, near-white on dark), which is at least 3:1 against the page (WCAG 1.4.11) and still shows where the keyboard is (2.4.7).
+   Buttons and links keep their ring. The browser's tinted autofill background is replaced by the page colour, and the mobile
+   tap flash is off. */
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="submit"]):not([type="button"]), textarea, select):focus-visible { outline: none; border-color: var(--text); box-shadow: 0 0 0 1px var(--text); } /* :where() keeps this at the lowest weight, so a field inside a styled container can opt out */
+/* fields that sit inside a styled container (search boxes, the sign-up capsule) show focus on the container instead */
+.search-form input:focus-visible, .search-big input:focus-visible, .dsc-search input:focus-visible, .nl-form:not(.nl-mini) input[type="email"]:focus-visible { border-color: transparent; box-shadow: none; }
+input, textarea, select, button { -webkit-tap-highlight-color: transparent; }
+input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus, textarea:-webkit-autofill, select:-webkit-autofill { -webkit-text-fill-color: var(--text); -webkit-box-shadow: 0 0 0 1000px var(--bg) inset; caret-color: var(--text); transition: background-color 600000s 0s; }
+.nl-form input:-webkit-autofill, .nl-form input:-webkit-autofill:focus { -webkit-text-fill-color: #0b1220; -webkit-box-shadow: 0 0 0 1000px #fff inset; caret-color: #0b1220; }
+
 ::selection { background: var(--btn-bg); color: var(--btn-text); }
 .icon { flex: none; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -178,11 +189,12 @@ body.is-leaving { opacity: 0; transition: opacity 0.18s ease; }
 .icon-btn { position: relative; display: inline-grid; place-items: center; width: 2.9rem; height: 2.9rem; border: 0; border-radius: 12px; background: transparent; color: var(--text); transition: background-color 0.2s, transform 0.2s var(--ease); }
 .icon-btn:hover { background: var(--surface-2); }
 .icon-btn:active { transform: scale(0.9); }
-.theme-btn .i-sun, .theme-btn .i-moon { display: none; }
-html.light .theme-btn .i-auto, html.dark .theme-btn .i-auto { display: none; }
-html.light .theme-btn .i-sun { display: block; }
+.theme-btn .i-auto, .theme-btn .i-moon { display: none; }
+.theme-btn .i-sun { display: block; }
+html.dark .theme-btn .i-sun { display: none; }
 html.dark .theme-btn .i-moon { display: block; }
-html.light .theme-btn .i-moon { display: none; }
+/* a press fades the colours over a moment (js/site.js adds .theme-fade for 450 ms; not for reduced motion) */
+html.theme-fade, html.theme-fade *, html.theme-fade *::before, html.theme-fade *::after { transition: background-color 0.35s ease, color 0.35s ease, border-color 0.35s ease, fill 0.35s ease, stroke 0.35s ease, box-shadow 0.35s ease !important; }
 
 /* ---------------------------------------------------------------- header */
 .site-header { position: sticky; top: 0; z-index: 40; background: var(--header-bg); backdrop-filter: saturate(1.4) blur(14px); border-bottom: 1px solid var(--line-soft); transition: box-shadow 0.3s; }
@@ -254,7 +266,7 @@ body.no-scroll { overflow: hidden; }
 .result mark { background: #ffe066; color: #111; border-radius: 3px; padding: 0 0.1em; }
 .search-all { display: block; text-align: center; padding: 0.9rem; font-weight: 700; color: var(--link); text-decoration: none; }
 .search-big { border: 2px solid var(--line); border-radius: 999px; background: var(--surface); padding: 0.45rem 0.45rem 0.45rem 1.25rem; transition: border-color 0.2s, box-shadow 0.2s; }
-.search-big:focus-within { border-color: var(--btn-bg); box-shadow: 0 0 0 4px var(--soft); }
+.search-big:focus-within { border-color: var(--text); box-shadow: 0 0 0 1px var(--text); }
 .search-count { margin: 1.25rem 0 0.75rem; color: var(--text-2); min-height: 1.5em; }
 .result-list .result { padding: 1rem; border: 1px solid var(--line); margin-bottom: 0.9rem; background: var(--surface); }
 .result-list .result img { width: 8rem; height: 5.5rem; }
@@ -573,7 +585,7 @@ body.no-scroll { overflow: hidden; }
 .field input, .field textarea { width: 100%; padding: 0.8rem 1rem; border: 2px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--text); font-size: 1.0625rem; transition: border-color 0.2s, box-shadow 0.2s; }
 .field input::placeholder, .field textarea::placeholder { color: var(--text-3); opacity: 1; }
 .field textarea { resize: vertical; min-height: 8rem; }
-.field input:focus, .field textarea:focus { outline: none; border-color: var(--btn-bg); box-shadow: 0 0 0 4px var(--soft); }
+.field input:focus, .field textarea:focus { outline: none; border-color: var(--text); box-shadow: 0 0 0 1px var(--text); }
 .field [aria-invalid="true"] { border-color: var(--err); }
 .field-err { margin: 0.4rem 0 0; font-size: 0.9375rem; font-weight: 600; color: var(--err); }
 .form-status:focus { outline: none; }
@@ -672,7 +684,7 @@ body.no-scroll { overflow: hidden; }
 .nl-form:not([data-state="sent"]) .nl-panel-done { opacity: 0; transform: translateY(10px); visibility: hidden; pointer-events: none; transition: opacity 0.24s ease, transform 0.24s ease, visibility 0s linear 0.24s; }
 .nl-panel-form { display: flex; flex-direction: column; gap: 0.7rem; }
 .nl-field { display: flex; align-items: center; gap: 0.35rem; padding: 0.3rem 0.3rem 0.3rem 1.15rem; background: #fff; border-radius: 999px; box-shadow: 0 12px 30px -14px rgba(5, 12, 45, 0.6); transition: transform 0.3s var(--ease); }
-.nl-field:focus-within { outline: 3px solid #fff; outline-offset: 3px; transform: translateY(-1px); }
+.nl-field:focus-within { outline: 2px solid #fff; outline-offset: 2px; transform: translateY(-1px); }
 .nl-field:has(input[aria-invalid="true"]) { box-shadow: inset 0 0 0 2px #b42318, 0 12px 30px -14px rgba(5, 12, 45, 0.6); }
 .nl-field.is-nudge { animation: nlf-nudge 0.4s var(--ease); }
 .nl-ico { display: inline-flex; flex: none; color: #1e3a9e; }
@@ -696,6 +708,12 @@ body.no-scroll { overflow: hidden; }
 .nl-status.is-err, .nl-status.is-warn { display: flex; align-items: flex-start; gap: 0.6rem; }
 .nl-status.is-err::before, .nl-status.is-warn::before { content: "!" / ""; flex: none; display: inline-grid; place-items: center; width: 1.4rem; height: 1.4rem; margin-top: 0.05rem; border-radius: 50%; background: #ffd0d0; color: #7a1212; font-size: 0.95rem; font-weight: 900; line-height: 1; }
 .nl-status.is-warn::before { background: #fff3c4; color: #5c4400; content: "?" / ""; }
+/* errors are red: on the blue band a white pill carries the red words (red on blue would not be readable), elsewhere the text itself is red */
+.foot-cta .nl-status.is-err { align-self: flex-start; padding: 0.4rem 0.85rem 0.4rem 0.5rem; border-radius: 999px; background: #fff; color: #b42318; font-weight: 700; }
+.foot-cta .nl-status.is-err::before { background: #fdeceb; color: #b42318; }
+.foot-cta .nl-status.is-warn { align-self: flex-start; padding: 0.4rem 0.85rem 0.4rem 0.5rem; border-radius: 999px; background: #fff; color: #5c4400; font-weight: 700; }
+.foot-cta .nl-status.is-warn .nl-link { color: #1e3a9e; }
+.nl-mini .nl-status.is-err { color: var(--err); font-weight: 700; }
 .nl-link { padding: 0; border: 0; background: none; color: #fff; font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .nl-link:hover { text-decoration-thickness: 2px; }
 .nl-link:focus-visible { outline: 3px solid #fff; outline-offset: 3px; border-radius: 3px; }
@@ -736,8 +754,8 @@ body.no-scroll { overflow: hidden; }
 .nl-mini .nl-ico { display: none; }
 .nl-mini input[type="email"] { min-height: 2.9rem; padding: 0 1.1rem; border: 1.5px solid var(--line); border-radius: 999px; background: var(--bg); color: var(--text); font-size: 1rem; }
 .nl-mini input[type="email"]::placeholder { color: var(--text-3); }
-.nl-mini input[type="email"]:focus-visible { outline: 3px solid var(--ring, #2f6bff); outline-offset: 2px; border-color: var(--btn-bg); }
-.nl-mini .nl-field:has(input[aria-invalid="true"]) input[type="email"] { border-color: var(--err); }
+.nl-mini input[type="email"]:focus-visible { outline: none; border-color: var(--text); box-shadow: 0 0 0 1px var(--text); }
+.nl-mini .nl-field:has(input[aria-invalid="true"]) input[type="email"] { border-color: var(--err); box-shadow: 0 0 0 1px var(--err); }
 .nl-mini .nl-btn { width: 100%; min-height: 2.9rem; background: var(--btn-bg); color: var(--btn-text); }
 .nl-mini .nl-btn:hover { background: var(--btn-bg-hover, var(--btn-bg)); filter: brightness(1.12); }
 .nl-mini .nl-btn:focus-visible { outline: 3px solid var(--ring, #2f6bff); outline-offset: 2px; }
@@ -1371,7 +1389,7 @@ main.is-switching .hero-listing + .section > .wrap > * { animation: none !import
 .dsc-search { display: flex; align-items: center; border-radius: 999px; background: #fff; padding: 0.3rem 0.3rem 0.3rem 1.1rem; }
 .dsc-search input { flex: 1; min-width: 0; border: 0; background: transparent; color: #0b1220; font-size: 1.0625rem; padding: 0.55rem 0; outline: none; }
 .dsc-search input::placeholder { color: #55627a; }
-.dsc-search:focus-within { box-shadow: 0 0 0 4px rgba(122, 162, 255, 0.7); }
+.dsc-search:focus-within { outline: 2px solid #fff; outline-offset: 2px; }
 .dsc-search button { display: grid; place-items: center; flex: none; width: 2.75rem; height: 2.75rem; border: 0; border-radius: 50%; background: #1e3a9e; color: #fff; }
 .dsc-try { margin-top: 1rem; margin-bottom: 0.4rem; font-size: 0.9375rem; font-weight: 700; color: #cfdaf0; }
 .dsc-tags { display: flex; flex-wrap: wrap; gap: 0.45rem; }

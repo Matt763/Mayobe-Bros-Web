@@ -65,8 +65,8 @@ test('nothing is fetched on load and the fragment leaves the address bar first',
 
 test('one press on Confirm makes one POST /v1/newsletter/confirm with the token', async () => {
   const t = setup();
-  assert.equal(t.nodes.title.textContent, 'One last step: confirm your subscription');
-  assert.equal(t.nodes.go.textContent, 'Confirm my subscription');
+  assert.equal(t.nodes.title.textContent, 'Confirm your subscription');
+  assert.equal(t.nodes.go.textContent, 'Confirm subscription');
   await press(t);
   assert.equal(fetches(t).length, 1);
   const [, url, body, init] = fetches(t)[0];
@@ -78,8 +78,8 @@ test('one press on Confirm makes one POST /v1/newsletter/confirm with the token'
   assert.equal(t.nodes.go.hidden, true, 'no button after success');
   assert.ok(t.nodes.title.focused > 0, 'focus on the new heading');
   assert.equal(t.nodes.title.textContent, 'You are subscribed');
-  assert.match(t.nodes.text.textContent, /We are sending a welcome email[\s\S]*it may be skipped\./);
-  assert.match(t.nodes.status.textContent, /^Your subscription is confirmed\.$/);
+  assert.equal(t.nodes.text.textContent, 'A welcome email may arrive in a few minutes.', 'a hedge: the welcome email can be delayed or skipped');
+  assert.match(t.nodes.status.textContent, /^You are subscribed\.$/);
   assert.equal(t.nodes.box.attrs['data-state'], 'ok', 'the card shows the check mark');
   // a stray second click sends nothing
   t.nodes.go.handlers.click(); await new Promise((r) => setTimeout(r, 10));
@@ -99,16 +99,17 @@ test('one press on Unsubscribe makes one POST /v1/newsletter/unsubscribe', async
   assert.ok(t.nodes.title.focused > 0);
 });
 
-test('404 shows the expired-or-used message with focus on the heading and no button', async () => {
+test('404 shows the one link message, the same for Confirm and Unsubscribe, with focus on the heading and no button', async () => {
   const t = setup({ fetchImpl: async () => ({ status: 404, body: { error: 'x' } }) });
   await press(t);
-  assert.equal(t.nodes.title.textContent, 'This link was already used or has expired');
-  assert.match(t.nodes.status.textContent, /already used or has expired/);
+  assert.equal(t.nodes.title.textContent, 'Link is invalid or expired');
+  assert.equal(t.nodes.status.textContent, 'Link is invalid or expired.');
   assert.equal(t.nodes.go.hidden, true);
   assert.ok(t.nodes.title.focused > 0);
   const u = setup({ hash: `#u=${TOKEN}`, fetchImpl: async () => ({ status: 404, body: { error: 'x' } }) });
   await press(u);
-  assert.match(u.nodes.title.textContent, /could not find/i);
+  assert.equal(u.nodes.title.textContent, 'Link is invalid or expired', 'one wording whatever the cause, so nothing says whether an address is on the list');
+  assert.equal(u.nodes.status.textContent, 'Link is invalid or expired.');
   assert.equal(u.nodes.go.hidden, true);
 });
 
@@ -136,15 +137,16 @@ test('no or a malformed fragment wires no button', () => {
     assert.equal(fetches(t).length, 0);
     assert.ok(t.nodes.title.textContent.length > 0);
   }
-  assert.match(setup({ hash: '#c=short' }).nodes.title.textContent, /does not look right/);
+  assert.equal(setup({ hash: '#c=short' }).nodes.title.textContent, 'Link is invalid or expired');
 });
 
-test('the confirm screen says it is the last step and that the press stops email scanners', () => {
+test('the confirm screen asks for one press (nothing is sent before it, so link scanners cannot sign anyone up) in a short title and one sentence', () => {
   const t = setup();
-  assert.equal(t.nodes.title.textContent, 'One last step: confirm your subscription');
-  assert.equal(t.nodes.text.textContent, 'You opened the link from our email. Press the button to finish. We ask you to press it so that email scanners cannot sign anyone up.');
-  assert.equal(t.nodes.go.textContent, 'Confirm my subscription');
+  assert.equal(t.nodes.title.textContent, 'Confirm your subscription');
+  assert.equal(t.nodes.text.textContent, 'Press the button to finish signing up.');
+  assert.equal(t.nodes.go.textContent, 'Confirm subscription');
   assert.equal(t.nodes.go.hidden, false);
+  assert.equal(fetches(t).length, 0);
 });
 
 test('next reads are hidden on load and shown after success, after 404 and on the no-fragment screen', async () => {
@@ -165,10 +167,34 @@ test('next reads are hidden on load and shown after success, after 404 and on th
   for (const hash of ['', '#c=short']) assert.equal(setup({ hash }).nodes.next.hidden, false, `on "${hash}"`);
 });
 
-test('the 404 text tells someone who already confirmed that they are subscribed', async () => {
-  const t = setup({ fetchImpl: async () => ({ status: 404, body: {} }) });
-  await press(t);
-  assert.equal(t.nodes.text.textContent, 'If you already pressed Confirm, you are subscribed and there is nothing more to do. If not, the link may be older than 7 days: sign up again with the form at the bottom of any page on our site.');
+test('the 404 sentence is general advice that is the same for every cause (it never says whether the address is on the list)', async () => {
+  const bodies = new Set();
+  for (const body of [{}, { error: 'Link is invalid or expired.' }, { error: 'something else' }]) {
+    const t = setup({ fetchImpl: async () => ({ status: 404, body }) });
+    await press(t);
+    bodies.add(t.nodes.title.textContent + '|' + t.nodes.text.textContent);
+  }
+  assert.equal(bodies.size, 1);
+  assert.equal([...bodies][0], 'Link is invalid or expired|If you already confirmed, you are all set.');
+  const u = setup({ hash: `#u=${TOKEN}`, fetchImpl: async () => ({ status: 404, body: {} }) });
+  await press(u);
+  assert.equal(u.nodes.text.textContent, 'If you already unsubscribed, you are all set.');
+});
+
+test('every title is five words or fewer and a 429 or a network failure names the action', async () => {
+  const titles = new Set();
+  for (const hash of ['', '#c=short', `#c=${TOKEN}`, `#u=${TOKEN}`]) titles.add(setup({ hash }).nodes.title.textContent);
+  const busy = setup({ fetchImpl: async () => ({ status: 429, body: {} }) });
+  await press(busy);
+  assert.equal(busy.nodes.title.textContent, 'Too many attempts');
+  assert.equal(busy.nodes.status.textContent, 'Too many attempts. Try again later.');
+  const down = setup({ hash: `#u=${TOKEN}`, fetchImpl: async () => { throw new Error('offline'); } });
+  await press(down);
+  assert.equal(down.nodes.title.textContent, 'Could not unsubscribe');
+  assert.equal(down.nodes.status.textContent, 'Could not unsubscribe. Try again.');
+  assert.equal(down.nodes.text.textContent, 'Check your connection, then try again.');
+  for (const n of [busy, down]) titles.add(n.nodes.title.textContent);
+  for (const h of titles) assert.ok(h.split(' ').length <= 5, h);
 });
 
 test('a request with no answer for 15 s shows the network text and Try again; one press makes exactly one more POST', async () => {
@@ -182,7 +208,7 @@ test('a request with no answer for 15 s shows the network text and Try again; on
   assert.equal(pending[0].ms, 15000);
   pending[0].f();
   await new Promise((r) => setTimeout(r, 20));
-  assert.equal(t.nodes.status.textContent, 'We could not reach our server. Check your connection, then press Try again.');
+  assert.equal(t.nodes.status.textContent, 'Could not confirm. Try again.');
   assert.equal(t.nodes.go.textContent, 'Try again');
   assert.equal(t.nodes.go.hidden, false);
   assert.equal(t.nodes.go.disabled, false);

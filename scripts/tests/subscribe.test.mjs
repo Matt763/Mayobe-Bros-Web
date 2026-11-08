@@ -85,7 +85,7 @@ test('an empty submit shows a message and sends nothing', async () => {
   const t = setup({ email: '   ' });
   await t.submit();
   assert.equal(fetches(t).length, 0);
-  assert.match(shown(t.status), /does not look right/);
+  assert.equal(shown(t.status), 'Email is required.');
   assert.ok(t.field.classes.has('is-nudge'), 'the field nudges');
   assert.equal(state(t), 'idle');
 });
@@ -116,7 +116,7 @@ test('a valid submit posts JSON {email, website:"", ts} once, disables the butto
   assert.equal(state(t), 'sent', 'the confirmation card is shown');
   assert.equal(shown(t.status), '', 'the card says it, not the live region');
   const said = t.body.textContent + t.body.children.map((c) => c.textContent ?? c.text ?? '').join('');
-  assert.equal(said, 'If this address can receive our emails, a link to confirm is on its way:neema@example.comOpen it and press the button to finish.');
+  assert.equal(said, 'If the address can receive email, a link is on its way:neema@example.comOpen it to finish.');
   assert.equal(t.body.children[0].tag, 'strong', 'the address is a text node inside <strong>, never HTML');
   assert.equal(t.body.children[0].textContent, 'neema@example.com');
   assert.equal('inert' in t.panelDone.attrs, false, 'the card can be reached');
@@ -140,7 +140,7 @@ test('a bad address shows a message and fetches nothing', async () => {
     const t = setup({ email });
     await t.submit();
     assert.equal(fetches(t).length, 0, email);
-    assert.match(shown(t.status), /does not look right/, email);
+    assert.equal(shown(t.status), email.trim() ? 'Email looks incorrect.' : 'Email is required.', email);
     assert.match(t.status.className, /is-err/);
     assert.equal(t.input.attrs['aria-invalid'], 'true');
     assert.ok(t.input.focused > 0, 'focus goes to the field');
@@ -150,11 +150,11 @@ test('a bad address shows a message and fetches nothing', async () => {
 test('429 and 503 and a network error show their messages and re-enable the button', async () => {
   let t = setup({ fetchImpl: async () => ({ status: 429, body: { error: 'x' } }) });
   await t.submit();
-  assert.equal(shown(t.status), 'Too many tries. Please wait an hour and try again.');
+  assert.equal(shown(t.status), 'Too many attempts. Try again later.');
   assert.equal(state(t), 'idle');
   assert.equal(t.button.disabled, false);
   assert.equal(t.input.value, 'neema@example.com', 'the address is kept');
-  const generic = 'Sorry, that did not go through. Please try again later, or follow us with RSS.';
+  const generic = 'Could not subscribe. Try again later, or use RSS.';
   for (const fetchImpl of [async () => ({ status: 503, body: { error: 'x' } }), async () => { throw new Error('offline'); }, async () => ({ status: 500, body: undefined })]) {
     t = setup({ fetchImpl });
     await t.submit();
@@ -169,9 +169,9 @@ test('429 and 503 and a network error show their messages and re-enable the butt
 });
 
 test('a 400 naming the email field asks for a better address', async () => {
-  const t = setup({ fetchImpl: async () => ({ status: 400, body: { error: 'That email address does not look right.', field: 'email' } }) });
+  const t = setup({ fetchImpl: async () => ({ status: 400, body: { error: 'Email looks incorrect.', field: 'email' } }) });
   await t.submit();
-  assert.match(shown(t.status), /does not look right/);
+  assert.equal(shown(t.status), 'Email looks incorrect.');
   assert.equal(t.input.attrs['aria-invalid'], 'true');
 });
 
@@ -211,13 +211,24 @@ test('only near-misses of common providers are questioned: real and unrelated do
   }
 });
 
-test('the sidebar version (nl-mini) uses the shorter sentences and keeps the hedge and the address as text', async () => {
+test('the sidebar version (nl-mini) says the same short sentences and keeps the hedge and the address as text', async () => {
   const t = setup({ email: 'neema@example.com', attrs: {} });
   t.form.className = 'foot-form nl-form nl-mini';
   await t.submit();
   const said = t.body.textContent + t.body.children.map((c) => c.textContent ?? c.text ?? '').join('');
-  assert.equal(said, 'If this address can get our emails, a link is on its way:neema@example.comOpen it to finish.');
+  assert.equal(said, 'If the address can receive email, a link is on its way:neema@example.comOpen it to finish.');
   assert.equal(t.body.children[0].tag, 'strong');
+});
+
+test('no message names a limit, a server or a reason: only the short wordings', async () => {
+  const seen = new Set();
+  for (const fetchImpl of [async () => ({ status: 429, body: { error: 'You have tried several times already.' } }), async () => ({ status: 503, body: { error: 'The newsletter is not available right now.' } }), async () => { throw new Error('Failed to fetch'); }]) {
+    const t = setup({ fetchImpl });
+    await t.submit();
+    seen.add(shown(t.status));
+  }
+  assert.deepEqual([...seen].sort(), ['Could not subscribe. Try again later, or use RSS.', 'Too many attempts. Try again later.']);
+  for (const m of seen) assert.doesNotMatch(m, /hour|server|network|several|Sorry|!/i, m);
 });
 
 test('"Use a different address" brings the form back, focuses the field and hides the card', async () => {

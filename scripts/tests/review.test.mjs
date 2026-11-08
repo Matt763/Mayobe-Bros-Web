@@ -138,10 +138,16 @@ test('a bad, expired, unsigned or foreign link is refused and approves nothing',
   assert.equal((await call('POST', '/v1/review', { body: { r: t } })).status, 404, 'no secret: every link is dead');
 });
 
-test('a comment its author deleted cannot be approved; a missing one answers 404', async () => {
+test('a comment its author deleted, or that is already hidden as spam, cannot be approved; a missing one answers 404 with the same words', async () => {
   const h = await held();
   env.DB.raw.prepare("UPDATE comments SET status = 'deleted' WHERE id = ?").run(h.json.id);
-  assert.equal((await call('POST', '/v1/review', { body: { r: await reviewToken(env, h.json.id, 'approve') } })).status, 409);
+  const gone = await call('POST', '/v1/review', { body: { r: await reviewToken(env, h.json.id, 'approve') } });
+  assert.equal(gone.status, 404);
+  env.DB.raw.prepare("UPDATE comments SET status = 'spam' WHERE id = ?").run(h.json.id);
+  const spam = await call('POST', '/v1/review', { body: { r: await reviewToken(env, h.json.id, 'approve') } });
+  assert.equal(spam.status, 404, 'an old email does not bring a hidden comment back');
+  assert.deepEqual(spam.json, gone.json, 'the answer does not say which case it was');
+  assert.deepEqual(await listed(), []);
   assert.equal((await call('POST', '/v1/review', { body: { r: await reviewToken(env, 777, 'approve') } })).status, 404);
 });
 

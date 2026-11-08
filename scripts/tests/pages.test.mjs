@@ -108,12 +108,12 @@ test('/manage/ is noindex, no-referrer, has one button, and calls the API only f
   const calls = [...js.matchAll(/\bfetch\(/g)].length;
   assert.equal(calls, 1, 'exactly one fetch call in manage.js');
   assert.match(js, /addEventListener\('click',\s*go\)|addEventListener\("click",\s*go\)/, 'the button click must run go()');
-  // The one exception is the team's own Approve / Ignore link (#r=): pressing the email button is the click, so the page answers at once.
-  // Both direct calls sit in the `kind === 'r'` block and wait while the tab is hidden; edit-code (#l=) and stop-emails (#u=) links never run on load.
+  // The one exception is the team's Ignore link (#r=...i...): it changes nothing, so it answers at once. Approve, like every other link
+  // on this page, waits for a press (a mail scanner that runs JavaScript must never publish a held comment).
   const direct = [...js.matchAll(/^.*(?<!function )\bgo\(\).*$/gm)].map((m) => m[0]);
-  assert.equal(direct.length, 2, 'go() is called directly only for the review link');
+  assert.equal(direct.length, 2, 'go() is called directly only for the Ignore link');
   assert.ok(direct.every((l) => /visibilityState/.test(l)), 'only behind the visibility check');
-  assert.match(js, /if \(kind === 'r'\) \{\n\s*var runReview/, 'and only in the review block');
+  assert.match(js, /if \(kind === 'r' && secret\.charAt\(secret\.indexOf\('\.'\) \+ 1\) === 'i'\) \{\n\s*var runReview/, 'and only for the Ignore action');
   assert.match(js, /history\.replaceState/);
   const footer = html.split('<footer')[1] || '';
   assert.doesNotMatch(footer, /href="[^"]*\/manage\/"/, 'not linked from the footer');
@@ -332,4 +332,61 @@ test('every article has a mini sign-up in its sidebar next to the footer form, w
   const at = (s) => rail.indexOf(s);
   assert.ok(at('rail-news') > at('rail-next') && at('rail-news') < at('rail-latest'), 'after Read next, before More like this');
   assert.ok(!/<noscript>/.test(rail), 'no second noscript line: the Follow module already offers RSS');
+});
+
+// Content-Security-Policy (a <meta> tag: GitHub Pages cannot send headers) and the referrer policy.
+import { createHash } from 'node:crypto';
+const cspOf = (html) => { const m = html.match(/<meta http-equiv="Content-Security-Policy" content="([^"]*)">/); return m ? m[1].replace(/&#39;/g, "'").replace(/&amp;/g, '&') : ''; };
+const directive = (csp, name) => (csp.split('; ').find((d) => d.startsWith(`${name} `)) || '').split(' ').slice(1);
+const inlineHashes = (html) => [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => `'sha256-${createHash('sha256').update(m[1], 'utf8').digest('base64')}'`);
+
+test('every page ships a policy that allows its one inline script by hash and never allows inline or eval script', () => {
+  const newestPost = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'search.json'), 'utf8'))[0].u;
+  for (const file of ['index.html', `${newestPost.slice(1)}index.html`, 'post/index.html', 'search/index.html', 'contact/index.html', 'manage/index.html', 'newsletter/index.html', '404.html']) {
+    const f = path.join(ROOT, file);
+    if (!fs.existsSync(f)) continue;
+    const html = fs.readFileSync(f, 'utf8');
+    const csp = cspOf(html);
+    assert.ok(csp, `${file}: has a policy`);
+    assert.ok(html.indexOf('http-equiv="Content-Security-Policy"') < html.indexOf('<script'), `${file}: the policy comes before every script`);
+    const script = directive(csp, 'script-src');
+    for (const h of inlineHashes(html)) assert.ok(script.includes(h), `${file}: the inline script's hash is in script-src`);
+    assert.ok(!script.includes("'unsafe-inline'") && !script.includes("'unsafe-eval'"), `${file}: no unsafe-inline or unsafe-eval for scripts`);
+    assert.deepEqual(directive(csp, 'object-src'), ["'none'"]);
+    assert.deepEqual(directive(csp, 'base-uri'), ["'self'"]);
+    assert.deepEqual(directive(csp, 'form-action'), ["'self'"]);
+    assert.ok(directive(csp, 'default-src').join() === "'self'", `${file}: default-src is self`);
+    assert.ok(!/\*\s|\s\*(;|$)/.test(csp.replace(/https:\/\/\*\./g, '')), `${file}: no bare wildcard source`);
+  }
+});
+
+test('the bare email-link pages get the tightest policy: no third parties at all, no frames', () => {
+  for (const file of ['manage/index.html', 'newsletter/index.html']) {
+    const f = path.join(ROOT, file);
+    if (!fs.existsSync(f)) continue;
+    const csp = cspOf(fs.readFileSync(f, 'utf8'));
+    assert.deepEqual(directive(csp, 'frame-src'), ["'none'"], file);
+    for (const d of ['script-src', 'connect-src', 'img-src']) assert.ok(directive(csp, d).every((x) => !/youtube|google|cloudflareinsights|doubleclick/.test(x)), `${file} ${d}`);
+  }
+});
+
+test('the policy follows site.config.json: AdSense hosts only when ads are on, Turnstile only with a key', () => {
+  const policy = (over) => cspOf(renderWith(over).page('about'));
+  const off = policy({ adsense: { client: 'ca-pub-1', autoAds: false, sidebarSlot: '' } });
+  assert.ok(!/googlesyndication|adtrafficquality/.test(off), 'ads off: no ad hosts');
+  const on = policy({ adsense: { client: 'ca-pub-1', autoAds: true, sidebarSlot: '' } });
+  assert.match(on, /script-src[^;]*pagead2\.googlesyndication\.com/);
+  assert.match(on, /frame-src[^;]*googleads\.g\.doubleclick\.net/);
+  assert.ok(!/challenges\.cloudflare\.com/.test(off));
+  assert.match(policy({ turnstileSiteKey: '0x4AAAAAAAAAAAAAAAAAAAAA' }), /script-src[^;]*challenges\.cloudflare\.com/);
+  assert.match(policy({ commentsApi: 'https://api.test/' }), /connect-src[^;]*https:\/\/api\.test/);
+  assert.ok(!/googletagmanager/.test(policy({ analytics: { gtmId: '', cloudflareToken: '' } })), 'no Tag Manager host without a container id');
+});
+
+test('pages set a referrer policy unless they set their own (no-referrer on the email-link pages)', () => {
+  const home = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  assert.match(home, /<meta name="referrer" content="strict-origin-when-cross-origin">/);
+  const manage = fs.readFileSync(path.join(ROOT, 'manage', 'index.html'), 'utf8');
+  assert.match(manage, /<meta name="referrer" content="no-referrer">/);
+  assert.doesNotMatch(manage, /strict-origin-when-cross-origin/);
 });

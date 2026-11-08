@@ -377,9 +377,9 @@
       var why = ev && ev.error;
       if (why === 'interrupted' || why === 'canceled') return;
       queued--;
-      if (why === 'not-allowed') { fail('The browser blocked the sound. Press play again.', true); return; }
+      if (why === 'not-allowed') { fail('Sound is blocked. Press play again.', true); return; }
       errRun++;
-      if (errRun >= 3 || why === 'synthesis-unavailable' || why === 'language-unavailable' || why === 'voice-unavailable') { fail('This device could not play the voice. Try another voice in settings.'); return; }
+      if (errRun >= 3 || why === 'synthesis-unavailable' || why === 'language-unavailable' || why === 'voice-unavailable') { fail('Could not play audio. Try another voice.'); return; }
       if (i >= S.length - 1) finish(); else pump();
     };
     refs.push(u);
@@ -413,7 +413,7 @@
       if (myGen !== gen || state !== 'playing') return;
       pump();
       startWatch = setTimeout(function () {
-        if (myGen === gen && state === 'playing' && !tStart[i]) fail('The voice did not start. Press play to try again, or pick another voice in settings.');
+        if (myGen === gen && state === 'playing' && !tStart[i]) fail('Audio did not start. Press play to try again.');
       }, 6000);
     };
     tStart = {};

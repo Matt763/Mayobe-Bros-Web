@@ -88,7 +88,7 @@ test('a failed lookup after success leaves no live button, announces it, and sen
     const t = setup({ fetchImpl: async (url, init) => (url.endsWith('/manage/exchange') ? { status: 200, body: { ok: true, id: 7, slug: 'hello-post', token: DEVICE } } : lookup(url, init)) });
     await press(t);
     assert.equal(t.nodes.go.hidden, true, 'button gone');
-    assert.match(t.nodes.status.textContent, /This browser can now edit your comment/);
+    assert.match(t.nodes.status.textContent, /^Your comment is ready\./);
     assert.equal(t.nodes.next.hidden, false, 'the latest articles and a link to all articles are shown');
     assert.ok(t.nodes.title.focused > 0, 'focus moved to the heading');
     assert.equal(t.log.filter((e) => e[0] === 'assign').length, 0);
@@ -103,17 +103,18 @@ test('a failed lookup after success leaves no live button, announces it, and sen
 test('a storage failure shows the storage message, announced, with focus on the heading', async () => {
   const t = setup({ storage: { fail: true }, fetchImpl: exchangeOk({ path: '/post/a/hello-post/' }) });
   await press(t);
-  assert.match(t.nodes.title.textContent, /cannot save the code/);
-  assert.match(t.nodes.status.textContent, /cannot save the code/);
+  assert.equal(t.nodes.title.textContent, 'Browser storage is blocked');
+  assert.match(t.nodes.status.textContent, /^Browser storage is blocked\. Allow site data/);
+  assert.doesNotMatch(t.nodes.title.textContent + t.nodes.text.textContent + t.nodes.status.textContent, /code|token/i, 'no internals');
   assert.equal(t.nodes.go.hidden, true);
   assert.ok(t.nodes.title.focused > 0);
   assert.equal(t.log.filter((e) => e[0] === 'assign').length, 0);
 });
 
 test('expired links, stopped emails and network errors are announced; only a network error keeps a button', async () => {
-  let t = setup({ fetchImpl: async () => ({ status: 404, body: { error: 'That comment could not be found.' } }) });
+  let t = setup({ fetchImpl: async () => ({ status: 404, body: { error: 'Link is invalid or expired.' } }) });
   await press(t);
-  assert.match(t.nodes.status.textContent, /expired or was removed/);
+  assert.equal(t.nodes.status.textContent, 'Link is invalid or expired.');
   assert.equal(t.nodes.go.hidden, true);
   assert.ok(t.nodes.title.focused > 0);
   t = setup({ hash: `#u=${TOKEN}`, fetchImpl: async () => ({ status: 200, body: { ok: true } }) });
@@ -123,7 +124,7 @@ test('expired links, stopped emails and network errors are announced; only a net
   assert.equal(t.nodes.go.hidden, true);
   t = setup({ fetchImpl: async () => { throw new Error('offline'); } });
   await press(t);
-  assert.match(t.nodes.status.textContent, /could not reach/);
+  assert.equal(t.nodes.status.textContent, 'Could not open comment. Try again.');
   assert.equal(t.nodes.go.hidden, false);
   assert.equal(t.nodes.go.disabled, false);
   assert.ok(t.nodes.go.focused > 0, 'focus returns to the retry button');
@@ -161,7 +162,7 @@ test('a timeout shows the network text and Try again', async () => {
   assert.equal(pending[0].ms, 15000);
   pending[0].f();
   await new Promise((r) => setTimeout(r, 20));
-  assert.equal(t.nodes.status.textContent, 'We could not reach the comments service. Check your connection, then press Try again.');
+  assert.equal(t.nodes.status.textContent, 'Could not open comment. Try again.');
   assert.equal(t.nodes.go.textContent, 'Try again');
   assert.equal(t.nodes.go.hidden, false);
   assert.equal(t.nodes.go.disabled, false);
@@ -184,56 +185,62 @@ test('next reads appear after reply emails are stopped', async () => {
   assert.equal(setup({ hash: '', fetchImpl: exchangeOk() }).nodes.next.hidden, false, 'on the no-link screen');
 });
 
-// ---- the team's Approve / Ignore link (#r=): the press was the click on the email button, so the page answers at once
+// ---- the team's Approve / Ignore link (#r=). Approve waits for a press (a mail scanner that runs JavaScript must never publish a held
+// comment); Ignore changes nothing, so it answers at once.
 const SIG = 'S'.repeat(43);
 const REVIEW = (a) => `12.${a}.abc123.${SIG}`;
 const reviewOk = (result, extra = {}) => async (url) => (url.endsWith('/review') ? { status: 200, body: { ok: true, result, id: 12, path: '/post/a/hello-post/', ...extra } } : { status: 404, body: [] });
 const settle = () => new Promise((r) => setTimeout(r, 30));
 
-test('review link: the secret leaves the address first, then one call to /review with the whole token', async () => {
+test('review link, Approve: nothing is sent on load; the secret leaves the address; ONE press makes one call with the whole token', async () => {
   const t = setup({ hash: `#r=${REVIEW('a')}`, fetchImpl: reviewOk('approved') });
   await settle();
   assert.deepEqual(t.log[0], ['replaceState', '/manage/']);
+  assert.equal(t.log.filter((e) => e[0] === 'fetch').length, 0, 'a scanner that only opens the page approves nothing');
+  assert.equal(t.nodes.title.textContent, 'Approve this comment?');
+  assert.equal(t.nodes.go.textContent, 'Approve');
+  assert.equal(t.nodes.go.hidden, false);
+  await press(t);
   const f = t.log.filter((e) => e[0] === 'fetch');
   assert.equal(f.length, 1);
   assert.equal(f[0][1], 'https://api.test/v1/review');
   assert.deepEqual(JSON.parse(f[0][2]), { r: REVIEW('a') });
   assert.equal(t.nodes.title.textContent, 'Comment approved');
-  assert.match(t.nodes.text.textContent, /Approved by Admin Mayobe Bros/);
+  assert.equal(t.nodes.text.textContent, 'It is now visible to readers.');
   assert.equal(t.nodes.go.textContent, 'View the comment');
-  assert.equal(t.nodes.go.hidden, false);
   t.nodes.go.handlers.click();
   assert.deepEqual(t.log.at(-1), ['assign', '/post/a/hello-post/#comment-12']);
 });
 
-test('review link: Ignore, a second press and an expired link each end in a clear sentence', async () => {
+test('review link, Ignore answers at once (it changes nothing); Approve answers a second press, an expired link and a deleted comment in clear words', async () => {
   let t = setup({ hash: `#r=${REVIEW('i')}`, fetchImpl: reviewOk('kept') });
   await settle();
-  assert.equal(t.nodes.title.textContent, 'Left as it is');
+  assert.equal(t.nodes.title.textContent, 'Comment left hidden');
   t = setup({ hash: `#r=${REVIEW('a')}`, fetchImpl: reviewOk('already') });
-  await settle();
+  await press(t);
   assert.equal(t.nodes.title.textContent, 'Already approved');
   t = setup({ hash: `#r=${REVIEW('a')}`, fetchImpl: async () => ({ status: 404, body: { error: 'x' } }) });
-  await settle();
-  assert.equal(t.nodes.title.textContent, 'This link has expired or is not valid');
+  await press(t);
+  assert.equal(t.nodes.title.textContent, 'Link is invalid or expired');
+  assert.doesNotMatch(t.nodes.text.textContent, /node |scripts\/|comments\.mjs/, 'no command line on a public page');
   assert.equal(t.nodes.go.hidden, true);
   t = setup({ hash: `#r=${REVIEW('a')}`, fetchImpl: async () => ({ status: 409, body: { error: 'x' } }) });
-  await settle();
-  assert.equal(t.nodes.title.textContent, 'The author deleted this comment');
+  await press(t);
+  assert.equal(t.nodes.title.textContent, 'Comment was deleted');
 });
 
 test('review link: a network failure offers Try again, and the second press works', async () => {
   let n = 0;
   const t = setup({ hash: `#r=${REVIEW('a')}`, fetchImpl: async (u) => { if (n++ === 0) throw new Error('offline'); return reviewOk('approved')(u); } });
-  await settle();
+  await press(t);
   assert.equal(t.nodes.go.textContent, 'Try again');
   assert.equal(t.nodes.go.hidden, false);
   await press(t);
   assert.equal(t.nodes.title.textContent, 'Comment approved');
 });
 
-test('review link: a hidden tab waits until it is shown; a cut-short or foreign token never calls the API', async () => {
-  const t = setup({ hash: `#r=${REVIEW('a')}`, fetchImpl: reviewOk('approved'), visibility: 'hidden' });
+test('review link, Ignore: a hidden tab waits until it is shown; a cut-short or foreign token never calls the API', async () => {
+  const t = setup({ hash: `#r=${REVIEW('i')}`, fetchImpl: reviewOk('kept'), visibility: 'hidden' });
   await settle();
   assert.equal(t.log.filter((e) => e[0] === 'fetch').length, 0, 'nothing while hidden');
   t.doc.visibilityState = 'visible';
@@ -254,7 +261,20 @@ test('the status line keeps its st-status class when the script rewrites it (the
 test('a network error changes the heading and the sentence too, so the page never keeps saying "Opening your comment..."', async () => {
   const t = setup({ fetchImpl: async () => { throw new Error('offline'); } });
   await press(t);
-  assert.equal(t.nodes.title.textContent, 'We could not reach the server');
-  assert.match(t.nodes.text.textContent, /Nothing was changed/);
+  assert.equal(t.nodes.title.textContent, 'Could not open comment');
+  assert.equal(t.nodes.text.textContent, 'Check your connection, then try again.');
   assert.equal(t.nodes.go.textContent, 'Try again');
+});
+
+test('every page heading is five words or fewer, and a 429 uses the one limit wording', async () => {
+  const seen = new Set();
+  for (const hash of ['', '#x=' + TOKEN, `#l=${TOKEN}`, `#u=${TOKEN}`, `#r=${REVIEW('a')}`, `#r=${REVIEW('i')}`]) {
+    const t = setup({ hash, fetchImpl: async () => ({ status: 429, body: { error: 'x' } }) });
+    seen.add(t.nodes.title.textContent);
+    await settle();
+    if (t.nodes.go.handlers.click) await press(t);
+    if (t.nodes.go.handlers.click) { assert.equal(t.nodes.status.textContent, 'Too many attempts. Try again later.', hash); assert.equal(t.nodes.title.textContent, 'Too many attempts'); }
+    seen.add(t.nodes.title.textContent);
+  }
+  for (const h of seen) assert.ok(h.split(' ').length <= 5, h);
 });

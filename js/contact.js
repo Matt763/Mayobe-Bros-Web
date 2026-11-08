@@ -14,11 +14,12 @@
   var loaded = Date.now();
   var sending = false;
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  // field: [fewest characters, most characters, label]. The message names the field and the problem, in a few words (see problem()).
   var RULES = {
-    name: [2, 50, 'Please enter your name (2 to 50 characters).'],
-    email: [0, 254, 'Please enter an email address that looks right, like you@example.com.'],
-    subject: [3, 120, 'Please enter a subject (3 to 120 characters).'],
-    message: [10, 3000, 'Please write a message of 10 to 3,000 characters.']
+    name: [2, 50, 'Name'],
+    email: [0, 254, 'Email'],
+    subject: [3, 120, 'Subject'],
+    message: [10, 3000, 'Message']
   };
 
   function setStatus(kind, text) {
@@ -30,11 +31,15 @@
     input.setAttribute('aria-invalid', text ? 'true' : 'false');
     if (note) { note.textContent = text || ''; note.hidden = !text; }
   }
-  function valid(k, v) {
+  // '' when the value is fine, otherwise a short sentence ("Name is required.", "Email looks incorrect.", "Message is too short.")
+  function problem(k, v) {
     var r = RULES[k];
-    if (k === 'email') return v.length <= r[1] && EMAIL_RE.test(v);
-    return v.length >= r[0] && v.length <= r[1];
+    if (!v) return r[2] + ' is required.';
+    if (k === 'email') return v.length <= r[1] && EMAIL_RE.test(v) ? '' : 'Email looks incorrect.';
+    if (v.length < r[0]) return r[2] + ' is too short.';
+    return v.length > r[1] ? r[2] + ' is too long.' : '';
   }
+  function valid(k, v) { return !problem(k, v); }
   // One random id per form fill. The server uses it to recognise a retry of the same message, so a retry after a timeout is not delivered twice.
   function newId() {
     var out = '';
@@ -73,18 +78,19 @@
   }
   function plainFallback() {
     status.className = 'form-status is-err';
-    status.textContent = 'Sorry, we could not send your message from this page. Please email us at ' + mailto + '.';
+    status.textContent = 'Could not send. Email us at ' + mailto + '.';
   }
+  // The address itself is the link: it opens the visitor's mail app with the message already filled in.
   function fallback(f, lead) {
     var text = 'Name: ' + wellFormed(f.name.value.trim()) + '\nEmail: ' + wellFormed(f.email.value.trim()) + '\n\n' + wellFormed(f.message.value.trim());
     var href = 'mailto:' + mailto + '?subject=' + encodeURIComponent(wellFormed(f.subject.value.trim()).slice(0, 120)) + '&body=' + encodeLimited(text, 1800);
     var a = doc.createElement('a');
     a.href = href;
-    a.textContent = 'send it from your own email app';
+    a.textContent = mailto;
     status.className = 'form-status is-err';
-    status.textContent = lead || 'Sorry, we could not send your message from this page. Please ';
+    status.textContent = lead || 'Could not send. Try again, or email ';
     status.appendChild(a);
-    status.appendChild(doc.createTextNode(' (it opens with your message filled in), or write to ' + mailto + '.'));
+    status.appendChild(doc.createTextNode('.'));
   }
   function showFallback(f, lead) {
     try { fallback(f, lead); } catch (e) { plainFallback(); }
@@ -96,11 +102,11 @@
     if (sending) return;
     var f = form.elements, first = null;
     Object.keys(RULES).forEach(function (k) {
-      var ok = valid(k, f[k].value.trim());
-      fieldError(k, ok ? '' : RULES[k][2]);
-      if (!ok && !first) first = f[k];
+      var why = problem(k, f[k].value.trim());
+      fieldError(k, why);
+      if (why && !first) first = f[k];
     });
-    if (first) { setStatus('err', 'Please check the highlighted fields.'); first.focus(); return; }
+    if (first) { setStatus('err', 'Some fields need attention.'); first.focus(); return; }
     var payload = { name: f.name.value.trim(), email: f.email.value.trim(), subject: f.subject.value.trim(), message: f.message.value.trim(), website: f.website ? f.website.value : '', ts: loaded, id: formId };
     sending = true;
     button.disabled = true;
@@ -110,14 +116,14 @@
         form.reset();
         loaded = Date.now();
         formId = newId();
-        setStatus('ok', 'Thank you. Your message was sent. If it needs a reply, we will write to the address you gave.');
+        setStatus('ok', 'Message sent.');
         status.focus();
       } else if (r.status === 400 && r.body.field && RULES[r.body.field] && r.body.error) {
         fieldError(r.body.field, r.body.error);
-        setStatus('err', 'Please check the highlighted field.');
+        setStatus('err', 'One field needs attention.');
         f[r.body.field].focus();
       } else if (r.status === 429) {
-        showFallback(f, 'You have sent several messages already. Please try again later, or ');
+        showFallback(f, 'Too many attempts. Try again later, or email ');
       } else {
         showFallback(f);
       }

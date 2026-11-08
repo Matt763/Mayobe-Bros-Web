@@ -9,3 +9,5 @@ node_modules/
 .playwright-cli/
 .taste-skill/
 .indexnow-state.json
+# an empty file the owner keeps in css/: never commit it
+css/Mayobe AI

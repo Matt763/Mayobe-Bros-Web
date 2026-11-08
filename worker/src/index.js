@@ -41,7 +41,12 @@ const CID_RE = /^[A-Za-z0-9-]{16,64}$/;
 const LINK_RE = /(https?:\/\/|www\.|\b[a-z0-9-]+\.(?:com|net|org|info|biz|xyz|top|click|link|ru|cn|co\.tz|go\.tz|tk|ml|ga|cf|gq)\b|t\.me\/|bit\.ly)/i;
 const COMMENT_PAGE = 20; // conversations per GET /v1/posts/:slug
 const LINK_DAYS = 7; // an emailed manage link works for this long
-const NOT_FOUND = 'That comment could not be found.'; // the one answer for a wrong token, a missing comment, a team comment and so on, so nothing can be probed
+// Words the visitor sees. One neutral wording per class of problem, so an answer never says which check failed or whether anything exists.
+const NOT_FOUND = 'Comment not found.'; // the one answer for a wrong token, a missing comment, a team comment and so on, so nothing can be probed
+const LINK_BAD = 'Link is invalid or expired.'; // the one answer for every emailed link that cannot be used (wrong, expired, used, removed)
+const TRY_LATER = 'Too many attempts. Try again later.'; // the one answer for every limit, so no limit is named
+const NOT_SENT = 'Could not send. Try again.';
+const NO_EDIT = 'Comment can no longer be edited.'; // pending, has a reply, or past the edit window: one answer for all three
 
 
 function origins(env) {
@@ -87,13 +92,15 @@ async function dropLinks(env, id) {
 // The two cleaners are shared by comments and the contact form, so both strip the same characters.
 const cleanName = (raw) => String(raw || '').normalize('NFKC').replace(/[\p{Cc}\p{Cf}]+/gu, '').replace(/\s+/g, ' ').trim(); // stored exactly as it was checked: no invisible characters
 const cleanText = (raw) => String(raw || '').replace(/\r\n?/g, '\n').replace(/\t/g, ' ').replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g, '').replace(/\n{3,}/g, '\n\n').trim(); // no control characters (terminal escapes) are stored; newlines stay
+// "Name is required." / "Name is too short." / "Name is too long." (or '' when the length is fine): short, names the field, no numbers.
+const lengthError = (label, value, min, max) => (!value ? `${label} is required.` : value.length < min ? `${label} is too short.` : value.length > max ? `${label} is too long.` : '');
 function cleanComment(rawName, rawBody) {
   const name = cleanName(rawName);
   const body = cleanText(rawBody);
-  if (name.length < 2 || name.length > 50) return { error: 'Please enter your name (2 to 50 characters).' };
-  if (body.length < 3) return { error: 'Your comment is too short.' };
-  if (body.length > 1500) return { error: 'Your comment is too long (1,500 characters at most).' };
-  if (LINK_RE.test(body) || LINK_RE.test(name)) return { error: 'Links are not allowed in comments.' };
+  const bad = lengthError('Name', name, 2, 50) || lengthError('Comment', body, 3, 1500);
+  if (bad) return { error: bad };
+  if (LINK_RE.test(name)) return { error: 'Name cannot contain links.' };
+  if (LINK_RE.test(body)) return { error: 'Comment cannot contain links.' };
   return { name, body };
 }
 // The contact form: same cleaning, other limits, and links are allowed (the owner email shows them as plain text). Returns { name, email, subject, message, type } or { error, field } (the page marks that field).
@@ -102,16 +109,20 @@ function cleanContact(b) {
   const subject = cleanName(String(b.subject ?? '').replace(/[\r\n\t]+/g, ' ')); // one line: no line breaks, no invisible characters
   const message = cleanText(b.message);
   const email = String(b.email ?? '').trim();
-  if (name.length < 2 || name.length > 50) return { error: 'Please enter your name (2 to 50 characters).', field: 'name' };
-  if (email.length > 254 || /\p{Cc}|\p{Cf}/u.test(email) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !validEmail(email)) return { error: 'That email address does not look right.', field: 'email' };
-  if (subject.length < 3 || subject.length > 120) return { error: 'Please enter a subject (3 to 120 characters).', field: 'subject' };
-  if (message.length < 10) return { error: 'Your message is too short (10 characters at least).', field: 'message' };
-  if (message.length > 3000) return { error: 'Your message is too long (3,000 characters at most).', field: 'message' };
+  const nameBad = lengthError('Name', name, 2, 50);
+  if (nameBad) return { error: nameBad, field: 'name' };
+  if (email.length > 254 || /\p{Cc}|\p{Cf}/u.test(email) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !validEmail(email)) return { error: email ? 'Email looks incorrect.' : 'Email is required.', field: 'email' };
+  const subjectBad = lengthError('Subject', subject, 3, 120);
+  if (subjectBad) return { error: subjectBad, field: 'subject' };
+  const messageBad = lengthError('Message', message, 10, 3000);
+  if (messageBad) return { error: messageBad, field: 'message' };
   return { name, email, subject, message, type: typeof b.type === 'string' && Object.hasOwn(CONTACT_TYPES, b.type) ? b.type : 'general' };
 }
-function isAdmin(request, env) {
+// Both sides are hashed first, so the comparison always runs over 64 equal characters and the token's length is not leaked.
+async function isAdmin(request, env) {
   const t = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
-  return !!env.ADMIN_TOKEN && env.ADMIN_TOKEN.length >= 16 && same(t, env.ADMIN_TOKEN);
+  if (!env.ADMIN_TOKEN || env.ADMIN_TOKEN.length < 16) return false;
+  return same(await sha(t), await sha(env.ADMIN_TOKEN));
 }
 
 // Resend webhooks are signed with Svix: HMAC-SHA256 over `${svix-id}.${svix-timestamp}.${rawBody}`, keyed with the base64-decoded part of
@@ -165,7 +176,7 @@ async function resendWebhook(request, env, cors) {
   const to = ev.data?.to;
   const list = (Array.isArray(to) ? to : [to]).filter((a) => typeof a === 'string').slice(0, 50);
   // Our own mailboxes are never suppressed: that would silently switch off owner alerts and contact notices.
-  const own = new Set([env.OWNER_EMAIL, env.CONTACT_EMAIL, 'info@mayobebros.com', 'support@mayobebros.com', ...[env.MAIL_FROM, env.MAIL_FROM_SUPPORT].map((f) => /<([^<>]+)>/.exec(String(f || ''))?.[1] || f)]
+  const own = new Set([...reviewRecipients(env), env.OWNER_EMAIL, env.CONTACT_EMAIL, 'info@mayobebros.com', 'support@mayobebros.com', ...[env.MAIL_FROM, env.MAIL_FROM_SUPPORT].map((f) => /<([^<>]+)>/.exec(String(f || ''))?.[1] || f)]
     .map((x) => String(x || '').trim().toLowerCase()).filter(Boolean));
   let n = 0;
   let ownerSeen = false;
@@ -268,8 +279,9 @@ function reviewRecipients(env) {
   return uniq.length ? uniq : [env.OWNER_EMAIL || 'info@mayobebros.com'];
 }
 async function mailOwner(env, ctx, kind, c, reason) {
-  // Comment alerts get 8 a day (a held alert goes to every review address, so up to 16 of the 24 daily owner units; contact notices get 7), so questions cannot silence the contact form. The comment is saved either way; `node scripts/comments.mjs list` shows everything.
-  if (!(await hit(env, ctx, `oaday:${utcDay()}`, 8, DAY_TTL))) return;
+  // Held alerts get 6 a day (12 of the 24 daily owner units with two review addresses), question alerts 4, contact notices 7: 23 in all. The comment is saved either way; `node scripts/comments.mjs list` shows everything.
+  // held alerts (6 a day, each to every review address) and question alerts (4 a day) count separately, so harmless questions can never silence a held-comment alert
+  if (!(await hit(env, ctx, `${kind === 'held' ? 'ohday' : 'oqday'}:${utcDay()}`, kind === 'held' ? 6 : 4, DAY_TTL))) return;
   const meta = await postMeta(env, c.slug);
   const origin = siteOrigin(env);
   // Held comments carry two buttons (approve, ignore) when REVIEW_SECRET is set. Each link is signed for this one comment and expires in 7 days.
@@ -318,7 +330,7 @@ async function handle(request, env, ctx) {
   // Browsers always send Origin on cross-site POSTs. Refuse any that is not our site.
   if (method === 'POST' && !path.startsWith('/v1/admin/') && path !== '/v1/newsletter/one-click') {
     const o = request.headers.get('Origin');
-    if (!o || !origins(env).includes(o)) return fail('Origin not allowed.', 403, cors);
+    if (!o || !origins(env).includes(o)) return fail(NOT_SENT, 403, cors);
   }
 
   const nl = await newsletterRoute(request, env, ctx, path, cors);
@@ -329,16 +341,17 @@ async function handle(request, env, ctx) {
   if (method === 'POST' && path === '/v1/review') {
     const b = await readJson(request);
     const ih = await ipHash(request, env);
-    if (!(await hit(env, ctx, `review:${ih}`, 60, 3600))) return fail('Too many tries. Please wait a little.', 429, cors);
+    if (!(await hit(env, ctx, `review:${ih}`, 60, 3600))) return fail(TRY_LATER, 429, cors);
     const t = await checkReviewToken(env, b.r);
-    if (!t) return fail('This link has expired or is not valid.', 404, cors);
+    if (!t) return fail(LINK_BAD, 404, cors);
     const row = await env.DB.prepare('SELECT id, slug, parent_id, status FROM comments WHERE id = ?').bind(t.id).first();
-    if (!row) return fail(NOT_FOUND, 404, cors);
+    if (!row) return fail(LINK_BAD, 404, cors);
     const where = async () => ({ path: (await postMeta(env, row.slug)).path, slug: row.slug });
     if (t.action === 'ignore') return reply({ ok: true, result: row.status === 'approved' ? 'already' : row.status === 'pending' ? 'kept' : row.status, id: row.id, ...(await where()) }, 200, cors);
+    if (row.status !== 'pending' && row.status !== 'approved') return fail(LINK_BAD, 404, cors); // a comment already hidden as spam is not brought back by an old email
     const r = await approveHeld(env, ctx, row);
-    if (r === 'deleted') return fail('That comment was deleted by its author and cannot be approved.', 409, cors);
-    if (r === 'missing') return fail(NOT_FOUND, 404, cors);
+    if (r === 'deleted') return fail('Comment was deleted by its author.', 409, cors);
+    if (r === 'missing') return fail(LINK_BAD, 404, cors);
     return reply({ ok: true, result: r, id: row.id, ...(await where()), stats: await getStats(env, row.slug) }, 200, cors);
   }
 
@@ -356,7 +369,7 @@ async function handle(request, env, ctx) {
 
   if ((m = path.match(/^\/v1\/posts\/([^/]+)$/)) && method === 'GET') {
     const slug = m[1];
-    if (!(await slugKnown(env, slug))) return fail('Unknown post.', 404, cors);
+    if (!(await slugKnown(env, slug))) return fail('Article not found.', 404, cors);
     // Conversations (a comment with its replies) come newest first, COMMENT_PAGE at a time: ?offset=N asks for the next page. A post with
     // thousands of comments never sends them all at once, and the newest are never cut off. `more` says whether another page exists.
     const offset = Math.min(100000, Math.max(0, Math.floor(Number(url.searchParams.get('offset'))) || 0));
@@ -394,11 +407,11 @@ async function handle(request, env, ctx) {
     const slug = m[1];
     const b = await readJson(request);
     const type = b.type === null || b.type === undefined ? null : String(b.type);
-    if (type !== null && !REACTIONS.includes(type)) return fail('Unknown reaction.', 400, cors);
-    if (!CID_RE.test(String(b.cid || ''))) return fail('Missing visitor id.', 400, cors);
+    if (type !== null && !REACTIONS.includes(type)) return fail('Could not save reaction. Try again.', 400, cors);
+    if (!CID_RE.test(String(b.cid || ''))) return fail('Could not save reaction. Try again.', 400, cors);
     const ih = await ipHash(request, env);
-    if (!(await hit(env, ctx, `r:${ih}:${Math.floor(now() / 600000)}`, 60, 700))) return fail('Too many reactions. Please wait a few minutes.', 429, cors);
-    if (!(await slugKnown(env, slug))) return fail('Unknown post.', 404, cors);
+    if (!(await hit(env, ctx, `r:${ih}:${Math.floor(now() / 600000)}`, 60, 700))) return fail(TRY_LATER, 429, cors);
+    if (!(await slugKnown(env, slug))) return fail('Article not found.', 404, cors);
     const old = (await env.DB.prepare('SELECT type FROM reactions WHERE slug = ? AND cid = ?').bind(slug, b.cid).first())?.type || null;
     if (old !== type) {
       const st = [];
@@ -420,22 +433,22 @@ async function handle(request, env, ctx) {
     if (env.TURNSTILE_SECRET) {
       const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body: new URLSearchParams({ secret: env.TURNSTILE_SECRET, response: String(b.tt || '') }) });
       const j = await r.json().catch(() => ({}));
-      if (!j.success) return fail('Please complete the security check and try again.', 400, cors);
+      if (!j.success) return fail('Complete the security check.', 400, cors);
     }
     const email = String(b.email || '').trim().slice(0, 120);
     const clean = cleanComment(b.name, b.body);
     if (clean.error) return fail(clean.error, 400, cors);
     const { name, body } = clean;
-    if (email && (/\p{Cc}|\p{Cf}/u.test(email) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) return fail('That email address does not look right.', 400, cors);
-    if (!CID_RE.test(String(b.cid || ''))) return fail('Missing visitor id.', 400, cors);
+    if (email && (/\p{Cc}|\p{Cf}/u.test(email) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) return fail('Email looks incorrect.', 400, cors);
+    if (!CID_RE.test(String(b.cid || ''))) return fail(NOT_SENT, 400, cors);
     const ih = await ipHash(request, env);
-    if (!(await hit(env, ctx, `c:${ih}:${Math.floor(now() / 3600000)}`, 5, 3700))) return fail('You have posted several comments already. Please try again later.', 429, cors);
-    if (!(await slugKnown(env, slug))) return fail('Unknown post.', 404, cors);
+    if (!(await hit(env, ctx, `c:${ih}:${Math.floor(now() / 3600000)}`, 5, 3700))) return fail(TRY_LATER, 429, cors);
+    if (!(await slugKnown(env, slug))) return fail('Article not found.', 404, cors);
     let parent = null;
     if (b.parent) {
       parent = Number(b.parent);
       const p = Number.isInteger(parent) ? await env.DB.prepare("SELECT id FROM comments WHERE id = ? AND slug = ? AND status = 'approved' AND parent_id IS NULL").bind(parent, slug).first() : null;
-      if (!p) return fail('You can only reply to an approved comment.', 400, cors);
+      if (!p) return fail('Could not post reply.', 400, cors);
     }
     const dup = await env.DB.prepare('SELECT 1 AS ok FROM comments WHERE slug = ? AND cid = ? AND body = ? AND created > ?').bind(slug, b.cid, body, now() - 600000).first();
     let status = dup ? 'duplicate' : 'pending';
@@ -450,7 +463,7 @@ async function handle(request, env, ctx) {
       if (looksLikeTeam(name)) reasons.push('impersonation'); // only the admin reply route may use a name that looks like the team
       if ((await env.DB.prepare("SELECT COUNT(*) AS n FROM comments WHERE (cid = ? OR ip_hash = ?) AND status = 'spam'").bind(b.cid, ih).first())?.n) reasons.push('earlier-spam');
       const pending = await env.DB.prepare("SELECT COUNT(*) AS n FROM comments WHERE cid = ? AND status = 'pending'").bind(b.cid).first();
-      if (reasons.length && (pending?.n || 0) >= 5) return fail('You already have several comments waiting for review.', 429, cors);
+      if (reasons.length && (pending?.n || 0) >= 5) return fail(TRY_LATER, 429, cors);
       status = reasons.length ? 'pending' : 'approved';
       const t = now();
       const wantsMail = b.notify === true && !!email; // "email me about replies" counts only with an address
@@ -483,13 +496,13 @@ async function handle(request, env, ctx) {
     if (c.error) return reply({ error: c.error, field: c.field }, 400, cors);
     const ih = await ipHash(request, env);
     const hour = Math.floor(now() / 3600000);
-    if (!(await hit(env, ctx, `ct:${ih}:${hour}`, 3, 3700))) return fail('You have sent several messages already. Please try again later.', 429, cors);
+    if (!(await hit(env, ctx, `ct:${ih}:${hour}`, 3, 3700))) return fail(TRY_LATER, 429, cors);
     // the key holds a hash of the address, never the address itself
-    if (!(await hit(env, ctx, `cte:${(await sha(`${canonicalEmail(c.email)}|${env.HASH_SALT || 'mayobe'}`)).slice(0, 32)}:${hour}`, 2, 3700))) return fail('You have sent several messages already. Please try again later.', 429, cors);
+    if (!(await hit(env, ctx, `cte:${(await sha(`${canonicalEmail(c.email)}|${env.HASH_SALT || 'mayobe'}`)).slice(0, 32)}:${hour}`, 2, 3700))) return fail(TRY_LATER, 429, cors);
     // at most 7 contact notices a day, so a flood leaves 3 of the owner's 10 daily units for held-comment and question alerts
     const tooMany = !(await hit(env, ctx, `ctday:${utcDay()}`, 7, DAY_TTL));
     const general = env.CONTACT_EMAIL || 'info@mayobebros.com';
-    const down = () => fail(`We could not send your message. Please email us at ${general}.`, 503, cors);
+    const down = () => fail(`Could not send. Email us at ${general}.`, 503, cors);
     if (tooMany || !env.RESEND_API_KEY) return down();
     // the page sends one id per form fill, so a retry after a timeout reuses the same keys and cannot be delivered twice; without a good id a fresh one is made
     const id = typeof b.id === 'string' && CID_RE.test(b.id) ? b.id : crypto.randomUUID();
@@ -513,13 +526,13 @@ async function handle(request, env, ctx) {
 
   if (method === 'POST' && path === '/v1/manage/exchange') {
     const b = await readJson(request).catch(() => null);
-    if (!b || Array.isArray(b)) return fail(NOT_FOUND, 404, cors);
+    if (!b || Array.isArray(b)) return fail(LINK_BAD, 404, cors);
     const ih = await ipHash(request, env);
-    if (!(await hit(env, ctx, `mx:${ih}:${Math.floor(now() / 3600000)}`, 30, 3700))) return fail('Too many tries. Please try again later.', 429, cors);
-    if (typeof b.link !== 'string' || !TOKEN_RE.test(b.link)) return fail(NOT_FOUND, 404, cors);
+    if (!(await hit(env, ctx, `mx:${ih}:${Math.floor(now() / 3600000)}`, 30, 3700))) return fail(TRY_LATER, 429, cors);
+    if (typeof b.link !== 'string' || !TOKEN_RE.test(b.link)) return fail(LINK_BAD, 404, cors);
     const link = await env.DB.prepare("SELECT comment_id FROM manage_links WHERE hash = ? AND kind = 'link' AND expires > ?").bind(await sha(b.link), now()).first();
     const row = link ? await env.DB.prepare("SELECT id, slug, status, notify_wanted FROM comments WHERE id = ?").bind(link.comment_id).first() : null;
-    if (!row || !['approved', 'pending'].includes(row.status)) return fail(NOT_FOUND, 404, cors);
+    if (!row || !['approved', 'pending'].includes(row.status)) return fail(LINK_BAD, 404, cors);
     const device = await addLink(env, 'device', row.id, null);
     if (row.notify_wanted) await env.DB.prepare('UPDATE comments SET notify_confirmed = 1 WHERE id = ? AND notify_wanted = 1').bind(row.id).run(); // opening the link proves the address is read by the commenter
     const meta = await postMeta(env, row.slug); // the real article address (it includes the category); absent when the list cannot be read
@@ -528,13 +541,13 @@ async function handle(request, env, ctx) {
 
   if (method === 'POST' && path === '/v1/notify/unsubscribe') {
     const b = await readJson(request).catch(() => null);
-    if (!b || Array.isArray(b)) return fail(NOT_FOUND, 404, cors);
+    if (!b || Array.isArray(b)) return fail(LINK_BAD, 404, cors);
     const ih = await ipHash(request, env);
-    if (!(await hit(env, ctx, `un:${ih}:${Math.floor(now() / 3600000)}`, 30, 3700))) return fail('Too many tries. Please try again later.', 429, cors);
-    if (typeof b.token !== 'string' || !TOKEN_RE.test(b.token)) return fail(NOT_FOUND, 404, cors);
+    if (!(await hit(env, ctx, `un:${ih}:${Math.floor(now() / 3600000)}`, 30, 3700))) return fail(TRY_LATER, 429, cors);
+    if (typeof b.token !== 'string' || !TOKEN_RE.test(b.token)) return fail(LINK_BAD, 404, cors);
     const link = await env.DB.prepare("SELECT comment_id FROM manage_links WHERE hash = ? AND kind = 'unsub'").bind(await sha(b.token)).first();
     const row = link ? await env.DB.prepare('SELECT id FROM comments WHERE id = ?').bind(link.comment_id).first() : null;
-    if (!row) return fail(NOT_FOUND, 404, cors);
+    if (!row) return fail(LINK_BAD, 404, cors);
     await env.DB.prepare('UPDATE comments SET notify_wanted = 0, notify_confirmed = 0 WHERE id = ?').bind(row.id).run();
     return reply({ ok: true }, 200, cors);
   }
@@ -545,15 +558,15 @@ async function handle(request, env, ctx) {
     if (typeof b.token !== 'string' || !TOKEN_RE.test(b.token)) return fail(NOT_FOUND, 404, cors);
     const ih = await ipHash(request, env);
     const hour = Math.floor(now() / 3600000);
-    if (!(await hit(env, ctx, `ed:${ih}:${hour}`, 20, 3700))) return fail('You have edited several comments already. Please try again later.', 429, cors);
+    if (!(await hit(env, ctx, `ed:${ih}:${hour}`, 20, 3700))) return fail(TRY_LATER, 429, cors);
     const row = await ownerRow(env, id, b.token);
     if (!row) return fail(NOT_FOUND, 404, cors);
     // counted per comment only once the owner is proven, so strangers guessing ids cannot lock the owner out
-    if (!(await hit(env, ctx, `edc:${id}:${hour}`, 10, 3700))) return fail('You have edited this comment several times already. Please try again later.', 429, cors);
-    if (row.status !== 'approved') return fail('This comment is waiting for review, so it cannot be edited.', 409, cors);
-    if (await hasReplies(env, id)) return fail('This comment has a reply, so it can no longer be edited.', 409, cors);
+    if (!(await hit(env, ctx, `edc:${id}:${hour}`, 10, 3700))) return fail(TRY_LATER, 429, cors);
+    if (row.status !== 'approved') return fail(NO_EDIT, 409, cors);
+    if (await hasReplies(env, id)) return fail(NO_EDIT, 409, cors);
     const windowMin = Number(env.EDIT_WINDOW_MINUTES) > 0 ? Number(env.EDIT_WINDOW_MINUTES) : 30;
-    if (now() - row.created > windowMin * 60000) return fail(`The ${windowMin} minutes for editing have passed.`, 409, cors);
+    if (now() - row.created > windowMin * 60000) return fail(NO_EDIT, 409, cors);
     const clean = cleanComment(row.name, b.body);
     if (clean.error) return fail(clean.error, 400, cors);
     const shown = (edited) => ({ id, body: clean.body, ...(edited ? { edited } : {}) });
@@ -571,7 +584,7 @@ async function handle(request, env, ctx) {
     if (status === 'pending') st.push(env.DB.prepare('UPDATE post_stats SET comments = MAX(0, comments - 1) WHERE slug = ? AND changes() > 0').bind(row.slug));
     const done = await env.DB.batch(st);
     if (!(done[0]?.results || []).length) {
-      if (await hasReplies(env, id)) return fail('This comment has a reply, so it can no longer be edited.', 409, cors);
+      if (await hasReplies(env, id)) return fail(NO_EDIT, 409, cors);
       return fail(NOT_FOUND, 404, cors);
     }
     return reply({ ok: true, status, comment: shown(t), stats: await getStats(env, row.slug) }, 200, cors);
@@ -582,7 +595,7 @@ async function handle(request, env, ctx) {
     const b = await readJson(request);
     if (typeof b.token !== 'string' || !TOKEN_RE.test(b.token)) return fail(NOT_FOUND, 404, cors);
     const ih = await ipHash(request, env);
-    if (!(await hit(env, ctx, `del:${ih}:${Math.floor(now() / 3600000)}`, 20, 3700))) return fail('You have deleted several comments already. Please try again later.', 429, cors);
+    if (!(await hit(env, ctx, `del:${ih}:${Math.floor(now() / 3600000)}`, 20, 3700))) return fail(TRY_LATER, 429, cors);
     // Each write only applies while the row is still in the status that was read (and still has / has no replies), and the count is lowered
     // only if that row really changed. If another request got there first, read again; after three tries answer the generic 404.
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -609,10 +622,10 @@ async function handle(request, env, ctx) {
   if ((m = path.match(/^\/v1\/comments\/(\d+)\/like$/)) && method === 'POST') {
     const id = Number(m[1]);
     const b = await readJson(request);
-    if (!CID_RE.test(String(b.cid || ''))) return fail('Missing visitor id.', 400, cors);
-    if (typeof b.on !== 'boolean') return fail('Say whether to like or unlike.', 400, cors);
+    if (!CID_RE.test(String(b.cid || ''))) return fail('Could not save like. Try again.', 400, cors);
+    if (typeof b.on !== 'boolean') return fail('Could not save like. Try again.', 400, cors);
     const ih = await ipHash(request, env);
-    if (!(await hit(env, ctx, `l:${ih}:${Math.floor(now() / 600000)}`, 120, 700))) return fail('Too many likes. Please wait a few minutes.', 429, cors);
+    if (!(await hit(env, ctx, `l:${ih}:${Math.floor(now() / 600000)}`, 120, 700))) return fail(TRY_LATER, 429, cors);
     const row = Number.isSafeInteger(id) && id > 0 ? await env.DB.prepare("SELECT id, slug FROM comments WHERE id = ? AND status = 'approved'").bind(id).first() : null;
     if (!row) return fail(NOT_FOUND, 404, cors);
     // Every statement only applies while the comment is still approved. The like row is added with INSERT OR IGNORE (a double tap or a second tab is
@@ -631,7 +644,9 @@ async function handle(request, env, ctx) {
 
   /* ------------------------------------------------------------- moderation */
   if (path.startsWith('/v1/admin/')) {
-    if (!isAdmin(request, env)) return fail('Unauthorized.', 401, cors);
+    // 60 admin requests per 10 minutes per visitor: enough for the command line, too few to guess a token
+    if (!(await hit(env, ctx, `adm:${await ipHash(request, env)}`, 60, 600))) return fail(TRY_LATER, 429, cors);
+    if (!(await isAdmin(request, env))) return fail('Unauthorized.', 401, cors);
     const nla = await newsletterAdmin(request, env, ctx, path, url, cors);
     if (nla) return nla;
     if (method === 'GET' && path === '/v1/admin/comments') {
@@ -697,9 +712,10 @@ export default {
       return await handle(request, env, ctx);
     } catch (err) {
       const cors = corsFor(request, env);
-      if (err && err.status) return fail(err.message, err.status, cors);
+      // readJson's own messages (413 too big, 400 not readable) are plain-English for the logs only: the visitor gets a short neutral line
+      if (err && err.status) return fail(err.status === 413 ? 'Message is too long.' : NOT_SENT, err.status, cors);
       console.error('engage error', err && err.stack ? err.stack : err);
-      return fail('Something went wrong. Please try again.', 500, cors);
+      return fail('Something went wrong. Try again.', 500, cors);
     }
   },
   // Cron Trigger (wrangler.jsonc "triggers"): the daily newsletter run. runNewsletter never throws.

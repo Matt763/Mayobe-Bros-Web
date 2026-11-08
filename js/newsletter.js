@@ -1,8 +1,9 @@
 /* Mayobe Bros: the /newsletter/ page. It confirms a sign-up (#c=<code>) or stops the newsletter (#u=<code>) from the link in our email.
    Nothing is sent when the page opens: email scanners and link previewers open links too, so the API is called only when a person
    presses the button (the go function below). Nothing is stored in the browser.
-   Every press ends in a sentence that says what happened: done, already used or expired, or "could not reach our server" with a
-   Try again button. A request with no answer after 15 seconds counts as "could not reach". */
+   Every press ends in a sentence that says what happened: done, "Link is invalid or expired" (one wording for a wrong, old or used
+   link, so the page never says whether an address is on the list), or "Could not confirm" with a Try again button. A request with no
+   answer after 15 seconds counts as a failure. */
 (function () {
   'use strict';
 
@@ -43,16 +44,17 @@
   }
   function fail(code) {
     if (code === 404) {
-      if (kind === 'u') outcome('info', 'is-err', 'We could not find that subscription', 'The link may be old, or the address may already have been removed from our list. If you still get our emails, write to us and we will remove it.', 'We could not find that subscription.');
-      else outcome('info', 'is-err', 'This link was already used or has expired', 'If you already pressed Confirm, you are subscribed and there is nothing more to do. If not, the link may be older than 7 days: sign up again with the form at the bottom of any page on our site.', 'This link was already used or has expired.');
+      // the same title for both buttons and every cause; the sentence under it is general advice, true whatever the state of the address
+      outcome('info', 'is-err', 'Link is invalid or expired', kind === 'u' ? 'If you already unsubscribed, you are all set.' : 'If you already confirmed, you are all set.', 'Link is invalid or expired.');
       return;
     }
-    title.textContent = code === 429 ? 'Too many tries' : 'We could not reach our server';
-    text.textContent = code === 429 ? 'Please wait a little, then press Try again. Nothing was changed.' : 'Check your connection, then press Try again. Nothing was changed.';
+    var what = kind === 'u' ? 'Could not unsubscribe' : 'Could not confirm';
+    title.textContent = code === 429 ? 'Too many attempts' : what;
+    text.textContent = code === 429 ? 'Try again later.' : 'Check your connection, then try again.';
     button.hidden = false;
     idle('Try again');
     state('err');
-    say('is-err', code === 429 ? 'Too many tries. Please wait a little and press the button again.' : 'We could not reach our server. Check your connection, then press Try again.');
+    say('is-err', code === 429 ? 'Too many attempts. Try again later.' : what + '. Try again.');
     button.focus();
   }
   function show(st, h, p, label) {
@@ -62,10 +64,10 @@
     if (label) { button.textContent = label; button.hidden = false; } else { button.hidden = true; showNext(); }
   }
 
-  if (kind === 'c') show('mail', 'One last step: confirm your subscription', 'You opened the link from our email. Press the button to finish. We ask you to press it so that email scanners cannot sign anyone up.', 'Confirm my subscription');
-  else if (kind === 'u') show('mail', 'Stop newsletter emails', 'Press the button and we will stop sending you newsletter emails. Nothing happens until you press it.', 'Unsubscribe');
-  else if (!frag) show('info', 'Open the link from your email', 'This page works with the link in an email from us. To sign up, use the form at the bottom of any page on our site.');
-  else show('info', 'This link does not look right', 'It may have been cut short when it was copied. Open the link from the email again, or copy the whole address.');
+  if (kind === 'c') show('mail', 'Confirm your subscription', 'Press the button to finish signing up.', 'Confirm subscription');
+  else if (kind === 'u') show('mail', 'Stop newsletter emails', 'Press the button to stop receiving them.', 'Unsubscribe');
+  else if (!frag) show('info', 'Open the email link', 'This page opens from the link in our email.');
+  else show('info', 'Link is invalid or expired', 'Open the link from the email again.');
 
   // One POST that gives up after 15 seconds. The first answer wins: a late reply after the timeout is ignored.
   function post(url, body) {
@@ -93,8 +95,8 @@
         busy = false;
         if (!r.ok) { fail(r.status); return; }
         secret = '';
-        if (kind === 'u') outcome('ok', 'is-ok', 'You are unsubscribed', 'Thank you for reading. We will not send you newsletter emails any more. If you change your mind, you can sign up again with the form at the bottom of any page on our site.', 'You are unsubscribed from our newsletter.', { noHelp: true });
-        else outcome('ok', 'is-ok', 'You are subscribed', 'Thank you. We will send you one email when we publish a new article, and every email has a link to stop. We are sending a welcome email with our latest articles. It can take a few minutes, and on a very busy day it may be skipped.', 'Your subscription is confirmed.', { noHelp: true });
+        if (kind === 'u') outcome('ok', 'is-ok', 'You are unsubscribed', 'You will no longer get our newsletter.', 'You are unsubscribed.', { noHelp: true });
+        else outcome('ok', 'is-ok', 'You are subscribed', 'A welcome email may arrive in a few minutes.', 'You are subscribed.', { noHelp: true });
       })
       .catch(function () { busy = false; fail(0); });
   }

@@ -1,4 +1,5 @@
 // HTML templates for every page type. Pure functions: data in, HTML string out.
+import { createHash } from 'node:crypto';
 import { escapeHtml as e, addHeadingIds } from './markdown.mjs';
 import { emailAlt } from './email-images.mjs';
 
@@ -154,6 +155,49 @@ export function createRenderer(ctx) {
 
   // <title> gets the brand when it still fits in search results; og:title and twitter:title never do: WhatsApp's own guide says the title
   // must be "without any branding" (the app prints the domain under it), and it shows at most 2 lines, so the brand would only push words out.
+  /* Content-Security-Policy, written into every page as a <meta> tag (GitHub Pages cannot send headers). It lists exactly what the pages load:
+     our own files, the comments Worker, and the third parties that are switched on in site.config.json (Cloudflare Web Analytics, Google Tag
+     Manager, YouTube after a press on play, AdSense only when ads are on). The one inline script a page has is allowed by its SHA-256, computed
+     here from the page's own text, so it cannot drift. A meta tag cannot enforce frame-ancestors, report-uri or sandbox (no clickjacking
+     protection without a real header), and a policy cannot be checked by a test alone: after changing a host, load a post, press play on a video
+     and press Accept with the browser console open. When ads are switched on (adsense.autoAds), re-test ads: Google's host list changes. */
+  const adsOn = !!(adsenseId && config.adsense?.autoAds);
+  function contentSecurityPolicy(inlineScripts, bare) {
+    let apiOrigin = '';
+    try { apiOrigin = api ? new URL(api).origin : ''; } catch { apiOrigin = ''; }
+    const hashes = inlineScripts.map((t) => `'sha256-${createHash('sha256').update(t, 'utf8').digest('base64')}'`);
+    const google = ['https://*.google-analytics.com', 'https://*.analytics.google.com', 'https://*.googletagmanager.com', 'https://*.g.doubleclick.net', 'https://www.google.com'];
+    const script = ["'self'", ...hashes];
+    const connect = ["'self'", apiOrigin];
+    const img = ["'self'", 'data:'];
+    const frame = [];
+    if (!bare) {
+      script.push('https://www.youtube.com'); // the player's iframe API, loaded only after a press on play
+      img.push('https://i.ytimg.com'); // video posters
+      frame.push('https://www.youtube-nocookie.com');
+      if (cfToken) { script.push('https://static.cloudflareinsights.com'); connect.push('https://cloudflareinsights.com'); }
+      if (gtmId) { script.push('https://www.googletagmanager.com'); connect.push(...google); img.push(...google); }
+      if (adsOn) {
+        script.push('https://pagead2.googlesyndication.com', 'https://*.googlesyndication.com', 'https://partner.googleadservices.com', 'https://www.googletagservices.com', 'https://*.adtrafficquality.google');
+        connect.push('https://pagead2.googlesyndication.com', 'https://*.googlesyndication.com', 'https://*.doubleclick.net', 'https://*.adtrafficquality.google', 'https://www.google.com');
+        img.push('https:'); // ad creatives come from many hosts
+        frame.push('https://googleads.g.doubleclick.net', 'https://tpc.googlesyndication.com', 'https://*.googlesyndication.com', 'https://*.doubleclick.net', 'https://*.adtrafficquality.google', 'https://www.google.com');
+      }
+      if (config.turnstileSiteKey) { script.push('https://challenges.cloudflare.com'); connect.push('https://challenges.cloudflare.com'); frame.push('https://challenges.cloudflare.com'); }
+    }
+    const uniq = (a) => [...new Set(a.filter(Boolean))].join(' ');
+    return [
+      "default-src 'self'", `script-src ${uniq(script)}`, "style-src 'self' 'unsafe-inline'", `img-src ${uniq(img)}`, `connect-src ${uniq(connect)}`,
+      frame.length ? `frame-src ${uniq(frame)}` : "frame-src 'none'", "media-src 'self'", "font-src 'self'", "object-src 'none'", "base-uri 'self'", "form-action 'self'",
+    ].join('; ');
+  }
+  // Puts the policy first in <head> (right after the viewport tag, before any script) and a referrer policy on pages that do not set their own.
+  function withPolicy(headHtml, bare, noReferrer) {
+    const inline = [...headHtml.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+    const tag = `<meta http-equiv="Content-Security-Policy" content="${e(contentSecurityPolicy(inline, bare))}">${noReferrer ? '' : '\n<meta name="referrer" content="strict-origin-when-cross-origin">'}`;
+    return headHtml.replace('<meta name="viewport" content="width=device-width, initial-scale=1">', (m) => `${m}\n${tag}`);
+  }
+
   function head({ title, description, path, share = '', imageAlt = '', type = 'website', jsonLd = [], noindex = false, article = null, preload = '', noReferrer = false, bare = false }) {
     // the brand is added only when the whole title still fits in search results (about 60 characters)
     const branded = `${title} | ${config.name}`;
@@ -170,7 +214,7 @@ export function createRenderer(ctx) {
 <meta property="article:section" content="${e(article.section)}">
 <meta property="article:author" content="${e(article.authorUrl || article.author)}">${article.tags.map((t) => `\n<meta property="article:tag" content="${e(t)}">`).join('')}`
       : '';
-    return `<meta charset="utf-8">
+    const out = `<meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="content-language" content="${config.language}">
 <title>${e(fullTitle)}</title>
@@ -201,6 +245,7 @@ ${bare ? '<meta name="color-scheme" content="light">\n<meta name="theme-color" c
 <meta name="twitter:image" content="${img}">${si.alt ? `\n<meta name="twitter:image:alt" content="${e(si.alt)}">` : ''}${art}${preload ? `\n<link rel="preload" as="image" href="${preload}"${topicSet(preload) ? ` imagesrcset="${topicSet(preload)}" imagesizes="100vw"` : ''} fetchpriority="high">` : ''}${api ? `\n<link rel="preconnect" href="${new URL(api).origin}" crossorigin>` : ''}
 ${bare ? "<script>document.documentElement.classList.add('js')</script>" : `<script>(function(){var d=document.documentElement,t=null;d.classList.add('js');try{t=localStorage.getItem('theme')}catch(e){}if(t==='dark')d.classList.add('dark');else if(t==='light')d.classList.add('light');else if(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)d.classList.add('dark')})();</script>`}
 <link rel="stylesheet" href="${assetUrl('css/style.css')}">${jsonLd.map((j) => `\n<script type="application/ld+json">${json(j)}</script>`).join('')}`;
+    return withPolicy(out, bare, noReferrer);
   }
 
   /* ------------------------------------------------------------- header */
@@ -236,7 +281,7 @@ ${bare ? "<script>document.documentElement.classList.add('js')</script>" : `<scr
       <a class="brand" href="${u('/')}" aria-label="${e(config.name)} home">${brand}</a>
       <div class="header-actions">
         <button class="icon-btn" type="button" data-search-open aria-label="Search" aria-haspopup="dialog">${icon('search')}</button>
-        <button class="icon-btn theme-btn" type="button" data-theme-toggle aria-label="Theme: follows your device. Click to change.">${icon('monitor', 20, 'i-auto')}${icon('sun', 20, 'i-sun')}${icon('moon', 20, 'i-moon')}</button>
+        <button class="icon-btn theme-btn" type="button" data-theme-toggle aria-label="Switch to dark mode" title="Dark mode">${icon('monitor', 20, 'i-auto')}${icon('sun', 20, 'i-sun')}${icon('moon', 20, 'i-moon')}</button>
         <button class="icon-btn menu-btn" type="button" data-drawer-open aria-label="Open menu" aria-controls="drawer" aria-expanded="false">${icon('menu', 24)}</button>
       </div>
     </div>
@@ -292,8 +337,8 @@ ${bare ? "<script>document.documentElement.classList.add('js')</script>" : `<scr
               <span class="nl-check" aria-hidden="true"><svg viewBox="0 0 52 52" width="46" height="46" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle class="nl-check-ring" cx="26" cy="26" r="23"/><path class="nl-check-tick" d="M15.5 27.5l7.5 7.5 14-16"/></svg></span>
               <div class="nl-done-text">
                 <h3 class="nl-done-title" tabindex="-1" data-nl-title>Check your inbox</h3>
-                <p class="nl-done-body" data-nl-body>${mini ? 'If this address can get our emails, a link is on its way:<strong>reader.name@example.com</strong>Open it to finish.' : 'If this address can receive our emails, a link to confirm is on its way:<strong>firstname.lastname@example.com</strong>Open it and press the button to finish.'}</p>
-                <p class="nl-done-help">${mini ? 'Nothing yet? Check spam or Promotions.' : 'Nothing after a few minutes? Look in spam or Promotions.'} <button class="nl-link" type="button" data-nl-again>Use a different address</button></p>
+                <p class="nl-done-body" data-nl-body>If the address can receive email, a link is on its way:<strong>${mini ? 'reader.name@example.com' : 'firstname.lastname@example.com'}</strong>Open it to finish.</p>
+                <p class="nl-done-help">Nothing yet? Check spam or Promotions. <button class="nl-link" type="button" data-nl-again>Use a different address</button></p>
               </div>
             </div>
           </div>
@@ -941,7 +986,7 @@ ${discover()}`;
   ${endpoint ? '<div class="hp" aria-hidden="true"><label>Leave this field empty <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>' : ''}
   <button class="btn btn-primary btn-lg" type="submit">Send message ${icon('arrowRight', 18)}</button>
   <p class="form-status" role="status" aria-live="polite" tabindex="-1"></p>
-  <noscript><p>This form needs JavaScript. Please email us at <a href="mailto:${e(c.general)}">${e(c.general)}</a>.</p></noscript>
+  <noscript><p>This form needs JavaScript. Email us at <a href="mailto:${e(c.general)}">${e(c.general)}</a>.</p></noscript>
 </form>`;
   }
 
@@ -1154,8 +1199,8 @@ ${withIds.html}
     const items = qa[slug] || [];
     if (!items.length) return '';
     const day = (ms) => fmtDate(new Date(ms));
-    const node = (c, team) => `<article class="comment${team ? ' is-team' : ''}" id="comment-${c.id}"><span class="avatar" aria-hidden="true">${team ? `<img class="avatar-logo" src="${u('/assets/img/icon-192.png')}" alt="" width="96" height="96">` : e((c.name[0] || '?').toUpperCase())}</span><div><div class="comment-head"><span class="comment-name">${e(c.name)}</span>${team ? `<span class="team-badge">Team</span>` : ''}<time class="comment-time" datetime="${new Date(c.at).toISOString()}">${day(c.at)}</time></div><p class="comment-body">${e(c.body)}</p></div></article>`;
-    return items.map((c) => `<article class="comment" id="comment-${c.id}"><span class="avatar" aria-hidden="true">${e((c.name[0] || '?').toUpperCase())}</span><div><div class="comment-head"><span class="comment-name">${e(c.name)}</span><time class="comment-time" datetime="${new Date(c.at).toISOString()}">${day(c.at)}</time></div><p class="comment-body">${e(c.body)}</p></div><div class="comment-replies">${c.replies.map((r) => node(r, true)).join('')}</div></article>`).join('');
+    const node = (c, team) => `<article class="comment${team ? ' is-team' : ''}" id="comment-${Number(c.id) || 0}"><span class="avatar" aria-hidden="true">${team ? `<img class="avatar-logo" src="${u('/assets/img/icon-192.png')}" alt="" width="96" height="96">` : e((c.name[0] || '?').toUpperCase())}</span><div><div class="comment-head"><span class="comment-name">${e(c.name)}</span>${team ? `<span class="team-badge">Team</span>` : ''}<time class="comment-time" datetime="${new Date(c.at).toISOString()}">${day(c.at)}</time></div><p class="comment-body">${e(c.body)}</p></div></article>`;
+    return items.map((c) => `<article class="comment" id="comment-${Number(c.id) || 0}"><span class="avatar" aria-hidden="true">${e((c.name[0] || '?').toUpperCase())}</span><div><div class="comment-head"><span class="comment-name">${e(c.name)}</span><time class="comment-time" datetime="${new Date(c.at).toISOString()}">${day(c.at)}</time></div><p class="comment-body">${e(c.body)}</p></div><div class="comment-replies">${c.replies.map((r) => node(r, true)).join('')}</div></article>`).join('');
   };
 
   const engageBlock = (p) =>

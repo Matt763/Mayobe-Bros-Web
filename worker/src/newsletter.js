@@ -12,9 +12,12 @@ import { sendMail, validEmail, CAPS } from './mail.js';
 import { confirmSubscriptionEmail, welcomeEmail, farewellEmail, newPostEmail, oneLine } from './mail-templates.js';
 import { SLUG_RE, TOKEN_RE, now, reply, fail, sha, ipHash, newToken, hit, readJson, siteOrigin, siteOf, canonicalEmail, utcDay, DAY_TTL, later } from './util.js';
 
-export const NL_UNSUB_NOT_FOUND = 'We could not find that request.';
+// One neutral wording for every link problem (wrong, expired, already used, removed) and one for every limit, so an answer never says
+// whether an address is on the list or which check failed.
+export const NL_UNSUB_NOT_FOUND = 'Link is invalid or expired.';
 const ONE_CLICK_MAX = 1024;
-export const NL_NOT_FOUND = 'That link has expired or was already used.';
+export const NL_NOT_FOUND = 'Link is invalid or expired.';
+const TRY_LATER = 'Too many attempts. Try again later.';
 const CONFIRM_DAYS = 7;
 const MIN_FORM_MS = 2500;
 
@@ -58,9 +61,8 @@ async function startSubscription(env, ctx, address) {
       env.DB.prepare("UPDATE newsletter_subscribers SET status = 'pending', email = ?, confirmed = NULL, unsubscribed = NULL, farewell_sent = 0 WHERE id = ? AND status = 'unsubscribed'").bind(address, row.id),
       env.DB.prepare('DELETE FROM newsletter_tokens WHERE subscriber_id = ?').bind(row.id),
     ]);
-  } else {
-    await env.DB.prepare("UPDATE newsletter_subscribers SET email = ? WHERE id = ? AND status = 'pending'").bind(address, row.id).run();
   }
+  // (a still-pending address is never overwritten by a later sign-up with the same inbox key: otherwise a stranger could redirect someone else's confirmation)
   const day = utcDay();
   if (!(await hit(env, ctx, `nlem:${(await sha(`${key}|${env.HASH_SALT || 'mayobe'}`)).slice(0, 32)}:${day}`, 1, DAY_TTL))) return; // 1 a day per address
   if (!(await hit(env, ctx, `nlconf:${day}`, 8, DAY_TTL))) return; // 8 a day in total, so a flood leaves the news slice for articles
@@ -162,7 +164,7 @@ export async function newsletterRoute(request, env, ctx, path, cors) {
   }
 
   if (path === '/v1/newsletter/unsubscribe') {
-    if (!(await unsubLimit(request, env, ctx))) return fail('Too many requests. Please try again later.', 429, cors);
+    if (!(await unsubLimit(request, env, ctx))) return fail(TRY_LATER, 429, cors);
     const b = await readJson(request).catch(() => null);
     const r = b && !Array.isArray(b) ? await unsubscribeByToken(env, typeof b.token === 'string' ? b.token : '') : (await sha(''), null);
     if (!r) return fail(NL_UNSUB_NOT_FOUND, 404, cors);
@@ -176,11 +178,11 @@ export async function newsletterRoute(request, env, ctx, path, cors) {
     // `elapsed` is measured by the browser (ms since the page loaded), so a visitor's clock that is set wrong does not matter.
     const elapsed = typeof b.elapsed === 'number' || (typeof b.elapsed === 'string' && b.elapsed.trim() !== '') ? Number(b.elapsed) : NaN;
     if (b.website || !Number.isFinite(elapsed) || elapsed < MIN_FORM_MS) return reply({ ok: true }, 200, cors);
-    if (!env.RESEND_API_KEY) return fail('The newsletter is not available right now.', 503, cors); // before anything is stored
+    if (!env.RESEND_API_KEY) return fail('Could not subscribe. Try again later.', 503, cors); // before anything is stored
     const address = cleanAddress(b.email);
-    if (!address) return reply({ error: 'That email address does not look right.', field: 'email' }, 400, cors);
+    if (!address) return reply({ error: String(b.email ?? '').trim() ? 'Email looks incorrect.' : 'Email is required.', field: 'email' }, 400, cors);
     const ih = await ipHash(request, env);
-    if (!(await hit(env, ctx, `nl:${ih}:${Math.floor(now() / 3600000)}`, 3, 3700))) return fail('You have tried several times already. Please try again later.', 429, cors);
+    if (!(await hit(env, ctx, `nl:${ih}:${Math.floor(now() / 3600000)}`, 3, 3700))) return fail(TRY_LATER, 429, cors);
     later(env, ctx, () => startSubscription(env, ctx, address));
     return reply({ ok: true }, 200, cors);
   }

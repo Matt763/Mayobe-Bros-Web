@@ -321,7 +321,7 @@ const commonLinks = (o) => [['Visit Mayobe Bros', `${o}/`], ['Privacy policy', `
 // header field, a second address or a query to the link.
 // encodeURIComponent leaves ! ' ( ) * ~ as they are, so those are encoded by hand (input is already well-formed).
 const pct = (s) => encodeURIComponent(s).replace(/[!'()*~]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
-const mailto = (addr, subject) => `mailto:${oneLine(addr).replace(/[^A-Za-z0-9@._+-]/g, pct)}?subject=${pct(clip(subject, 120))}`;
+const mailto = (addr, subject) => `mailto:${oneLine(addr).replace(/[^A-Za-z0-9@._+-]/gu, pct)}?subject=${pct(clip(subject, 120))}`;
 
 /* ------------------------------------------------------------------ comment emails */
 

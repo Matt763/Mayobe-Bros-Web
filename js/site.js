@@ -28,27 +28,33 @@
   }
 
   /* ---------------------------------------------------------------- theme
-     Three states: auto (follow the device, the default), light, dark.
-     "auto" stores nothing, so the site always starts exactly as the device is set. */
+     One press always flips what you see now: light becomes dark, dark becomes light. A choice is stored only when it differs from the
+     device setting, so a reader who never chooses (or flips back to what the device already says) has nothing stored and the site
+     follows the device. (The old three-step cycle device > light > dark made the first press change nothing visible whenever the
+     device was already light, so it took two presses.) */
   var mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  var deviceDark = function () { return !!(mq && mq.matches); };
   function mode() { var t = store('theme'); return t === 'light' || t === 'dark' ? t : 'auto'; }
+  function isDark() { var m = mode(); return m === 'dark' || (m === 'auto' && deviceDark()); }
   function applyTheme() {
     var m = mode();
-    var dark = m === 'dark' || (m === 'auto' && mq && mq.matches);
+    var dark = isDark();
     root.classList.toggle('dark', dark);
     root.classList.toggle('light', m === 'light');
-    var names = { auto: 'Theme: follows your device', light: 'Theme: light', dark: 'Theme: dark' };
-    var next = { auto: 'light', light: 'dark', dark: 'device setting' };
     $$('[data-theme-toggle]').forEach(function (b) {
-      b.setAttribute('aria-label', names[m] + '. Click to switch to ' + next[m] + '.');
-      b.setAttribute('title', names[m]);
+      b.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+      b.setAttribute('title', dark ? 'Light mode' : 'Dark mode');
     });
   }
   applyTheme();
+  var fadeTimer = 0;
   $$('[data-theme-toggle]').forEach(function (btn) {
     btn.addEventListener('click', function () {
-      var m = mode();
-      store('theme', m === 'auto' ? 'light' : m === 'light' ? 'dark' : null);
+      var target = isDark() ? 'light' : 'dark';
+      // a short colour fade (css .theme-fade), skipped for readers who ask for less motion
+      var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (!calm) { root.classList.add('theme-fade'); clearTimeout(fadeTimer); fadeTimer = setTimeout(function () { root.classList.remove('theme-fade'); }, 450); }
+      store('theme', (target === 'dark') === deviceDark() ? null : target);
       applyTheme();
     });
   });
@@ -434,11 +440,11 @@
     }
     var copy = $('[data-copy-link]', box);
     if (copy) copy.addEventListener('click', function () {
-      var done = function () { say('Link copied'); };
-      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, function () { say('Copy failed'); });
+      var done = function () { say('Link copied.'); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, function () { say('Could not copy.'); });
       else {
         var t = el('textarea'); t.value = url; t.style.position = 'fixed'; t.style.opacity = '0'; doc.body.appendChild(t); t.select();
-        try { doc.execCommand('copy'); done(); } catch (e) { say('Copy failed'); }
+        try { doc.execCommand('copy'); done(); } catch (e) { say('Could not copy.'); }
         t.remove();
       }
     });
@@ -890,7 +896,7 @@
     btn.addEventListener('click', function () {
       var status = $('.rss-status');
       function done(ok) {
-        if (status) status.textContent = ok ? 'Copied. Now paste it into your feed reader.' : 'Could not copy by itself. Select the address and copy it.';
+        if (status) status.textContent = ok ? 'Copied. Paste it into your feed reader.' : 'Could not copy. Select the address and copy it.';
         if (!ok) { src.focus(); src.select(); }
       }
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(src.value).then(function () { done(true); }, function () { done(false); });
@@ -904,7 +910,7 @@
     statusEl.textContent = 'Sending…';
     return fetch(form.action, { method: 'POST', body: new FormData(form), headers: { Accept: 'application/json' } })
       .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); form.reset(); statusEl.classList.add('is-ok'); statusEl.textContent = okMessage; })
-      .catch(function () { statusEl.classList.add('is-err'); statusEl.textContent = 'Sorry, that did not go through. Please try again, or email us directly.'; });
+      .catch(function () { statusEl.classList.add('is-err'); statusEl.textContent = 'Could not send. Try again, or email us.'; });
   }
   var cf = $('#contact-form');
   // with the mail service on, js/contact.js sends the message (data-mail-api); this handler is the mailto form and the old plain form post
@@ -920,8 +926,8 @@
         if (!ok && !bad) bad = f[k];
       });
       cfStatus.className = 'form-status';
-      if (bad) { cfStatus.classList.add('is-err'); cfStatus.textContent = 'Please complete every field with a valid email address.'; bad.focus(); return; }
-      if (cf.getAttribute('data-endpoint')) { postForm(cf, cfStatus, 'Thank you! Your message has been sent.'); return; }
+      if (bad) { cfStatus.classList.add('is-err'); cfStatus.textContent = 'Fill in every field correctly.'; bad.focus(); return; }
+      if (cf.getAttribute('data-endpoint')) { postForm(cf, cfStatus, 'Message sent.'); return; }
       var to = cf.getAttribute('data-mailto');
       var body = 'Name: ' + f.name.value.trim() + '\nEmail: ' + f.email.value.trim() + '\n\n' + f.message.value.trim();
       cfStatus.classList.add('is-ok');

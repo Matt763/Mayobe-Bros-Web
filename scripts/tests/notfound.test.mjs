@@ -273,7 +273,7 @@ test('the script never fetches, stores or writes HTML', () => {
 // ---- wiring: render and the built file ----
 test('404: notfound.js loads before site.js and before the analytics beacon', () => {
   const h = render404({ analytics: { cloudflareToken: 'a'.repeat(32) } });
-  const a = h.indexOf('js/notfound.js'), b = h.indexOf('js/site.js'), c = h.indexOf('cloudflareinsights');
+  const a = h.indexOf('js/notfound.js'), b = h.indexOf('js/site.js'), c = h.indexOf('src="https://static.cloudflareinsights.com');
   assert.ok(a > -1 && b > -1 && c > -1, 'all three scripts present');
   assert.ok(a < b && b < c, `order ${a} ${b} ${c}`);
 });

@@ -339,28 +339,31 @@ test("edit: wrong token, other comment's token, unknown id and junk all give the
   assert.equal((await call('POST', `/v1/comments/${a.id}/edit`, { body: { body: 'Changed text that is fine' } })).status, 404);
 });
 
+const NO_EDIT = 'Comment can no longer be edited.';
 test('edit: refused after 30 minutes, with a reply, with a pending reply, and on a held comment', async () => {
   const old = await mk();
   env.DB.raw.exec('UPDATE comments SET created = created - 1860000 WHERE id = ' + old.id);
   const late = await edit(old.id, old.token, 'Too late to change this');
   assert.equal(late.status, 409);
-  assert.equal(late.json.error, 'The 30 minutes for editing have passed.');
+  assert.equal(late.json.error, NO_EDIT);
 
   const p = await mk({ body: 'A parent comment here', cid: CID2 }, '2.2.2.2');
   await mk({ body: 'A reply to it here', parent: p.id, cid: 'qqqqqqqqqqqqqqqqqq56' }, '3.3.3.3');
   const withReply = await edit(p.id, p.token, 'Changing after a reply');
   assert.equal(withReply.status, 409);
-  assert.equal(withReply.json.error, 'This comment has a reply, so it can no longer be edited.');
+  assert.equal(withReply.json.error, NO_EDIT);
 
   const p2 = await mk({ body: 'Another parent comment', cid: 'wwwwwwwwwwwwwwwwww78' }, '4.4.4.4');
   const rep = await mk({ body: 'A reply that is held', parent: p2.id, cid: 'eeeeeeeeeeeeeeeeee90' }, '5.5.5.5');
   env.DB.raw.exec("UPDATE comments SET status = 'pending' WHERE id = " + rep.id);
-  assert.equal((await edit(p2.id, p2.token, 'Changing after pending reply')).status, 409);
+  const pendingReply = await edit(p2.id, p2.token, 'Changing after pending reply');
+  assert.equal(pendingReply.status, 409);
+  assert.equal(pendingReply.json.error, NO_EDIT);
 
   const held = await mk({ body: RUDE, cid: 'rrrrrrrrrrrrrrrrrr12' }, '6.6.6.6');
   const h = await edit(held.id, held.token, 'Now I am polite and calm');
   assert.equal(h.status, 409);
-  assert.equal(h.json.error, 'This comment is waiting for review, so it cannot be edited.');
+  assert.equal(h.json.error, NO_EDIT, 'the same words for a held comment, a reply and a late edit: nothing says why');
 });
 
 test('edit: the screen runs again and a flagged edit is held', async () => {
@@ -488,7 +491,7 @@ test('edit: a comment that became spam between the checks cannot be revived or c
   afterReplyCheck(() => env.DB.raw.exec(`UPDATE comments SET status = 'spam' WHERE id = ${a.id}; UPDATE post_stats SET comments = 0 WHERE slug = 'hello-post'`));
   const r = await edit(a.id, a.token, RUDE);
   assert.equal(r.status, 404);
-  assert.equal(r.json.error, 'That comment could not be found.');
+  assert.equal(r.json.error, 'Comment not found.');
   assert.equal(rawRow(a.id).status, 'spam');
   assert.equal(rawRow(a.id).body, 'Thanks, this helped me a lot.');
   assert.equal(statCount(), 0, 'the count is not lowered for a row that did not change');
@@ -499,7 +502,7 @@ test('edit: a reply that arrives before the write blocks the edit', async () => 
   afterReplyCheck(() => env.DB.raw.exec(`INSERT INTO comments(slug, parent_id, name, body, status, created, cid) VALUES('hello-post', ${a.id}, 'Sam', 'A quick reply', 'approved', ${Date.now()}, 'zzzzzzzzzzzzzzzzzz99'); UPDATE post_stats SET comments = comments + 1`));
   const r = await edit(a.id, a.token, RUDE);
   assert.equal(r.status, 409);
-  assert.equal(r.json.error, 'This comment has a reply, so it can no longer be edited.');
+  assert.equal(r.json.error, NO_EDIT);
   assert.equal(rawRow(a.id).body, 'Thanks, this helped me a lot.');
   assert.equal(statCount(), 2);
 });
@@ -512,7 +515,7 @@ test('edit: EDIT_WINDOW_MINUTES sets the window and the message', async () => {
   env.DB.raw.exec(`UPDATE comments SET created = created - ${2 * 60000} WHERE id = ${a.id}`);
   const late = await edit(a.id, a.token, 'Edited at six minutes');
   assert.equal(late.status, 409);
-  assert.equal(late.json.error, 'The 5 minutes for editing have passed.');
+  assert.equal(late.json.error, NO_EDIT, 'the message never names the window');
   env.EDIT_WINDOW_MINUTES = 'junk';
   const b = await mk({ body: 'Another comment here', cid: CID2 }, '2.2.2.2');
   env.DB.raw.exec(`UPDATE comments SET created = created - ${29 * 60000} WHERE id = ${b.id}`);
@@ -544,7 +547,7 @@ test('edit: a team reply and a spam-marked comment give the same generic 404', a
 
 /* ---------------------------------------------------------------- delete endpoint */
 const del = (id, token, opts = {}) => call('POST', `/v1/comments/${id}/delete`, { body: { token }, ...opts });
-const GENERIC = 'That comment could not be found.';
+const GENERIC = 'Comment not found.';
 const reply2 = (parent, over = {}, ip = '2.2.2.2') => mk({ body: 'A reply from someone', cid: CID2, parent, ...over }, ip);
 const admin = (id, action) => call('POST', `/v1/admin/comments/${id}`, { auth: env.ADMIN_TOKEN, origin: null, body: { action } });
 
@@ -1155,7 +1158,7 @@ test('exchange: expired, unknown, deleted, malformed and wrong-kind links all gi
   const link = linkOf(sent[0]);
   const generic = await exchange('x'.repeat(32));
   assert.equal(generic.status, 404);
-  assert.equal(generic.json.error, 'That comment could not be found.');
+  assert.equal(generic.json.error, 'Link is invalid or expired.');
   assert.deepEqual((await exchange('short')).json, generic.json);
   assert.deepEqual((await call('POST', '/v1/manage/exchange', { body: {} })).json, generic.json);
   assert.deepEqual((await call('POST', '/v1/manage/exchange', { body: { link: { a: 1 } } })).json, generic.json);
@@ -1251,7 +1254,7 @@ test('reply notice: none for the same visitor, an unconfirmed parent, an unsubsc
   // an unknown unsubscribe token is the generic 404
   const bad = await call('POST', '/v1/notify/unsubscribe', { body: { token: 'z'.repeat(32) } });
   assert.equal(bad.status, 404);
-  assert.equal(bad.json.error, 'That comment could not be found.');
+  assert.equal(bad.json.error, 'Link is invalid or expired.');
   assert.equal((await call('POST', '/v1/notify/unsubscribe', { body: {} })).status, 404);
 });
 
@@ -1329,13 +1332,13 @@ test('owner alerts: held comment with reasons, question, and nothing for an ordi
   assert.equal(sent.length, 0);
 });
 
-test('owner alerts: at most 8 a day; the 9th comment is still saved and listed; contact notices still get their 7', async () => {
+test('owner alerts: question alerts stop at 4 a day; the 9th comment is still saved and listed; held alerts and contact notices keep their own room', async () => {
   for (let i = 0; i < 9; i++) {
     const r = await post(comment({ body: `Is question number ${i} answered?`, cid: `visitorid-alert-${i}-123456` }), `7.7.7.${i}`);
     assert.equal(r.status, 201);
   }
   await flushMail();
-  assert.equal(sent.filter((s) => /question/i.test(s.body.subject)).length, 8, 'only 8 alerts');
+  assert.equal(sent.filter((s) => /question/i.test(s.body.subject)).length, 4, 'only 4 question alerts');
   const list = await call('GET', '/v1/admin/comments', { auth: env.ADMIN_TOKEN, origin: null });
   assert.equal(list.status, 200);
   assert.equal(env.DB.raw.prepare("SELECT COUNT(*) AS n FROM comments WHERE body LIKE 'Is question number%'").get().n, 9, 'all 9 saved');
@@ -1519,7 +1522,7 @@ test('exchange and unsubscribe give the generic 404 for bad JSON, non-objects an
     for (const raw of ['{nope', '[1,2]', '"str"', 'null', JSON.stringify({ link: 'y'.repeat(5000), token: 'y'.repeat(5000) })]) {
       const res = await worker.fetch(new Request(`https://api.test${path}`, { method: 'POST', headers: { Origin: ORIGIN, 'CF-Connecting-IP': '1.2.3.4' }, body: raw }), env, { waitUntil() {} });
       assert.equal(res.status, 404, `${path} ${raw.slice(0, 10)}`);
-      assert.deepEqual(await res.json(), { error: 'That comment could not be found.' });
+      assert.deepEqual(await res.json(), { error: 'Link is invalid or expired.' });
     }
   }
 });
@@ -1624,7 +1627,7 @@ test('contact: 3 an hour per IP and 2 an hour per address (any spelling), keyed 
   for (let i = 0; i < 3; i++) assert.equal((await contact({ email: `p${i}@example.com` }, '9.9.9.9')).status, 200);
   const fourth = await contact({ email: 'p9@example.com' }, '9.9.9.9');
   assert.equal(fourth.status, 429);
-  assert.match(fourth.json.error, /try again later/i);
+  assert.equal(fourth.json.error, 'Too many attempts. Try again later.');
   const spellings = ['Pat@Gmail.com', 'p.a.t+x@gmail.com', 'pat@googlemail.com'];
   assert.equal((await contact({ email: spellings[0] })).status, 200);
   assert.equal((await contact({ email: spellings[1] })).status, 200);
@@ -1640,7 +1643,7 @@ test('contact: at most 7 notices a day, so 3 owner units stay for comment alerts
   const before = sent.length;
   const r = await contact({ email: 'late@example.com' });
   assert.equal(r.status, 503);
-  assert.equal(r.json.error, 'We could not send your message. Please email us at info@mayobebros.com.');
+  assert.equal(r.json.error, 'Could not send. Email us at info@mayobebros.com.');
   await flushMail();
   assert.equal(sent.length, before, 'no mail was attempted for the 8th message');
   // a held comment still alerts the owner (owner slice), and a manage link still goes out (commenter slice)
@@ -1999,6 +2002,15 @@ test('webhook: our own addresses are never suppressed, even mixed with a visitor
   assert.equal(m.ok, true);
 });
 
+test('webhook: the review addresses are never suppressed either (a spam report on an alert must not silence the alerts)', async () => {
+  env.RESEND_WEBHOOK_SECRET = WH_SECRET;
+  env.REVIEW_EMAILS = 'Reviewer@Example.org, second@example.org';
+  const orig = console.log;
+  console.log = () => {};
+  try { assert.equal((await hook({ type: 'email.complained', data: { to: ['reviewer@example.org', 'second@example.org', 'visitor@example.com'] } })).status, 200); } finally { console.log = orig; }
+  assert.deepEqual(suppressedRows(), [{ email: 'visitor@example.com', reason: 'complaint' }]);
+});
+
 test('mail: an owner-kind send skipped as suppressed logs one short line without the address', async () => {
   env.DB.raw.prepare("INSERT INTO suppressed(email, reason, created) VALUES('own@example.org','bounce',1)").run();
   const errs = [];
@@ -2011,4 +2023,90 @@ test('mail: an owner-kind send skipped as suppressed logs one short line without
   } finally { console.error = orig; }
   assert.equal(errs.length, 1);
   assert.equal(/own@example/.test(errs[0]), false);
+});
+
+/* ---------------------------------------------------------------- the words a visitor can read */
+// Every error the page can show is short, plain and neutral: no limit, no cause, no internal word, no exclamation mark.
+const BANNED = /server|api\b|json|token|visitor id|origin|status|http|several|hour|minutes|already|waiting for review|held|spam|screen|rule|exist|sorry|oops|!/i;
+const plain = (msg, where) => {
+  assert.equal(typeof msg, 'string', where);
+  assert.match(msg, /^[A-Z][^.!?]*(\. [A-Z][^.!?]*)*\.$/, `${where}: ${msg}`);
+  assert.doesNotMatch(msg, BANNED, `${where}: ${msg}`);
+  assert.ok(msg.split(' ').length <= 8, `${where}: ${msg}`);
+};
+
+test('comment field errors name the field and the problem in a few words, with no numbers', async () => {
+  const cases = [
+    [{ name: '' }, 'Name is required.'],
+    [{ name: 'A' }, 'Name is too short.'],
+    [{ name: 'x'.repeat(51) }, 'Name is too long.'],
+    [{ name: 'see www.example.com' }, 'Name cannot contain links.'],
+    [{ body: '' }, 'Comment is required.'],
+    [{ body: 'ab' }, 'Comment is too short.'],
+    [{ body: 'x'.repeat(1501) }, 'Comment is too long.'],
+    [{ body: 'visit www.example.com now' }, 'Comment cannot contain links.'],
+    [{ email: 'nope' }, 'Email looks incorrect.'],
+  ];
+  for (const [over, expected] of cases) {
+    const r = await call('POST', '/v1/posts/hello-post/comments', { body: comment(over), ip: '8.8.8.8' });
+    assert.equal(r.status, 400, JSON.stringify(over).slice(0, 40));
+    assert.equal(r.json.error, expected);
+    assert.doesNotMatch(r.json.error, /\d/);
+  }
+});
+
+test('every refusal a visitor can reach uses one of a few neutral sentences', async () => {
+  const seen = new Map();
+  const note = (r, where) => { assert.ok(r.json && r.json.error, where); plain(r.json.error, where); seen.set(where, r.json.error); };
+  note(await call('POST', '/v1/posts/hello-post/react', { body: { cid: CID, type: 'love' } }), 'bad reaction');
+  note(await call('POST', '/v1/posts/hello-post/react', { body: { cid: 'short', type: 'like' } }), 'bad visitor id');
+  note(await call('POST', '/v1/posts/not-a-real-post/react', { body: { cid: CID, type: 'like' } }), 'unknown post');
+  note(await call('POST', '/v1/posts/hello-post/comments', { body: comment({ cid: 'x' }) }), 'comment without a good visitor id');
+  note(await call('POST', '/v1/posts/hello-post/comments', { body: comment({ parent: 9999 }) }), 'reply to nothing');
+  note(await call('POST', '/v1/comments/1/like', { body: { cid: CID, on: true } }), 'like on nothing');
+  note(await call('POST', '/v1/comments/1/like', { body: { cid: CID } }), 'like without on');
+  note(await call('POST', '/v1/comments/1/edit', { body: { token: 'x'.repeat(32), body: 'Some new text' } }), 'edit with a wrong token');
+  note(await call('POST', '/v1/comments/1/delete', { body: { token: 'x'.repeat(32) } }), 'delete with a wrong token');
+  note(await call('POST', '/v1/manage/exchange', { body: { link: 'x'.repeat(32) } }), 'a link that works for nothing');
+  note(await call('POST', '/v1/review', { body: { r: '1.a.abc.' + 'x'.repeat(43) } }), 'a review link that works for nothing');
+  note(await call('POST', '/v1/posts/hello-post/comments', { body: comment(), origin: 'https://evil.example' }), 'a foreign origin');
+  // not JSON, and too large: the reader gets a short sentence, never the wording meant for a log
+  for (const [raw, where] of [['{nope', 'not JSON'], ['x'.repeat(5000), 'too large']]) {
+    const res = await worker.fetch(new Request('https://api.test/v1/posts/hello-post/comments', { method: 'POST', headers: { Origin: ORIGIN, 'CF-Connecting-IP': '2.2.2.2' }, body: raw }), env, { waitUntil() {} });
+    note({ json: await res.json() }, where);
+  }
+  assert.equal(seen.get('not JSON'), 'Could not send. Try again.');
+  assert.equal(seen.get('too large'), 'Message is too long.');
+  // the same words whatever the cause: an unknown link, a missing comment and a wrong token cannot be told apart
+  assert.equal(seen.get('a link that works for nothing'), seen.get('a review link that works for nothing'));
+  assert.equal(seen.get('edit with a wrong token'), seen.get('delete with a wrong token'));
+  assert.equal(seen.get('edit with a wrong token'), seen.get('like on nothing'));
+});
+
+test('every limit says the same thing and names no number, window or rule', async () => {
+  const limit = 'Too many attempts. Try again later.';
+  let r;
+  for (let i = 0; i < 61; i++) r = await call('POST', '/v1/posts/hello-post/react', { body: { cid: CID, type: i % 2 ? 'like' : 'sad' }, ip: '3.3.3.3' });
+  assert.equal(r.status, 429);
+  assert.equal(r.json.error, limit);
+  for (let i = 0; i < 6; i++) r = await call('POST', '/v1/posts/hello-post/comments', { body: comment({ body: `Comment number ${i} here` }), ip: '4.4.4.4' });
+  assert.equal(r.status, 429);
+  assert.equal(r.json.error, limit);
+  // five held comments from one visitor, then a sixth: the same sentence, not "you have comments waiting for review"
+  for (let i = 0; i < 5; i++) await call('POST', '/v1/posts/hello-post/comments', { body: comment({ body: RUDE + ' ' + i, cid: CID2 }), ip: `5.5.5.${i}` });
+  r = await call('POST', '/v1/posts/hello-post/comments', { body: comment({ body: RUDE + ' again', cid: CID2 }), ip: '5.5.5.9' });
+  assert.equal(r.status, 429);
+  assert.equal(r.json.error, limit);
+  for (let i = 0; i < 31; i++) r = await call('POST', '/v1/notify/unsubscribe', { body: { token: 'z'.repeat(32) }, ip: '6.6.6.6' });
+  assert.equal(r.status, 429);
+  assert.equal(r.json.error, limit);
+});
+
+test('a repeated comment gets no error text from the server: the page shows its own plain "Comment received."', async () => {
+  const first = await call('POST', '/v1/posts/hello-post/comments', { body: comment(), ip: '7.7.7.7' });
+  const again = await call('POST', '/v1/posts/hello-post/comments', { body: comment(), ip: '7.7.7.7' });
+  assert.equal(first.json.status, 'approved');
+  assert.equal(again.json.status, 'duplicate', 'the page maps this status to a neutral sentence');
+  assert.equal(again.json.id, undefined);
+  assert.equal(again.json.error, undefined);
 });

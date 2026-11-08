@@ -21,7 +21,12 @@ export function slugify(text) {
     .replace(/^-+|-+$/g, '');
 }
 
-const cleanUrl = (u) => (u.startsWith('<') && u.endsWith('>') ? u.slice(1, -1) : u);
+// A link or picture address from a post. javascript:, vbscript: and data: addresses (also when hidden with spaces, tabs, line breaks or control
+// characters, which browsers ignore inside the scheme) become "#", so pasted or drafted text can never run script from a click.
+const cleanUrl = (u) => {
+  const url = u.startsWith('<') && u.endsWith('>') ? u.slice(1, -1) : u;
+  return /^(?:javascript|vbscript|data):/i.test(url.replace(/[\u0000-\u0020\u007f-\u009f\u200b-\u200f\u2028\u2029\ufeff]/g, '')) ? '#' : url;
+};
 const isExternal = (u) => /^https?:\/\//i.test(u);
 
 /* ---------------------------------------------------------------- inline */
@@ -295,7 +300,16 @@ export function blocks(lines) {
 
 export function markdown(src) {
   videoCount = 0;
-  return blocks(String(src).replace(/\r\n?/g, '\n').replace(/\t/g, '    ').split('\n'));
+  return neutralise(blocks(String(src).replace(/\r\n?/g, '\n').replace(/\t/g, '    ').split('\n')));
+}
+
+// Raw HTML is allowed in a post (<b>, <br>, <kbd>), but never anything that runs or loads code: script, iframe, object, embed, base, meta, link,
+// form, svg and math tags become visible text, and on...= event attributes are dropped. (The Content-Security-Policy in every page is the
+// second lock: even a missed case cannot run inline script.)
+function neutralise(html) {
+  return html
+    .replace(/<\s*(script|iframe|object|embed|base|meta|link|form|svg|math|style)\b/gi, '&lt;$1')
+    .replace(/(<[a-z][^>]*?)[\s/]+on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '$1');
 }
 
 /* ------------------------------------------------- headings / contents */

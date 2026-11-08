@@ -104,3 +104,24 @@ test('video figures get id video-1 and video-2 in body order', () => {
   assert.match(markdown('::video[Only](assets/video/c.mp4)'), /id="video-1"/);
   assert.doesNotMatch(markdown('::video[Only](assets/video/c.mp4)'), /id="video-2"/);
 });
+
+test('javascript:, vbscript: and data: addresses in links and pictures become "#", even when disguised', () => {
+  for (const bad of ['javascript:alert(1)', 'JaVaScRiPt:alert(1)', ' javascript:alert(1)', 'vbscript:msgbox(1)', 'data:text/html,<script>alert(1)</script>']) {
+    assert.match(markdown(`[x](${bad})`), /<a href="#"/, bad);
+    assert.match(markdown(`![x](${bad})`), /<img src="#"/, bad);
+  }
+  // a tab inside the scheme turns into spaces, which stops it being a link at all
+  assert.doesNotMatch(markdown('[x](java\tscript:alert(1))'), /(href|src)="[^"]*script:/i);
+  assert.match(markdown('[ok](https://example.com/a?b=c)'), /<a href="https:\/\/example\.com\/a\?b=c"/);
+  assert.match(markdown('[ok](/post/a/)'), /<a href="\/post\/a\/"/);
+  assert.match(markdown('[mail](mailto:info@example.com)'), /href="mailto:info@example\.com"/);
+});
+
+test('raw script, iframe and event attributes in a post are neutralised; harmless raw tags stay', () => {
+  assert.doesNotMatch(markdown('hello <script>alert(1)</script>'), /<script/i);
+  assert.doesNotMatch(markdown('<iframe src="https://evil.example"></iframe>'), /<iframe/i);
+  assert.doesNotMatch(markdown('<img src=x onerror=alert(1)>'), /onerror/i);
+  assert.doesNotMatch(markdown('<b onclick="x()">bold</b>'), /onclick/i);
+  assert.doesNotMatch(markdown('<svg onload=alert(1)>'), /<svg/i);
+  assert.match(markdown('Press <kbd>Ctrl</kbd> and <b>bold</b><br>text'), /<kbd>Ctrl<\/kbd>.*<b>bold<\/b><br>/);
+});

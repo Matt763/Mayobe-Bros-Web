@@ -165,7 +165,7 @@ test('no RESEND_API_KEY: 503 and no row', async () => {
   delete env.RESEND_API_KEY;
   const r = await sub('a@example.com');
   assert.equal(r.status, 503);
-  assert.equal(r.json.error, 'The newsletter is not available right now.');
+  assert.equal(r.json.error, 'Could not subscribe. Try again later.');
   assert.equal(rows('SELECT 1 FROM newsletter_subscribers').length, 0);
 });
 
@@ -220,7 +220,7 @@ test('confirm: a second press, an expired token (created set 8 days back), a mal
     await call('/v1/newsletter/confirm', { body: { token: 'short' } }),
     await call('/v1/newsletter/confirm', { body: { token: 'A'.repeat(32) } }),
     await call('/v1/newsletter/confirm', { body: {} })];
-  for (const r of results) assert.deepEqual(r, { status: 404, json: { error: 'That link has expired or was already used.' } });
+  for (const r of results) assert.deepEqual(r, { status: 404, json: { error: 'Link is invalid or expired.' } });
   assert.equal(rows("SELECT status FROM newsletter_subscribers WHERE email = 'late@example.com'")[0].status, 'pending');
 });
 
@@ -286,7 +286,7 @@ test('the button unsubscribes once and sends one farewell; a second press is 200
 test('unknown and malformed tokens give the same 404', async () => {
   await active();
   const bad = [await call('/v1/newsletter/unsubscribe', { body: { token: 'A'.repeat(32) } }), await call('/v1/newsletter/unsubscribe', { body: { token: 'short' } }), await call('/v1/newsletter/unsubscribe', { body: {} }), await call('/v1/newsletter/unsubscribe', { body: { token: 5 } })];
-  for (const r of bad) assert.deepEqual(r, { status: 404, json: { error: 'We could not find that request.' } });
+  for (const r of bad) assert.deepEqual(r, { status: 404, json: { error: 'Link is invalid or expired.' } });
   assert.equal(statusOf().status, 'active');
 });
 

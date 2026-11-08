@@ -13,7 +13,8 @@
   var clock = function () { return typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now(); };
   var loaded = clock();
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  var BAD = 'That email address does not look right. Check it and try again, for example you@example.com.';
+  var BAD = 'Email looks incorrect.';
+  var EMPTY = 'Email is required.';
   var base = doc.documentElement.getAttribute('data-base') || '';
   // A one-letter slip in a big provider's name is the most common reason a confirmation never arrives, so it is offered back once.
   var COMMON = ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'icloud.com'];
@@ -93,21 +94,21 @@
       void field.offsetWidth; // restart the animation when it is hit twice in a row
       field.classList.add('is-nudge');
     }
-    function badAddress() {
+    function badAddress(empty) {
       input.setAttribute('aria-invalid', 'true');
-      say('err', BAD);
+      say('err', empty ? EMPTY : BAD);
       nudge();
       input.focus();
     }
     function showDone(email) {
       if (body) {
-        // the sidebar version (nl-mini) has less room, so its sentences are shorter; both keep the "if this address can get our emails" hedge
-        var mini = /\bnl-mini\b/.test(String(form.className || ''));
-        body.textContent = mini ? 'If this address can get our emails, a link is on its way:' : 'If this address can receive our emails, a link to confirm is on its way:';
+        // the same short sentences in the footer and in the sidebar; they keep the "if the address can receive email" hedge,
+        // because a mail can be delayed, skipped or blocked and the page must not promise it
+        body.textContent = 'If the address can receive email, a link is on its way:';
         var strong = doc.createElement('strong');
         strong.textContent = email; // text only, never HTML; it sits on its own line so it is never cut in the middle
         body.appendChild(strong);
-        body.appendChild(doc.createTextNode(mini ? 'Open it to finish.' : 'Open it and press the button to finish.'));
+        body.appendChild(doc.createTextNode('Open it to finish.'));
       }
       if (panelDone) { panelDone.removeAttribute('inert'); panelDone.removeAttribute('aria-hidden'); }
       if (panelForm) { panelForm.setAttribute('inert', ''); panelForm.setAttribute('aria-hidden', 'true'); }
@@ -126,7 +127,7 @@
     function submit() {
       if (sending) return;
       var email = String(input.value || '').trim();
-      if (!email || email.length > 254 || !EMAIL_RE.test(email)) { warned = ''; badAddress(); return; }
+      if (!email || email.length > 254 || !EMAIL_RE.test(email)) { warned = ''; badAddress(!email); return; }
       var hint = suggestion(email);
       if (hint && warned !== email) { // ask once; pressing Subscribe again with the same address sends it as typed
         warned = email;
@@ -160,16 +161,16 @@
             showDone(email);
           } else if (r.status === 429) {
             setState('idle');
-            say('err', 'Too many tries. Please wait an hour and try again.');
+            say('err', 'Too many attempts. Try again later.');
           } else if (r.status === 400 && r.body.field === 'email') {
             setState('idle');
             badAddress();
           } else {
             setState('idle');
-            say('err', 'Sorry, that did not go through. Please try again later, or follow us with ', 'rss');
+            say('err', 'Could not subscribe. Try again later, or use ', 'rss');
           }
         })
-        .catch(function () { setState('idle'); say('err', 'Sorry, that did not go through. Please try again later, or follow us with ', 'rss'); })
+        .catch(function () { setState('idle'); say('err', 'Could not subscribe. Try again later, or use ', 'rss'); })
         .then(function () { sending = false; button.disabled = false; button.removeAttribute('aria-busy'); setLabel('Subscribe'); });
     }
 

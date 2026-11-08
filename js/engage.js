@@ -40,13 +40,15 @@
     var v = store('mb_cid');
     return v && /^[A-Za-z0-9-]{16,64}$/.test(v) ? v : '';
   }
+  // An error's message is shown to the reader as it is, so it is always one of ours: the Worker's own plain sentence, or one of these two.
+  // (A browser's own message for a failed request, such as "Failed to fetch", is never shown.)
   function call(path, opts) {
     return fetch(API + path, opts).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (j) {
-        if (!r.ok) { var e = new Error(j.error || 'Something went wrong. Please try again.'); e.status = r.status; throw e; }
+        if (!r.ok) { var e = new Error(typeof j.error === 'string' && j.error ? j.error : 'Something went wrong. Try again.'); e.status = r.status; throw e; }
         return j;
       });
-    });
+    }, function () { throw new Error('Could not connect. Try again.'); });
   }
   function post(path, body) {
     return call(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -142,12 +144,7 @@
     }
     setTimeout(function () { $$('.rx-dot', medal).forEach(function (d) { d.remove(); }); }, 1500);
   }
-  var THANKS = {
-    like: 'Glad you liked it.',
-    amazed: 'Glad it surprised you.',
-    sad: 'Sorry this one made you feel sad.',
-    angry: 'We hear you. Tell us what bothered you in the comments.'
-  };
+  var THANKS = 'Thanks for reacting.'; // the same calm sentence for every mood
 
   // Send the reader's latest choice. Taps are never ignored while a request is on its way: the screen changes at once, and
   // only the newest choice is sent when the previous round trip ends (so ten quick taps cost two requests, not ten).
@@ -158,7 +155,7 @@
     post('/posts/' + slug + '/react', { cid: cid(), type: target }).then(function (j) {
       confirmed = target;
       try { sessionStorage.removeItem('mb_stats'); } catch (e) {}
-      if (mine === target) { showStats(j.stats); say(target ? THANKS[target] : 'Reaction removed.'); } // a newer tap is waiting: do not repaint older numbers
+      if (mine === target) { showStats(j.stats); say(target ? THANKS : 'Reaction removed.'); } // a newer tap is waiting: do not repaint older numbers
     }).catch(function (err) {
       mine = confirmed; showMine(); refresh(); say(err.message, true); // go back to what the server has
     }).then(function () { syncing = false; sync(); });
@@ -181,7 +178,7 @@
       b.classList.remove('is-pop'); void b.offsetWidth; if (next) { b.classList.add('is-pop'); burst(b, next); }
       counter.classList.remove('is-bump'); void counter.offsetWidth; counter.classList.add('is-bump');
       if (next && navigator.vibrate) { try { navigator.vibrate(12); } catch (e) { /* not allowed here */ } } // a light tap on phones that support it
-      say(next ? THANKS[next] : 'Reaction removed.');
+      say(next ? THANKS : 'Reaction removed.');
       sync();
     });
   });
@@ -252,7 +249,7 @@
     }).catch(function (err) {
       likedIds[c.id] = was; c.likes = wasN;
       paintLike(btn, c);
-      liveSay(err.message || 'Your like could not be saved. Please try again.');
+      liveSay(err.message || 'Could not save like. Try again.');
     }).then(function () { delete likePending[c.id]; });
   }
   function focusAfter(id, sel) {
@@ -282,16 +279,16 @@
     box.addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.preventDefault(); back(); } });
     save.addEventListener('click', function () {
       var text = ta.value.trim();
-      if (text.length < 3) { st.className = 'form-status is-err'; st.textContent = 'Please write your comment.'; ta.focus(); return; }
-      if (/(https?:\/\/|www\.)/i.test(text)) { st.className = 'form-status is-err'; st.textContent = 'Links are not allowed in comments.'; ta.focus(); return; }
+      if (text.length < 3) { st.className = 'form-status is-err'; st.textContent = text ? 'Comment is too short.' : 'Comment is required.'; ta.focus(); return; }
+      if (/(https?:\/\/|www\.)/i.test(text)) { st.className = 'form-status is-err'; st.textContent = 'Comment cannot contain links.'; ta.focus(); return; }
       var token = ownGet(c.id);
-      if (!token) { st.className = 'form-status is-err'; st.textContent = 'This browser can no longer edit this comment.'; return; }
+      if (!token) { st.className = 'form-status is-err'; st.textContent = 'Comment can no longer be edited.'; return; }
       save.disabled = true; cancel.disabled = true;
       st.className = 'form-status'; st.textContent = 'Saving…';
       post('/comments/' + c.id + '/edit', { token: token, body: text }).then(function (j) {
         if (j && j.status === 'pending') {
           // hidden until approved: say so in place of the comment, because the comment is no longer in the public list
-          var msg = 'Your edit needs a quick check by our team. The comment is hidden until it is approved.';
+          var msg = 'Edit received. The comment is hidden until it is reviewed.';
           close();
           body.hidden = true; tools.hidden = true;
           try { sessionStorage.removeItem('mb_stats'); } catch (e) {}
@@ -332,7 +329,7 @@
     box.addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.preventDefault(); back(); } });
     yes.addEventListener('click', function () {
       var token = ownGet(c.id);
-      if (!token) { st.className = 'form-status is-err'; st.textContent = 'This browser can no longer delete this comment.'; return; }
+      if (!token) { st.className = 'form-status is-err'; st.textContent = 'Comment can no longer be deleted.'; return; }
       yes.disabled = true; keep.disabled = true;
       st.className = 'form-status'; st.textContent = 'Deleting…';
       post('/comments/' + c.id + '/delete', { token: token }).then(function () {
@@ -452,7 +449,7 @@
           allComments = allComments.concat(j.comments || []);
           nextOffset = j.next || 0;
           add();
-        }).catch(function () { more.disabled = false; more.removeAttribute('aria-busy'); more.textContent = 'Could not load more. Press to try again'; });
+        }).catch(function () { more.disabled = false; more.removeAttribute('aria-busy'); more.textContent = 'Could not load more. Try again.'; });
       });
       list.appendChild(more);
     }
@@ -491,7 +488,7 @@
       showStats(j.stats);
       renderComments(j.comments, j.next);
     }).catch(function () {
-      if (list && !list.children.length) list.appendChild(el('p', 'comment-empty', 'Comments could not be loaded right now. Please refresh in a moment.'));
+      if (list && !list.children.length) list.appendChild(el('p', 'comment-empty', 'Could not load comments.'));
     });
   }
 
@@ -528,14 +525,14 @@
       var f = form.elements;
       var name = f.name.value.trim(), body = f.body.value.trim(), email = f.email.value.trim();
       [f.name, f.body].forEach(function (x) { x.setAttribute('aria-invalid', x.value.trim().length < (x === f.name ? 2 : 3) ? 'true' : 'false'); });
-      if (name.length < 2) { setStatus('is-err', 'Please enter your name.'); f.name.focus(); return; }
-      if (body.length < 3) { setStatus('is-err', 'Please write your comment.'); f.body.focus(); return; }
-      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setStatus('is-err', 'That email address does not look right.'); f.email.focus(); return; }
-      if (/(https?:\/\/|www\.)/i.test(body)) { setStatus('is-err', 'Links are not allowed in comments.'); f.body.focus(); return; }
+      if (name.length < 2) { setStatus('is-err', name ? 'Name is too short.' : 'Name is required.'); f.name.focus(); return; }
+      if (body.length < 3) { setStatus('is-err', body ? 'Comment is too short.' : 'Comment is required.'); f.body.focus(); return; }
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setStatus('is-err', 'Email looks incorrect.'); f.email.focus(); return; }
+      if (/(https?:\/\/|www\.)/i.test(body)) { setStatus('is-err', 'Comment cannot contain links.'); f.body.focus(); return; }
       var payload = { name: name, email: email, body: body, parent: f.parent.value || null, cid: cid(), website: f.website.value, ts: pageLoaded };
       var wantsMail = !!(notifyRow && !notifyRow.hidden && f.notify.checked && EMAIL_RE.test(email));
       if (wantsMail) payload.notify = true;
-      var mailNote = wantsMail ? ' If the address is right and our email service is working, you will get an email shortly. Check your spam folder too.' : '';
+      var mailNote = wantsMail ? ' If the address can receive email, a link is on its way.' : '';
       if (TURNSTILE && window.turnstile && widget) payload.tt = window.turnstile.getResponse(widget);
       submit.disabled = true;
       setStatus('', 'Sending…');
@@ -545,16 +542,16 @@
         f.body.value = ''; f.parent.value = ''; $('[data-cancel-reply]', form).hidden = true;
         if (f.notify) f.notify.checked = false;
         if (j && j.status === 'approved' && j.comment) {
-          setStatus('is-ok', 'Thank you! Your comment is now live.' + mailNote);
+          setStatus('is-ok', 'Comment posted.' + mailNote);
           shownTop = Math.max(shownTop, COMMENT_BATCH);
           refresh().then(function () {
             var node = doc.getElementById('comment-' + j.comment.id);
             if (node) node.scrollIntoView({ behavior: 'smooth', block: 'center' });
           });
         } else if (j && j.status === 'duplicate') {
-          setStatus('is-ok', 'You already sent this comment.');
+          setStatus('is-ok', 'Comment received.');
         } else {
-          setStatus('is-ok', 'Thank you! Your comment needs a quick check by our team and will appear once it is approved.' + mailNote);
+          setStatus('is-ok', 'Comment received. It will appear after review.' + mailNote);
         }
         if (TURNSTILE && window.turnstile && widget) window.turnstile.reset(widget);
       }).catch(function (err) {

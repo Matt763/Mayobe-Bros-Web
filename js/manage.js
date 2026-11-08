@@ -1,7 +1,8 @@
 /* Mayobe Bros — the /manage/ page. It turns the link in a comment email into this browser's edit/delete code,
    or stops reply emails. Nothing is sent when the page opens: email scanners and link previewers open links too,
    so the API is called only when a person presses the button (the go function below). Every press ends in a sentence that says
-   what happened; a request with no answer after 15 seconds counts as "could not reach", with a Try again button. */
+   what happened; a request with no answer after 15 seconds counts as a failure, with a Try again button. Every link problem (wrong,
+   old, used, removed) gets the one wording "Link is invalid or expired", so the page never says whether a comment exists. */
 (function () {
   'use strict';
 
@@ -58,33 +59,26 @@
     if (opts.next) showNext();
     title.focus();
   }
-  function failReview(code) {
-    if (code === 404) outcome('is-err', 'This link has expired or is not valid', 'Review links work for 7 days. Open the comment list on your computer (node scripts/comments.mjs list) to approve it.', 'This link has expired or is not valid.', { next: true });
-    else if (code === 409) outcome('is-err', 'The author deleted this comment', 'It cannot be approved any more.', 'The author deleted this comment.', { next: true });
-    else {
-      title.textContent = code === 429 ? 'Too many tries' : 'We could not reach the server';
-      text.textContent = code === 429 ? 'Please wait a little, then press Try again. Nothing was changed.' : 'Check your connection, then press Try again. Nothing was changed.';
-      button.hidden = false;
-      idle('Try again');
-      state('err');
-      say('is-err', code === 429 ? 'Too many tries. Please wait a little and press the button again.' : 'We could not reach the comments service. Check your connection, then press Try again.');
-      button.focus();
-    }
-  }
-  function fail(code) {
-    if (kind === 'r') { failReview(code); return; }
-    if (code === 404) {
-      if (kind === 'u') outcome('is-err', 'We could not find that request', 'The link may be old, or the emails for this comment may already be stopped.', 'We could not find that request.', { next: true });
-      else outcome('is-err', 'This link has expired or was removed', 'Links in our emails work for 7 days. If you still want to edit or delete your comment, write to us and we will help.', 'This link has expired or was removed.', { next: true });
-      return;
-    }
-    title.textContent = code === 429 ? 'Too many tries' : 'We could not reach the server';
-    text.textContent = code === 429 ? 'Please wait a little, then press Try again. Nothing was changed.' : 'Check your connection, then press Try again. Nothing was changed.';
+  // The failure that is not the reader's fault (no answer, a busy service, too many presses): a Try again button and no blame.
+  function retryable(code) {
+    var what = kind === 'u' ? 'Could not stop emails' : kind === 'r' ? 'Could not finish' : 'Could not open comment';
+    title.textContent = code === 429 ? 'Too many attempts' : what;
+    text.textContent = code === 429 ? 'Try again later.' : 'Check your connection, then try again.';
     button.hidden = false;
     idle('Try again');
     state('err');
-    say('is-err', code === 429 ? 'Too many tries. Please wait a little and press the button again.' : 'We could not reach the comments service. Check your connection, then press Try again.');
+    say('is-err', code === 429 ? 'Too many attempts. Try again later.' : what + '. Try again.');
     button.focus();
+  }
+  function failReview(code) {
+    if (code === 404) outcome('is-err', 'Link is invalid or expired', 'Use the latest link from your email.', 'Link is invalid or expired.', { next: true });
+    else if (code === 409) outcome('is-err', 'Comment was deleted', 'It can no longer be approved.', 'Comment was deleted.', { next: true });
+    else retryable(code);
+  }
+  function fail(code) {
+    if (kind === 'r') { failReview(code); return; }
+    if (code === 404) { outcome('is-err', 'Link is invalid or expired', 'Use the latest link from your email.', 'Link is invalid or expired.', { next: true }); return; }
+    retryable(code);
   }
   function show(st, h, p, label) {
     title.textContent = h;
@@ -94,11 +88,12 @@
   }
 
   tag(kind === 'l' ? 'Your comment' : kind === 'u' ? 'Reply emails' : kind === 'r' ? 'Team review' : 'Mayobe Bros');
-  if (kind === 'l') show('mail', 'Open your comment', 'Press the button to let this browser edit or delete the comment you wrote. Nothing happens until you press it.', 'Open my comment');
-  else if (kind === 'u') show('mail', 'Stop reply emails', 'Press the button and we will stop sending you emails about replies to this comment. Your comment stays on the site.', 'Stop reply emails');
-  else if (kind === 'r') show('busy', secret.charAt(secret.indexOf('.') + 1) === 'a' ? 'Approving the comment...' : 'Leaving the comment as it is...', 'One moment.');
-  else if (!frag) show('info', 'Open the link from your email', 'This page works with the link in an email from us. If you came here without one, there is nothing to do.');
-  else { show('info', 'This link does not look right', 'It may have been cut short when it was copied. Open the link from the email again, or copy the whole address.'); help.hidden = false; }
+  if (kind === 'l') show('mail', 'Open your comment', 'Press the button to edit or delete your comment here.', 'Open my comment');
+  else if (kind === 'u') show('mail', 'Stop reply emails', 'Press the button to stop emails about replies.', 'Stop reply emails');
+  else if (kind === 'r' && secret.charAt(secret.indexOf('.') + 1) === 'a') show('mail', 'Approve this comment?', 'It will become public.', 'Approve');
+  else if (kind === 'r') show('busy', 'Keeping comment hidden...', 'One moment.');
+  else if (!frag) show('info', 'Open the email link', 'This page opens from the link in our email.');
+  else { show('info', 'Link is invalid or expired', 'Open the link from the email again.'); help.hidden = false; }
 
   // The only network helper. Both calls are made by the go function, which only the button's click handler runs.
   // It gives up after 15 seconds (the first answer wins: a late reply after the timeout is ignored).
@@ -114,7 +109,7 @@
   }
 
   var PATH_RE = /^\/post\/[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?(?:\/[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?)*\/$/;
-  var FALLBACK = ['This browser can now edit your comment', 'Open the article you wrote it on and find your comment: the Edit and Delete buttons are under it.', 'This browser can now edit your comment. Open the article and find your comment.'];
+  var FALLBACK = ['Your comment is ready', 'Open the article to edit or delete it.', 'Your comment is ready. Open the article to edit or delete it.'];
 
   var busy = false;
   // The only place the API is called. It runs only from the button's click handler.
@@ -138,14 +133,14 @@
         if (kind === 'r') { secret = ''; reviewDone(r.j || {}, sent.charAt(sent.indexOf('.') + 1)); return; }
         if (kind === 'u') {
           secret = '';
-          outcome('is-ok', 'Reply emails stopped', 'We will not email you about replies to this comment any more. You can still read replies on the article.', 'Reply emails stopped. You can still read replies on the article.', { noHelp: true, next: true });
+          outcome('is-ok', 'Reply emails stopped', 'You will no longer get emails about replies.', 'Reply emails stopped.', { noHelp: true, next: true });
           return;
         }
         var j = r.j || {};
         if (j.id == null || !/^\d+$/.test(String(j.id)) || typeof j.token !== 'string' || !/^[A-Za-z0-9_-]{32,64}$/.test(j.token) || typeof j.slug !== 'string' || !SLUG_RE.test(j.slug)) { fail(404); return; }
         if (!ownSet(j.id, j.token)) {
           secret = '';
-          outcome('is-err', 'This browser cannot save the code', 'Your browser is blocking storage for this site, so it cannot remember that the comment is yours. Allow site data for this page and open the link again.', 'This browser cannot save the code. Allow site data for this page and open the link again.');
+          outcome('is-err', 'Browser storage is blocked', 'Allow site data for this page, then open the link again.', 'Browser storage is blocked. Allow site data for this page, then open the link again.');
           return;
         }
         // From here the code is stored. The button never comes back: pressing it again would send nothing useful.
@@ -174,11 +169,11 @@
     var id = j.id != null && /^\d+$/.test(String(j.id)) ? String(j.id) : '';
     var path = typeof j.path === 'string' && j.path.length <= 300 && PATH_RE.test(j.path) ? j.path : '';
     var base = doc.documentElement.getAttribute('data-base') || '';
-    if (act === 'i' && j.result === 'kept') outcome('is-ok', 'Left as it is', 'The comment stays hidden. You can still approve it with the email link for 7 days.', 'Left as it is. The comment stays hidden.', { noHelp: true, next: true });
-    else if (act === 'i') outcome('is-ok', 'Nothing changed', 'This comment is already public, so there was nothing to ignore.', 'Nothing changed. The comment is already public.', { noHelp: true, next: true });
+    if (act === 'i' && j.result === 'kept') outcome('is-ok', 'Comment left hidden', 'The comment stays hidden.', 'Comment left hidden.', { noHelp: true, next: true });
+    else if (act === 'i') outcome('is-ok', 'Nothing changed', 'The comment is already public.', 'Nothing changed. The comment is already public.', { noHelp: true, next: true });
     else {
       var again = j.result === 'already';
-      outcome('is-ok', again ? 'Already approved' : 'Comment approved', again ? 'This comment was already public.' : 'It is now visible to readers, with a green double check and the line "Approved by Admin Mayobe Bros".', again ? 'Already approved.' : 'Comment approved. It is now visible to readers.', { noHelp: true, next: true });
+      outcome('is-ok', again ? 'Already approved' : 'Comment approved', again ? 'The comment was already public.' : 'It is now visible to readers.', again ? 'Already approved.' : 'Comment approved.', { noHelp: true, next: true });
     }
     if (path && id) {
       button.textContent = 'View the comment';
@@ -188,9 +183,9 @@
   }
   if (secret) button.addEventListener('click', go);
   if (kind === 'r' && next) next.hidden = true; // the article list waits for the answer
-  // An Approve / Ignore link was pressed in the team's own mailbox: the press is the click on the email button, so the page answers at once.
-  // It waits while the tab is hidden, so a background tab opened by a mail app does nothing until someone looks at it.
-  if (kind === 'r') {
+  // Approve needs a press, like every other link on this page: mail scanners that run JavaScript open links too, and one of them must
+  // never be able to publish a held comment. Ignore changes nothing, so it answers at once (and waits while the tab is hidden).
+  if (kind === 'r' && secret.charAt(secret.indexOf('.') + 1) === 'i') {
     var runReview = function () { if (doc.visibilityState !== 'hidden') { doc.removeEventListener('visibilitychange', runReview); go(); } };
     if (doc.visibilityState !== 'hidden') go(); else doc.addEventListener('visibilitychange', runReview);
   }
