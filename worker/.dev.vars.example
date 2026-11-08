@@ -1,7 +1,8 @@
 # Copy to worker/.dev.vars (git-ignored) and fill in YOUR values. Names only here: never put real values in this file.
 ADMIN_TOKEN=
 HASH_SALT=
-# Leave RESEND_API_KEY empty for local runs: a real key would send real mail and collide with production idempotency keys.
+# RESEND_API_KEY is used locally only by DEV_MAIL_REAL=1 (scripts/dev-api.mjs), which sends real mail only to the addresses in
+# DEV_MAIL_ALLOW and makes its own idempotency keys (dev-<run>-...). Every other local run ignores it and sends nothing.
 RESEND_API_KEY=
 RESEND_WEBHOOK_SECRET=
 TURNSTILE_SECRET=
