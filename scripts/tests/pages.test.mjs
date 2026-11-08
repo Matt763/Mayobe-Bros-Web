@@ -315,3 +315,21 @@ test('the privacy and newsletter pages say how email pictures load and that open
   assert.doesNotMatch(offPrivacy, /Our emails show pictures/);
   assert.match(offPrivacy, /We do not count who opens our emails/, 'the logo sentence stays with the comment emails');
 });
+
+// The mini sign-up in the article sidebar: same script and states as the footer form, ids that never repeat on the page.
+test('every article has a mini sign-up in its sidebar next to the footer form, with unique ids, after Read next and before More like this', () => {
+  const newestPost = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'search.json'), 'utf8'))[0].u;
+  const html = fs.readFileSync(path.join(ROOT, newestPost, 'index.html'), 'utf8');
+  const rail = html.slice(html.indexOf('<aside class="post-rail"'), html.indexOf('</aside>', html.indexOf('<aside class="post-rail"')));
+  assert.match(rail, /<section class="rail-mod rail-news" aria-labelledby="rnw-h">/);
+  assert.match(rail, /<form class="foot-form nl-form nl-mini"[^>]*data-newsletter[^>]*data-state="idle"[^>]*novalidate hidden>/);
+  assert.match(rail, /<input id="rail-email" type="email"[^>]*aria-describedby="rail-status rail-note"/);
+  assert.match(rail, /<p class="foot-status nl-status" id="rail-status" role="status">/);
+  assert.match(rail, /<div class="nl-panel nl-panel-done" data-nl-done inert aria-hidden="true">/);
+  assert.equal((html.match(/<form[^>]*data-newsletter/g) || []).length, 2, 'the footer form and the sidebar form');
+  const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(ids.filter((x, i) => ids.indexOf(x) !== i), [], 'no id twice on the page');
+  const at = (s) => rail.indexOf(s);
+  assert.ok(at('rail-news') > at('rail-next') && at('rail-news') < at('rail-latest'), 'after Read next, before More like this');
+  assert.ok(!/<noscript>/.test(rail), 'no second noscript line: the Follow module already offers RSS');
+});

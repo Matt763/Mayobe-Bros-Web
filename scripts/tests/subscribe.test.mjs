@@ -211,6 +211,15 @@ test('only near-misses of common providers are questioned: real and unrelated do
   }
 });
 
+test('the sidebar version (nl-mini) uses the shorter sentences and keeps the hedge and the address as text', async () => {
+  const t = setup({ email: 'neema@example.com', attrs: {} });
+  t.form.className = 'foot-form nl-form nl-mini';
+  await t.submit();
+  const said = t.body.textContent + t.body.children.map((c) => c.textContent ?? c.text ?? '').join('');
+  assert.equal(said, 'If this address can get our emails, a link is on its way:neema@example.comOpen it to finish.');
+  assert.equal(t.body.children[0].tag, 'strong');
+});
+
 test('"Use a different address" brings the form back, focuses the field and hides the card', async () => {
   const t = setup();
   await t.submit();

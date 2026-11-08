@@ -714,6 +714,45 @@ body.no-scroll { overflow: hidden; }
 .foot-cta .nl-done-body { margin: 0.2rem 0 0; font-size: 0.975rem; line-height: 1.45; color: #fff; overflow-wrap: anywhere; }
 .nl-done-body strong { display: block; margin: 0.15rem 0 0.2rem; font-weight: 800; overflow-wrap: anywhere; }
 .foot-cta .nl-done-help { margin: 0.35rem 0 0; font-size: 0.875rem; line-height: 1.45; color: #e8efff; }
+/* Wide screens: the words on the left and the form (or the confirmation card) on the right; below 64rem they stack. */
+@media (min-width: 64rem) {
+  .foot-cta-in { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 34rem); align-items: center; gap: 2rem clamp(2rem, 5vw, 5rem); }
+}
+@media (max-width: 22rem) {
+  .nl-done-body strong { font-size: 0.92rem; }
+  .nl-done-title { font-size: 1.1rem; }
+}
+/* The mini sign-up in the article sidebar (.nl-mini inside .rail-news): same states and script as the footer form, drawn for a narrow
+   card on the page's own colours (light and dark), always stacked: the field, then the button. */
+.rail-news { padding: 1.35rem; background: var(--surface); border: 1px solid var(--line-soft); }
+.rail-news .rail-title { margin-bottom: 0.4rem; }
+.rnw-sub { margin: 0 0 0.95rem; color: var(--text-2); font-size: 0.9688rem; line-height: 1.5; }
+.nl-mini { width: 100%; }
+.nl-mini .nl-panel { align-self: stretch; } /* the form sits at the top; the fine print sits at the bottom, so an error message fills the space the confirmation card reserves */
+.nl-mini .nl-panel-form .foot-form-note { margin-top: auto; padding-top: 0.25rem; }
+.nl-mini .nl-field { flex-direction: column; align-items: stretch; gap: 0.5rem; padding: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.nl-mini .nl-field:focus-within { outline: none; transform: none; }
+.nl-mini .nl-field:has(input[aria-invalid="true"]) { box-shadow: none; }
+.nl-mini .nl-ico { display: none; }
+.nl-mini input[type="email"] { min-height: 2.9rem; padding: 0 1.1rem; border: 1.5px solid var(--line); border-radius: 999px; background: var(--bg); color: var(--text); font-size: 1rem; }
+.nl-mini input[type="email"]::placeholder { color: var(--text-3); }
+.nl-mini input[type="email"]:focus-visible { outline: 3px solid var(--ring, #2f6bff); outline-offset: 2px; border-color: var(--btn-bg); }
+.nl-mini .nl-field:has(input[aria-invalid="true"]) input[type="email"] { border-color: var(--err); }
+.nl-mini .nl-btn { width: 100%; min-height: 2.9rem; background: var(--btn-bg); color: var(--btn-text); }
+.nl-mini .nl-btn:hover { background: var(--btn-bg-hover, var(--btn-bg)); filter: brightness(1.12); }
+.nl-mini .nl-btn:focus-visible { outline: 3px solid var(--ring, #2f6bff); outline-offset: 2px; }
+.nl-mini .nl-status { color: var(--text); font-size: 0.9375rem; }
+.nl-mini .foot-form-note, .rail-news .foot-form-note { margin: 0; padding: 0; color: var(--text-3); font-size: 0.8438rem; line-height: 1.5; }
+.rail-news .foot-form-note a { color: var(--link); text-decoration: underline; text-underline-offset: 2px; }
+.nl-mini .nl-link { color: var(--link); }
+.nl-mini .nl-link:focus-visible { outline-color: var(--ring, #2f6bff); }
+.nl-mini .nl-panel-done { grid-template-columns: minmax(0, 1fr); align-items: start; gap: 0.5rem; padding: 1rem; border-color: var(--line); border-radius: 1.1rem; background: var(--bg-alt); }
+.nl-mini .nl-check-ring, .nl-mini .nl-check-tick { stroke: var(--ok); }
+.nl-mini .nl-done-title { color: var(--text); font-size: 1.1rem; }
+.nl-mini .nl-done-title:focus-visible { outline-color: var(--ring, #2f6bff); }
+.nl-mini .nl-done-body { margin: 0.2rem 0 0; color: var(--text-2); font-size: 0.9375rem; line-height: 1.5; }
+.nl-mini .nl-done-help { margin: 0.4rem 0 0; color: var(--text-3); font-size: 0.8438rem; line-height: 1.5; }
+.nl-mini .nl-done-body strong { font-size: 0.9375rem; color: var(--text); }
 @keyframes nlf-rot { to { transform: rotate(360deg); } }
 @keyframes nlf-draw { to { stroke-dashoffset: 0; } }
 @keyframes nlf-tick { to { stroke-dashoffset: 0; } }

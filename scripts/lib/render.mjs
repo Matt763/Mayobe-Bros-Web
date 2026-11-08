@@ -272,6 +272,34 @@ ${bare ? "<script>document.documentElement.classList.add('js')</script>" : `<scr
   </div>
 </div>`;
 
+  /* The newsletter sign-up form, used twice: in the footer band ('foot') and as a mini version in the article sidebar ('rail', mini).
+     js/subscribe.js wires every form[data-newsletter]; ids carry the prefix so a page can hold both. Hidden until the script shows it. */
+  function newsletterForm(idp, mini = false) {
+    return `<form class="foot-form nl-form${mini ? ' nl-mini' : ''}" action="${u('/newsletter/')}" method="get" data-newsletter data-endpoint="${e(api)}/v1/newsletter/subscribe" data-state="idle" novalidate hidden>
+          <div class="nl-stack">
+            <div class="nl-panel nl-panel-form" data-nl-form>
+              <label class="sr-only" for="${idp}-email">Email address</label>
+              <div class="nl-field">
+                <span class="nl-ico" aria-hidden="true">${icon('mail', 20)}</span>
+                <input id="${idp}-email" type="email" name="email" required maxlength="254" placeholder="Your email address" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" enterkeyhint="send" aria-describedby="${idp}-status ${idp}-note">
+                <button class="nl-btn" type="submit"><span class="nl-btn-label">Subscribe</span><span class="nl-btn-ico" aria-hidden="true">${icon('arrowRight', 18)}</span><span class="nl-spin" aria-hidden="true"></span></button>
+              </div>
+              <div class="hp" aria-hidden="true"><label>Leave this field empty <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
+              <p class="foot-status nl-status" id="${idp}-status" role="status"></p>
+              <p class="foot-form-note" id="${idp}-note">One email when we publish a new article. Stop any time. See our <a href="${u('/privacy-policy/#newsletter')}">Privacy Policy</a>.</p>
+            </div>
+            <div class="nl-panel nl-panel-done" data-nl-done inert aria-hidden="true">
+              <span class="nl-check" aria-hidden="true"><svg viewBox="0 0 52 52" width="46" height="46" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle class="nl-check-ring" cx="26" cy="26" r="23"/><path class="nl-check-tick" d="M15.5 27.5l7.5 7.5 14-16"/></svg></span>
+              <div class="nl-done-text">
+                <h3 class="nl-done-title" tabindex="-1" data-nl-title>Check your inbox</h3>
+                <p class="nl-done-body" data-nl-body>${mini ? 'If this address can get our emails, a link is on its way:<strong>reader.name@example.com</strong>Open it to finish.' : 'If this address can receive our emails, a link to confirm is on its way:<strong>firstname.lastname@example.com</strong>Open it and press the button to finish.'}</p>
+                <p class="nl-done-help">${mini ? 'Nothing yet? Check spam or Promotions.' : 'Nothing after a few minutes? Look in spam or Promotions.'} <button class="nl-link" type="button" data-nl-again>Use a different address</button></p>
+              </div>
+            </div>
+          </div>
+        </form>`;
+  }
+
   /* ------------------------------------------------------------- footer */
   function footer() {
     const socials = [['facebook', 'Facebook'], ['twitter', 'X'], ['instagram', 'Instagram'], ['linkedin', 'LinkedIn'], ['whatsapp', 'WhatsApp Channel']].filter(([k]) => config.social?.[k]);
@@ -281,29 +309,7 @@ ${bare ? "<script>document.documentElement.classList.add('js')</script>" : `<scr
     // the newsletter form: hidden in the HTML and shown by js/subscribe.js, which sends it. Without JavaScript nothing can be sent
     // (no address in a URL or a log); the <noscript> line after it offers RSS instead.
     const cta = newsletter
-      ? `<form class="foot-form nl-form" action="${u('/newsletter/')}" method="get" data-newsletter data-endpoint="${e(api)}/v1/newsletter/subscribe" data-state="idle" novalidate hidden>
-          <div class="nl-stack">
-            <div class="nl-panel nl-panel-form" data-nl-form>
-              <label class="sr-only" for="foot-email">Email address</label>
-              <div class="nl-field">
-                <span class="nl-ico" aria-hidden="true">${icon('mail', 20)}</span>
-                <input id="foot-email" type="email" name="email" required maxlength="254" placeholder="Your email address" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" enterkeyhint="send" aria-describedby="foot-status foot-note">
-                <button class="nl-btn" type="submit"><span class="nl-btn-label">Subscribe</span><span class="nl-btn-ico" aria-hidden="true">${icon('arrowRight', 18)}</span><span class="nl-spin" aria-hidden="true"></span></button>
-              </div>
-              <div class="hp" aria-hidden="true"><label>Leave this field empty <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
-              <p class="foot-status nl-status" id="foot-status" role="status"></p>
-              <p class="foot-form-note" id="foot-note">One email when we publish a new article. Stop any time. See our <a href="${u('/privacy-policy/#newsletter')}">Privacy Policy</a>.</p>
-            </div>
-            <div class="nl-panel nl-panel-done" data-nl-done inert aria-hidden="true">
-              <span class="nl-check" aria-hidden="true"><svg viewBox="0 0 52 52" width="46" height="46" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle class="nl-check-ring" cx="26" cy="26" r="23"/><path class="nl-check-tick" d="M15.5 27.5l7.5 7.5 14-16"/></svg></span>
-              <div class="nl-done-text">
-                <h3 class="nl-done-title" tabindex="-1" data-nl-title>Check your inbox</h3>
-                <p class="nl-done-body" data-nl-body>If this address can receive our emails, a link to confirm is on its way:<strong>firstname.lastname@example.com</strong>Open it and press the button to finish.</p>
-                <p class="nl-done-help">Nothing after a few minutes? Look in spam or Promotions. <button class="nl-link" type="button" data-nl-again>Use a different address</button></p>
-              </div>
-            </div>
-          </div>
-        </form>
+      ? `${newsletterForm('foot')}
         <noscript><p class="foot-form-note foot-nojs">Email sign-up needs JavaScript. You can follow new articles with RSS instead.</p><a class="btn btn-primary btn-lg" href="${u('/rss/')}">${icon('rss', 18)} Follow with RSS</a></noscript>`
       : `<a class="btn btn-primary btn-lg" href="${u('/rss/')}">${icon('rss', 18)} Follow with RSS</a>`;
     return `<footer class="site-footer">
@@ -1223,6 +1229,14 @@ ${withIds.html}
         <p class="rail-eyebrow">${icon('list', 14)} Reading path · step ${at} of ${steps.length}</p>
         <h2 class="rail-title" id="rp-h">${e(hp.title)}</h2>
         <ol>${steps.map((x, i) => (x.slug === p.slug ? `<li class="is-here" aria-current="step"><span class="rp-n">${i + 1}</span><span class="rp-t">${e(x.title)}<em>You are here</em></span></li>` : `<li><a href="${u(x.path)}"><span class="rp-n">${i + 1}</span><span class="rp-t">${e(x.title)}<em>${x.readingMinutes} min read</em></span></a></li>`)).join('')}</ol>
+      </section>`);
+    }
+    // the mini sign-up (same script and states as the footer form); only when the newsletter is on
+    if (newsletter) {
+      mods.push(`<section class="rail-mod rail-news" aria-labelledby="rnw-h">
+        <h2 class="rail-title" id="rnw-h">${icon('mail', 16)} New articles by email</h2>
+        <p class="rnw-sub">Each new guide in your inbox. No spam, no paywall.</p>
+        ${newsletterForm('rail', true)}
       </section>`);
     }
     if (latest.length) {

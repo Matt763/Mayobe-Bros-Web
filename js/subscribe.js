@@ -101,11 +101,13 @@
     }
     function showDone(email) {
       if (body) {
-        body.textContent = 'If this address can receive our emails, a link to confirm is on its way:';
+        // the sidebar version (nl-mini) has less room, so its sentences are shorter; both keep the "if this address can get our emails" hedge
+        var mini = /\bnl-mini\b/.test(String(form.className || ''));
+        body.textContent = mini ? 'If this address can get our emails, a link is on its way:' : 'If this address can receive our emails, a link to confirm is on its way:';
         var strong = doc.createElement('strong');
         strong.textContent = email; // text only, never HTML; it sits on its own line so it is never cut in the middle
         body.appendChild(strong);
-        body.appendChild(doc.createTextNode('Open it and press the button to finish.'));
+        body.appendChild(doc.createTextNode(mini ? 'Open it to finish.' : 'Open it and press the button to finish.'));
       }
       if (panelDone) { panelDone.removeAttribute('inert'); panelDone.removeAttribute('aria-hidden'); }
       if (panelForm) { panelForm.setAttribute('inert', ''); panelForm.setAttribute('aria-hidden', 'true'); }
