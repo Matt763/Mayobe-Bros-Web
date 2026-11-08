@@ -78,7 +78,7 @@ test('one press on Confirm makes one POST /v1/newsletter/confirm with the token'
   assert.equal(t.nodes.go.hidden, true, 'no button after success');
   assert.ok(t.nodes.title.focused > 0, 'focus on the new heading');
   assert.equal(t.nodes.title.textContent, 'You are subscribed');
-  assert.match(t.nodes.text.textContent, /A welcome email with our latest articles is on its way\./);
+  assert.match(t.nodes.text.textContent, /We are sending a welcome email[\s\S]*it may be skipped\./);
   assert.match(t.nodes.status.textContent, /subscribed/i);
   assert.equal(t.nodes.box.attrs['data-state'], 'ok', 'the card shows the check mark');
   // a stray second click sends nothing

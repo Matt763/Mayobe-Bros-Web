@@ -1,6 +1,6 @@
 # Comment controls, Resend email and newsletter: design
 
-Date: 2026-11-06. Status: Phase 1 (comment edit, delete and likes) and Phase 2 (email through Resend) are implemented on branch `comment-controls`, pending the owner's deploy (checklist: `worker/README.md`). Phase 3 (newsletter) is implemented on the same branch, pending the owner's deploy (go-live order: `worker/README.md`).
+Date: 2026-11-06. Status: Phase 1 (comment edit, delete and likes) and Phase 2 (email through Resend) are implemented on branch `comment-controls`, pending the owner's deploy (checklist: `worker/README.md`). Phase 3 (newsletter) is implemented on the same branch, pending the owner's deploy (go-live order: `worker/README.md`). Email redesign (site-matching design, pictures, local real-mail mode, `--pages-live` guard) is implemented on the same branch; plan: `docs/superpowers/plans/2026-11-07-email-redesign.md`; the owner's real-mail check is still to do.
 
 ## Why
 

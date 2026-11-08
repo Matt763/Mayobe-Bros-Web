@@ -7,6 +7,8 @@ licence and the link, or made with an AI tool with the name of the tool). Keep t
 (post cover, category or label photograph, or the home hero) and adds only the site's own logo, a text chip and a shade. They carry the same
 source and licence as the cover they come from.
 
+`assets/email/*.jpg` (the pictures inside the emails) are the same: the build crops each one from the cover listed here, with the same source and licence. `assets/email/logo.png` is the site logo (`assets/img/logo.png`) on a white plate, nothing new.
+
 | File in `assets/posts/` | Used by | Source and licence |
 | --- | --- | --- |
 | `040af348f88a.webp` | next-generation-online-learning-platform.md, top-10-ai-tools-for-productivity.md | Imported from the old Supabase storage. **Source and licence not recorded. Owner to confirm.** |

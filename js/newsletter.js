@@ -92,7 +92,7 @@
         if (!r.ok) { fail(r.status); return; }
         secret = '';
         if (kind === 'u') outcome('ok', 'is-ok', 'You are unsubscribed', 'Thank you for reading. We will not send you newsletter emails any more. If you change your mind, you can sign up again with the form at the bottom of this page.', 'You are unsubscribed from our newsletter.', { noHelp: true });
-        else outcome('ok', 'is-ok', 'You are subscribed', 'Thank you. We will send you one email when we publish a new article, and every email has a link to stop. A welcome email with our latest articles is on its way.', 'You are subscribed. Your subscription is confirmed.', { noHelp: true });
+        else outcome('ok', 'is-ok', 'You are subscribed', 'Thank you. We will send you one email when we publish a new article, and every email has a link to stop. We are sending a welcome email with our latest articles. It can take a few minutes, and on a very busy day it may be skipped.', 'You are subscribed. Your subscription is confirmed.', { noHelp: true });
       })
       .catch(function () { busy = false; fail(0); });
   }

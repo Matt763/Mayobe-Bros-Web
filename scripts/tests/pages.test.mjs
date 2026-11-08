@@ -269,3 +269,18 @@ test('{{latest-posts:9}} is a build error', () => {
   for (const n of [0, 7, 9, 'x', '']) assert.throws(() => R.staticPage(pg(n)), /latest-posts/, String(n));
   assert.equal((R.staticPage(pg(6)).match(/<article class="card card-h">/g) || []).length, 6);
 });
+
+test('the privacy and newsletter pages say how email pictures load and that opens and clicks are not counted', () => {
+  const body = (h) => h.slice(h.indexOf('<main'), h.indexOf('</main>'));
+  const on = renderWith({ newsletterAction: 'api', commentsApi: 'https://api.test/' });
+  const privacy = body(on.page('privacy-policy'));
+  const news = privacy.slice(privacy.indexOf('<h3 id="newsletter">'));
+  assert.match(news, /pictures/);
+  assert.match(news, /GitHub Pages/);
+  assert.match(news, /We do not count who opens our emails or clicks their links\./);
+  assert.match(body(on.page('newsletter')), /with its title, a picture, a short summary and a link/);
+  const off = renderWith({ commentsApi: 'https://api.test/' });
+  const offPrivacy = body(off.page('privacy-policy'));
+  assert.doesNotMatch(offPrivacy, /Our emails show pictures/);
+  assert.match(offPrivacy, /We do not count who opens our emails/, 'the logo sentence stays with the comment emails');
+});
