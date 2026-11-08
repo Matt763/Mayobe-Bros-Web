@@ -45,16 +45,16 @@
   function fail(code) {
     if (code === 404) {
       // the same title for both buttons and every cause; the sentence under it is general advice, true whatever the state of the address
-      outcome('info', 'is-err', 'Link is invalid or expired', kind === 'u' ? 'If you already unsubscribed, you are all set.' : 'If you already confirmed, you are all set.', 'Link is invalid or expired.');
+      outcome('info', 'is-err', 'Link is invalid or expired', '', 'Link is invalid or expired.');
       return;
     }
     var what = kind === 'u' ? 'Could not unsubscribe' : 'Could not confirm';
     title.textContent = code === 429 ? 'Too many attempts' : what;
-    text.textContent = code === 429 ? 'Try again later.' : 'Check your connection, then try again.';
+    text.textContent = code === 429 ? 'Try again later.' : 'Connection failed.';
     button.hidden = false;
     idle('Try again');
     state('err');
-    say('is-err', code === 429 ? 'Too many attempts. Try again later.' : what + '. Try again.');
+    say('is-err', code === 429 ? 'Too many attempts. Try again later.' : 'Something went wrong.');
     button.focus();
   }
   function show(st, h, p, label) {

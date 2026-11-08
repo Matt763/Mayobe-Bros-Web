@@ -91,7 +91,7 @@ export async function sendMail(env, ctx, msg) {
     let json = null;
     try { json = JSON.parse(text); } catch { /* not JSON */ }
     if (!res.ok) {
-      logFail('send failed', res.status, text);
+      logFail('send failed', res.status, json?.name || json?.error?.name || ''); // never the body: it can hold the recipient
       if (res.status === 429 || res.status >= 500) await giveBack(env, msg.kind, day); // a retry can work; a permanent 4xx keeps its unit
       return { ok: false, status: res.status };
     }

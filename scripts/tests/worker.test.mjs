@@ -1137,7 +1137,7 @@ test('exchange: a device token works for edit and delete, confirms notices, and 
   assert.equal(env.DB.raw.prepare('SELECT notify_confirmed FROM comments WHERE id = ?').get(r.json.id).notify_confirmed, 1);
   const dev = env.DB.raw.prepare("SELECT * FROM manage_links WHERE kind = 'device'").get();
   assert.equal(dev.hash, sha256(x.json.token));
-  assert.equal(dev.expires, null);
+  assert.ok(dev.expires > Date.now() + 80 * 86400000 && dev.expires < Date.now() + 100 * 86400000); // about 90 days
   // the second exchange gives a different device token, and both work
   const y = await exchange(link, '9.9.9.9');
   assert.equal(y.status, 200);
@@ -1737,17 +1737,36 @@ test('contact: Origin is required and CORS answers only our site', async () => {
   assert.equal(sent.length, 0);
 });
 
-test('contact: TURNSTILE_SECRET does not block the form (the page has no widget yet) and is not called', async () => {
+test('contact: with TURNSTILE_SECRET set a missing, rejected or unverifiable token is refused and a good one passes', async () => {
   env.TURNSTILE_SECRET = 'secret';
   const realF = globalThis.fetch;
-  let asked = 0;
-  globalThis.fetch = async (u, init) => { if (String(u).includes('turnstile')) { asked++; return new Response(JSON.stringify({ success: false })); } return realF(u, init); };
+  let asked = 0, mode = 'ok', seenBody = '';
+  globalThis.fetch = async (u, init) => {
+    if (String(u).includes('turnstile')) { asked++; seenBody = String(init.body); if (mode === 'throw') throw new Error('down'); return new Response(JSON.stringify({ success: mode === 'ok' })); }
+    return realF(u, init);
+  };
   try {
-    assert.equal((await contact()).status, 200);
-    await flushMail();
-    assert.equal(asked, 0);
-    assert.equal(sent.length, 2);
+    let r = await contact();
+    assert.equal(r.status, 400); assert.equal(r.json.field, 'check'); assert.equal(r.json.error, 'Complete the security check.');
+    assert.equal(asked, 0, 'no token: the verifier is not even asked');
+    r = await contact({ tt: 'good-token' });
+    assert.equal(r.status, 200); assert.equal(asked, 1);
+    assert.match(seenBody, /secret=secret/); assert.match(seenBody, /response=good-token/);
+    mode = 'no';
+    assert.equal((await contact({ tt: 'bad-token', email: 'other@example.com' })).status, 400);
+    mode = 'throw';
+    assert.equal((await contact({ tt: 'any', email: 'third@example.com' })).status, 400, 'an unreachable verifier fails closed');
   } finally { globalThis.fetch = realF; }
+  await flushMail();
+});
+
+test('contact: without TURNSTILE_SECRET no token is needed and the verifier is never called', async () => {
+  delete env.TURNSTILE_SECRET;
+  const realF = globalThis.fetch;
+  let asked = 0;
+  globalThis.fetch = async (u, init) => { if (String(u).includes('turnstile')) asked++; return realF(u, init); };
+  try { assert.equal((await contact()).status, 200); assert.equal(asked, 0); } finally { globalThis.fetch = realF; }
+  await flushMail();
 });
 
 test('contact: validation errors name the field so the page can mark it', async () => {

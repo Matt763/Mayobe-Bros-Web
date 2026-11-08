@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const FILES = ['js/engage.js', 'js/manage.js', 'js/newsletter.js', 'js/subscribe.js', 'js/contact.js', 'js/site.js', 'js/listen.js', 'js/notfound.js', 'js/notfound-posts.js', 'js/pager.js'];
 // not a message to the visitor: text put into the body of a mail the visitor sends, and the cookie notice
-const OK = [/message shortened, please paste/, /We use browser storage/];
+const OK = [/message shortened/, /We use browser storage/];
 
 // every single-quoted string of two or more words, with comments taken out
 function sentences(file) {

@@ -28,7 +28,7 @@
 
 import { screen, looksLikeTeam } from './moderation.js';
 import { looksLikeQuestion } from './question.js';
-import { SLUG_RE, TOKEN_RE, enc, now, reply, fail, sha, ipHash, same, newToken, hit, readJson, siteOrigin, siteOf, canonicalEmail, utcDay, DAY_TTL, later } from './util.js';
+import { SLUG_RE, TOKEN_RE, enc, now, reply, fail, sha, ipHash, same, newToken, hit, readJson, siteOrigin, siteOf, canonicalEmail, utcDay, DAY_TTL, later, humanCheck } from './util.js';
 import { newsletterRoute, newsletterAdmin, runNewsletter } from './newsletter.js';
 import { sendMail, validEmail } from './mail.js';
 import { checkReviewToken, reviewLinks } from './review.js';
@@ -44,6 +44,7 @@ const LINK_DAYS = 7; // an emailed manage link works for this long
 // Words the visitor sees. One neutral wording per class of problem, so an answer never says which check failed or whether anything exists.
 const NOT_FOUND = 'Comment not found.'; // the one answer for a wrong token, a missing comment, a team comment and so on, so nothing can be probed
 const LINK_BAD = 'Link is invalid or expired.'; // the one answer for every emailed link that cannot be used (wrong, expired, used, removed)
+const CHECK = 'Complete the security check.';
 const TRY_LATER = 'Too many attempts. Try again later.'; // the one answer for every limit, so no limit is named
 const NOT_SENT = 'Could not send. Try again.';
 const NO_EDIT = 'Comment can no longer be edited.'; // pending, has a reply, or past the edit window: one answer for all three
@@ -68,7 +69,7 @@ async function ownerRow(env, id, token) {
   const match = same(givenHash, row?.manage_hash || '0'.repeat(64)); // a comment with no hash (older, or from the team) is compared with zeros and never matches
   // a device token (from the emailed manage link) is the same kind of secret, kept hashed in manage_links; it is looked up by its hash
   // The lookup runs every time, with the id bound even when no such comment exists, so timing does not reveal which ids exist.
-  const device = await env.DB.prepare("SELECT 1 AS ok FROM manage_links WHERE hash = ? AND comment_id = ? AND kind = 'device'").bind(givenHash, Number.isSafeInteger(id) ? id : 0).first();
+  const device = await env.DB.prepare("SELECT 1 AS ok FROM manage_links WHERE hash = ? AND comment_id = ? AND kind = 'device' AND (expires IS NULL OR expires > ?)").bind(givenHash, Number.isSafeInteger(id) ? id : 0, now()).first();
   if (!row || !TOKEN_RE.test(given) || !((row.manage_hash && match) || device) || !['approved', 'pending'].includes(row.status)) return null;
   const { manage_hash, ...own } = row; // the hash never leaves this function
   return own;
@@ -430,11 +431,7 @@ async function handle(request, env, ctx) {
     const b = await readJson(request);
     // bots: a filled hidden field or a form submitted faster than a person can type. Pretend it worked.
     if (b.website || (Number(b.ts) && now() - Number(b.ts) < 2500)) return reply({ ok: true, status: 'pending' }, 202, cors);
-    if (env.TURNSTILE_SECRET) {
-      const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body: new URLSearchParams({ secret: env.TURNSTILE_SECRET, response: String(b.tt || '') }) });
-      const j = await r.json().catch(() => ({}));
-      if (!j.success) return fail('Complete the security check.', 400, cors);
-    }
+    if (!(await humanCheck(env, request, b.tt))) return fail(CHECK, 400, cors);
     const email = String(b.email || '').trim().slice(0, 120);
     const clean = cleanComment(b.name, b.body);
     if (clean.error) return fail(clean.error, 400, cors);
@@ -490,8 +487,7 @@ async function handle(request, env, ctx) {
     const b = await readJson(request, 14000); // 3,000 characters can double when quotes and line breaks are escaped
     // bots: a filled hidden field or a form sent faster than a person can type. Pretend it worked; nothing is sent.
     if (b.website || (Number(b.ts) && now() - Number(b.ts) < 2500)) return reply({ ok: true }, 200, cors);
-    // No Turnstile check here on purpose: js/contact.js does not load the widget yet, so asking for a token would reject every message.
-    // Add it back together with the widget in the page.
+    if (!(await humanCheck(env, request, b.tt))) return reply({ error: CHECK, field: 'check' }, 400, cors);
     const c = cleanContact(b);
     if (c.error) return reply({ error: c.error, field: c.field }, 400, cors);
     const ih = await ipHash(request, env);
@@ -533,7 +529,7 @@ async function handle(request, env, ctx) {
     const link = await env.DB.prepare("SELECT comment_id FROM manage_links WHERE hash = ? AND kind = 'link' AND expires > ?").bind(await sha(b.link), now()).first();
     const row = link ? await env.DB.prepare("SELECT id, slug, status, notify_wanted FROM comments WHERE id = ?").bind(link.comment_id).first() : null;
     if (!row || !['approved', 'pending'].includes(row.status)) return fail(LINK_BAD, 404, cors);
-    const device = await addLink(env, 'device', row.id, null);
+    const device = await addLink(env, 'device', row.id, now() + 90 * 86400000); // a device token lasts 90 days
     if (row.notify_wanted) await env.DB.prepare('UPDATE comments SET notify_confirmed = 1 WHERE id = ? AND notify_wanted = 1').bind(row.id).run(); // opening the link proves the address is read by the commenter
     const meta = await postMeta(env, row.slug); // the real article address (it includes the category); absent when the list cannot be read
     return reply({ ok: true, id: row.id, slug: row.slug, ...(meta.found ? { path: meta.path } : {}), token: device }, 200, cors);

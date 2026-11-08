@@ -372,7 +372,7 @@ test('the bare email-link pages get the tightest policy: no third parties at all
 
 test('the policy follows site.config.json: AdSense hosts only when ads are on, Turnstile only with a key', () => {
   const policy = (over) => cspOf(renderWith(over).page('about'));
-  const off = policy({ adsense: { client: 'ca-pub-1', autoAds: false, sidebarSlot: '' } });
+  const off = policy({ adsense: { client: 'ca-pub-1', autoAds: false, sidebarSlot: '' }, turnstileSiteKey: '' });
   assert.ok(!/googlesyndication|adtrafficquality/.test(off), 'ads off: no ad hosts');
   const on = policy({ adsense: { client: 'ca-pub-1', autoAds: true, sidebarSlot: '' } });
   assert.match(on, /script-src[^;]*pagead2\.googlesyndication\.com/);

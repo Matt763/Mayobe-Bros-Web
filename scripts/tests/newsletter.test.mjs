@@ -118,6 +118,33 @@ test('Foo.Bar+news@gmail.com and foobar@googlemail.com are one subscriber', asyn
   assert.equal(sent.length, 1);
 });
 
+test('a second sign-up for the same inbox key mails the stored address, never the typed variant', async () => {
+  await sub('Victim@corp.com', {}, { ip: '2.2.2.2' });
+  sent = [];
+  env.DB.raw.prepare('DELETE FROM hits').run(); // lift the one-a-day limit so the variant is tried
+  await sub('victim+x@corp.com', {}, { ip: '3.3.3.3' });
+  assert.ok(sent.every((m) => [].concat(m.body.to).every((a) => a === 'victim@corp.com')), JSON.stringify(sent.map((m) => m.body.to)));
+  const r = rows('SELECT email FROM newsletter_subscribers');
+  assert.deepEqual(r.map((x) => x.email), ['victim@corp.com']);
+});
+
+test('with TURNSTILE_SECRET set, sign-up needs a verified token (fails closed); without it none is needed', async () => {
+  env.TURNSTILE_SECRET = 'secret';
+  const prev = globalThis.fetch;
+  let verdict = true;
+  globalThis.fetch = async (u, init) => String(u).includes('turnstile') ? new Response(JSON.stringify({ success: verdict })) : prev(u, init);
+  try {
+    let r = await sub('a1@example.com');
+    assert.equal(r.status, 400); assert.equal(r.json.field, 'check');
+    r = await sub('a2@example.com', { tt: 'tok' });
+    assert.equal(r.status, 200);
+    verdict = false;
+    assert.equal((await sub('a3@example.com', { tt: 'tok' })).status, 400);
+    assert.equal(rows("SELECT 1 FROM newsletter_subscribers WHERE email LIKE 'a3@%'").length, 0, 'nothing stored when the check fails');
+  } finally { globalThis.fetch = prev; delete env.TURNSTILE_SECRET; }
+  assert.equal((await sub('a4@example.com')).status, 200);
+});
+
 test('4th sign-up from one IP in an hour is 429 and sends nothing', async () => {
   for (let i = 1; i <= 3; i++) assert.equal((await sub(`p${i}@example.com`)).status, 200);
   const before = sent.length;

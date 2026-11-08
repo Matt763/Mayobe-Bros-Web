@@ -10,7 +10,7 @@ export const now = () => Date.now();
 export function reply(body, status, cors, cache) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': cache || 'no-store', 'X-Content-Type-Options': 'nosniff', ...cors },
+    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': cache || 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'", ...cors },
   });
 }
 export const fail = (msg, status, cors) => reply({ error: msg }, status, cors);
@@ -101,4 +101,22 @@ export function later(env, ctx, job) {
   if (!env.RESEND_API_KEY) return;
   const p = (async () => { try { await job(); } catch (err) { console.error('mail job failed', err && err.message ? err.message : err); } })();
   try { ctx?.waitUntil?.(p); } catch { /* nothing more to do */ }
+}
+
+// Cloudflare Turnstile. With no TURNSTILE_SECRET the check is off (true), so the Worker can be deployed before the site sends tokens.
+// Fails closed when the secret is set: a missing token, a rejected token or an unreachable verifier all answer false.
+export async function humanCheck(env, request, token) {
+  if (!env.TURNSTILE_SECRET) return true;
+  const t = typeof token === 'string' ? token.slice(0, 2048) : '';
+  if (!t) return false;
+  try {
+    const body = new URLSearchParams({ secret: env.TURNSTILE_SECRET, response: t });
+    const ip = request.headers.get('CF-Connecting-IP');
+    if (ip) body.set('remoteip', ip);
+    const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body, signal: AbortSignal.timeout(5000) });
+    const j = await r.json().catch(() => ({}));
+    return j.success === true;
+  } catch {
+    return false;
+  }
 }

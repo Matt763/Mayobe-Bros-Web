@@ -154,7 +154,7 @@ test('429 and 503 and a network error show their messages and re-enable the butt
   assert.equal(state(t), 'idle');
   assert.equal(t.button.disabled, false);
   assert.equal(t.input.value, 'neema@example.com', 'the address is kept');
-  const generic = 'Could not subscribe. Try again later, or use RSS.';
+  const generic = 'Something went wrong. Use RSS.';
   for (const fetchImpl of [async () => ({ status: 503, body: { error: 'x' } }), async () => { throw new Error('offline'); }, async () => ({ status: 500, body: undefined })]) {
     t = setup({ fetchImpl });
     await t.submit();
@@ -227,7 +227,7 @@ test('no message names a limit, a server or a reason: only the short wordings', 
     await t.submit();
     seen.add(shown(t.status));
   }
-  assert.deepEqual([...seen].sort(), ['Could not subscribe. Try again later, or use RSS.', 'Too many attempts. Try again later.']);
+  assert.deepEqual([...seen].sort(), ['Something went wrong. Use RSS.', 'Too many attempts. Try again later.']);
   for (const m of seen) assert.doesNotMatch(m, /hour|server|network|several|Sorry|!/i, m);
 });
 

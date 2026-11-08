@@ -379,7 +379,7 @@
       queued--;
       if (why === 'not-allowed') { fail('Sound is blocked. Press play again.', true); return; }
       errRun++;
-      if (errRun >= 3 || why === 'synthesis-unavailable' || why === 'language-unavailable' || why === 'voice-unavailable') { fail('Could not play audio. Try another voice.'); return; }
+      if (errRun >= 3 || why === 'synthesis-unavailable' || why === 'language-unavailable' || why === 'voice-unavailable') { fail('Audio failed.'); return; }
       if (i >= S.length - 1) finish(); else pump();
     };
     refs.push(u);
@@ -413,7 +413,7 @@
       if (myGen !== gen || state !== 'playing') return;
       pump();
       startWatch = setTimeout(function () {
-        if (myGen === gen && state === 'playing' && !tStart[i]) fail('Audio did not start. Press play to try again.');
+        if (myGen === gen && state === 'playing' && !tStart[i]) fail('Audio failed.');
       }, 6000);
     };
     tStart = {};

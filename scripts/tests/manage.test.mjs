@@ -104,7 +104,7 @@ test('a storage failure shows the storage message, announced, with focus on the 
   const t = setup({ storage: { fail: true }, fetchImpl: exchangeOk({ path: '/post/a/hello-post/' }) });
   await press(t);
   assert.equal(t.nodes.title.textContent, 'Browser storage is blocked');
-  assert.match(t.nodes.status.textContent, /^Browser storage is blocked\. Allow site data/);
+  assert.equal(t.nodes.status.textContent, "Browser storage is blocked.");
   assert.doesNotMatch(t.nodes.title.textContent + t.nodes.text.textContent + t.nodes.status.textContent, /code|token/i, 'no internals');
   assert.equal(t.nodes.go.hidden, true);
   assert.ok(t.nodes.title.focused > 0);
@@ -124,7 +124,7 @@ test('expired links, stopped emails and network errors are announced; only a net
   assert.equal(t.nodes.go.hidden, true);
   t = setup({ fetchImpl: async () => { throw new Error('offline'); } });
   await press(t);
-  assert.equal(t.nodes.status.textContent, 'Could not open comment. Try again.');
+  assert.equal(t.nodes.status.textContent, 'Something went wrong.');
   assert.equal(t.nodes.go.hidden, false);
   assert.equal(t.nodes.go.disabled, false);
   assert.ok(t.nodes.go.focused > 0, 'focus returns to the retry button');
@@ -162,7 +162,7 @@ test('a timeout shows the network text and Try again', async () => {
   assert.equal(pending[0].ms, 15000);
   pending[0].f();
   await new Promise((r) => setTimeout(r, 20));
-  assert.equal(t.nodes.status.textContent, 'Could not open comment. Try again.');
+  assert.equal(t.nodes.status.textContent, 'Something went wrong.');
   assert.equal(t.nodes.go.textContent, 'Try again');
   assert.equal(t.nodes.go.hidden, false);
   assert.equal(t.nodes.go.disabled, false);
@@ -262,7 +262,7 @@ test('a network error changes the heading and the sentence too, so the page neve
   const t = setup({ fetchImpl: async () => { throw new Error('offline'); } });
   await press(t);
   assert.equal(t.nodes.title.textContent, 'Could not open comment');
-  assert.equal(t.nodes.text.textContent, 'Check your connection, then try again.');
+  assert.equal(t.nodes.text.textContent, 'Connection failed.');
   assert.equal(t.nodes.go.textContent, 'Try again');
 });
 

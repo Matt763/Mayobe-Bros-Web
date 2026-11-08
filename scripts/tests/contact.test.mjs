@@ -115,7 +115,7 @@ test('503, a network error and an unreadable answer all show the mailto fallback
     assert.match(a.href, /^mailto:info@mayobebros\.com\?subject=A%20question&body=/);
     assert.ok(decodeURIComponent(a.href).includes('Hello, how do you choose topics?'));
     assert.ok(t.status.focused > 0);
-    assert.equal(t.status.textContent, 'Could not send. Try again, or email ');
+    assert.equal(t.status.textContent, 'Message not sent. Email us at ');
     assert.equal(a.textContent, 'info@mayobebros.com', 'the address is the link');
     assert.equal(t.status.children[1].text, '.');
     assert.equal(t.button.disabled, false);
@@ -126,7 +126,7 @@ test('503, a network error and an unreadable answer all show the mailto fallback
 test('429 says to try later and still offers the mailto link; the text is kept', async () => {
   const t = setup({ fetchImpl: async () => ({ status: 429, body: { error: 'x' } }) });
   await t.submit();
-  assert.equal(t.status.textContent, 'Too many attempts. Try again later, or email ');
+  assert.equal(t.status.textContent, 'Too many attempts. Email us at ');
   assert.match(t.status.children[0].href, /^mailto:/);
   assert.equal(t.log.some((l) => l[0] === 'reset'), false);
 });
@@ -163,7 +163,7 @@ test('a huge non-ASCII message gives a short mailto link with a note', async () 
   await t.submit();
   const href = t.status.children[0].href;
   assert.ok(href.split('&body=')[1].length <= 1900, `encoded body is ${href.split('&body=')[1].length}`);
-  assert.ok(bodyOf(href).includes('(message shortened, please paste the rest)'));
+  assert.ok(bodyOf(href).includes('(message shortened)'));
   assert.equal(t.button.disabled, false);
 });
 
@@ -172,7 +172,7 @@ test('even if building the fallback throws, the button is enabled again and the 
   await t.submit();
   assert.equal(t.button.disabled, false);
   assert.notEqual(t.status.textContent, 'Sending…');
-  assert.equal(t.status.textContent, 'Could not send. Email us at info@mayobebros.com.');
+  assert.equal(t.status.textContent, 'Message not sent. Email us at info@mayobebros.com.');
 });
 
 test('only a 400 that names a field is a field error; any other failure shows the fallback', async () => {
@@ -180,7 +180,7 @@ test('only a 400 that names a field is a field error; any other failure shows th
   await t.submit();
   assert.equal(t.f.email.attrs['aria-invalid'], 'true');
   assert.equal(t.notes.email.textContent, 'Email looks incorrect.');
-  assert.equal(t.status.textContent, 'One field needs attention.');
+  assert.equal(t.status.textContent, 'Invalid input.');
   assert.equal(t.f.email.focused, 1);
   assert.equal(t.status.children.length, 0, 'no fallback link');
   for (const resp of [{ status: 400, body: { error: 'Complete the security check.' } }, { status: 403, body: { error: 'Could not send. Try again.' } }, { status: 413, body: {} }, { status: 500, body: {} }, { status: 200, body: {} }]) {

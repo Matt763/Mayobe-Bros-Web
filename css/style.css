@@ -1029,19 +1029,10 @@ button.nav-link { border: 0; background: transparent; line-height: inherit; curs
 .nf-card p { margin: 0; }
 .nf-card-title { margin: 0 0 0.5rem; font-size: 1.25rem; font-weight: 800; }
 .nf-flow p { color: var(--text-2); }
-.nf-timer-head { display: inline-flex; align-items: center; gap: 0.6rem; font-weight: 600; }
-.nf-timer-head [tabindex="-1"]:focus { outline: none; }
-.nf-dot { flex: none; width: 0.75rem; height: 0.75rem; border-radius: 50%; background: var(--btn-bg); animation: nf-dot-pulse 2s ease-in-out infinite; }
-@keyframes nf-dot-pulse { 50% { opacity: 0.35; } }
-.nf-timer.is-stopped .nf-dot { animation: none; }
-.nf-count { font-size: clamp(2.25rem, 7vw, 3rem); font-weight: 900; line-height: 1.2; color: var(--link); font-variant-numeric: tabular-nums; }
-.nf-card .nf-unit { margin-bottom: 1rem; color: var(--text-3); font-size: 0.9375rem; }
-.nf-timer .btn { min-height: 44px; }
 .nf-more { margin-top: clamp(2rem, 5vw, 3rem); padding-top: clamp(1.5rem, 4vw, 2rem); border-top: 1px solid var(--line-soft); text-align: left; }
 .nf-more-title { text-wrap: balance; margin: 0 0 1.25rem; font-size: clamp(1.25rem, 3vw, 1.625rem); font-weight: 800; text-align: center; }
 .nf-all { margin: 1.5rem 0 0; text-align: center; }
 .nf-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.75rem 1rem; }
-@media (prefers-reduced-motion: reduce) { .nf-dot { animation: none; } }
 @media (max-width: 520px) { .nf-actions .btn { width: 100%; justify-content: center; } }
 
 /* Desktop header (1280px and up; below that the menu button and drawer are used, because the category links need about 1200px). The logo is centred between the top edge and the bottom line of the whole header. The menu

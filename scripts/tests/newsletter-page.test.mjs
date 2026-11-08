@@ -175,10 +175,10 @@ test('the 404 sentence is general advice that is the same for every cause (it ne
     bodies.add(t.nodes.title.textContent + '|' + t.nodes.text.textContent);
   }
   assert.equal(bodies.size, 1);
-  assert.equal([...bodies][0], 'Link is invalid or expired|If you already confirmed, you are all set.');
+  assert.equal([...bodies][0], 'Link is invalid or expired|');
   const u = setup({ hash: `#u=${TOKEN}`, fetchImpl: async () => ({ status: 404, body: {} }) });
   await press(u);
-  assert.equal(u.nodes.text.textContent, 'If you already unsubscribed, you are all set.');
+  assert.equal(u.nodes.text.textContent, '');
 });
 
 test('every title is five words or fewer and a 429 or a network failure names the action', async () => {
@@ -191,8 +191,8 @@ test('every title is five words or fewer and a 429 or a network failure names th
   const down = setup({ hash: `#u=${TOKEN}`, fetchImpl: async () => { throw new Error('offline'); } });
   await press(down);
   assert.equal(down.nodes.title.textContent, 'Could not unsubscribe');
-  assert.equal(down.nodes.status.textContent, 'Could not unsubscribe. Try again.');
-  assert.equal(down.nodes.text.textContent, 'Check your connection, then try again.');
+  assert.equal(down.nodes.status.textContent, 'Something went wrong.');
+  assert.equal(down.nodes.text.textContent, 'Connection failed.');
   for (const n of [busy, down]) titles.add(n.nodes.title.textContent);
   for (const h of titles) assert.ok(h.split(' ').length <= 5, h);
 });
@@ -208,7 +208,7 @@ test('a request with no answer for 15 s shows the network text and Try again; on
   assert.equal(pending[0].ms, 15000);
   pending[0].f();
   await new Promise((r) => setTimeout(r, 20));
-  assert.equal(t.nodes.status.textContent, 'Could not confirm. Try again.');
+  assert.equal(t.nodes.status.textContent, 'Something went wrong.');
   assert.equal(t.nodes.go.textContent, 'Try again');
   assert.equal(t.nodes.go.hidden, false);
   assert.equal(t.nodes.go.disabled, false);

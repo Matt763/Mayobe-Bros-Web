@@ -56,7 +56,7 @@ updated: 2026-11-08
 <p>We do not sell personal information. We use these service providers to run the site:</p>
 <ul>
   <li><strong>GitHub, Inc.</strong> hosts the website files (GitHub Pages).</li>
-  {{#comments}}<li><strong>Cloudflare, Inc.</strong> runs the comments and reactions service and stores that data.</li>{{/comments}}
+  {{#comments}}<li><strong>Cloudflare, Inc.</strong> runs the comments and reactions service and stores that data.{{#turnstile}} It also runs the spam check (Turnstile) on the comment{{#newsletter}}, newsletter{{/newsletter}} and contact forms: when you start to use a form, your browser loads Cloudflare's check, and Cloudflare receives your IP address and technical details about your browser to decide whether you are a person. See <a href="https://www.cloudflare.com/turnstile-privacy-policy/" rel="noopener">Cloudflare's Turnstile privacy notice</a>.{{/turnstile}}</li>{{/comments}}
   <li><strong>Google</strong> provides advertising when ads are switched on, and search tools that help us check how the site appears in Google Search.</li>
   <li><strong>YouTube (Google)</strong> provides a video only if you press play on an embedded YouTube video.</li>
   {{#comments}}<li><strong>Resend</strong>, an email provider based in the United States, delivers the emails our website sends: the contact form message to us, the confirmation to the sender, and the comment emails described above. It acts as a processor for us and keeps its own delivery records under its own policy. It tells us when an address bounces or reports an email as spam.</li>{{/comments}}

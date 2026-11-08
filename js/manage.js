@@ -63,21 +63,21 @@
   function retryable(code) {
     var what = kind === 'u' ? 'Could not stop emails' : kind === 'r' ? 'Could not finish' : 'Could not open comment';
     title.textContent = code === 429 ? 'Too many attempts' : what;
-    text.textContent = code === 429 ? 'Try again later.' : 'Check your connection, then try again.';
+    text.textContent = code === 429 ? 'Try again later.' : 'Connection failed.';
     button.hidden = false;
     idle('Try again');
     state('err');
-    say('is-err', code === 429 ? 'Too many attempts. Try again later.' : what + '. Try again.');
+    say('is-err', code === 429 ? 'Too many attempts. Try again later.' : 'Something went wrong.');
     button.focus();
   }
   function failReview(code) {
-    if (code === 404) outcome('is-err', 'Link is invalid or expired', 'Use the latest link from your email.', 'Link is invalid or expired.', { next: true });
+    if (code === 404) outcome('is-err', 'Link is invalid or expired', '', 'Link is invalid or expired.', { next: true });
     else if (code === 409) outcome('is-err', 'Comment was deleted', 'It can no longer be approved.', 'Comment was deleted.', { next: true });
     else retryable(code);
   }
   function fail(code) {
     if (kind === 'r') { failReview(code); return; }
-    if (code === 404) { outcome('is-err', 'Link is invalid or expired', 'Use the latest link from your email.', 'Link is invalid or expired.', { next: true }); return; }
+    if (code === 404) { outcome('is-err', 'Link is invalid or expired', '', 'Link is invalid or expired.', { next: true }); return; }
     retryable(code);
   }
   function show(st, h, p, label) {
@@ -140,7 +140,7 @@
         if (j.id == null || !/^\d+$/.test(String(j.id)) || typeof j.token !== 'string' || !/^[A-Za-z0-9_-]{32,64}$/.test(j.token) || typeof j.slug !== 'string' || !SLUG_RE.test(j.slug)) { fail(404); return; }
         if (!ownSet(j.id, j.token)) {
           secret = '';
-          outcome('is-err', 'Browser storage is blocked', 'Allow site data for this page, then open the link again.', 'Browser storage is blocked. Allow site data for this page, then open the link again.');
+          outcome('is-err', 'Browser storage is blocked', '', 'Browser storage is blocked.');
           return;
         }
         // From here the code is stored. The button never comes back: pressing it again would send nothing useful.

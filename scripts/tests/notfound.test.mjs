@@ -73,15 +73,21 @@ test('404: every address is root-absolute, also under a basePath', () => {
 
 test('404: without JavaScript nothing pretends to redirect', () => {
   const h = render404();
-  for (const attr of ['data-nf-timer', 'data-nf-flow', 'data-nf-back']) assert.ok(openTag(h, attr).includes(' hidden'), `${attr} must start hidden`);
+  for (const attr of ['data-nf-flow', 'data-nf-back']) assert.ok(openTag(h, attr).includes(' hidden'), `${attr} must start hidden`);
   assert.doesNotMatch(h, /http-equiv="refresh"/i);
   assert.match(h, /href="\/"[^>]*>[\s\S]*?Go to homepage/);
 });
 
-test('the Stop button is the first control in <main>', () => {
-  const first = mainOf(render404()).match(/<(a|button|input|select|textarea)\b[^>]*>/);
-  assert.ok(first, 'no control in <main>');
-  assert.match(first[0], /data-nf-stop/);
+test('404: there is no countdown, no Stop button and no automatic redirect, in the page or in the script', () => {
+  const h = render404();
+  assert.doesNotMatch(h, /data-nf-timer|data-nf-stop|data-nf-count|data-nf-unit|nf-timer|Taking you to the home page/);
+  assert.doesNotMatch(NF_SRC(), /location\.replace|location\.assign|location\.href\s*=|setInterval|setTimeout|clearInterval/);
+  for (const o of [{}, { path: '/missing/' }, { reduce: true }]) {
+    const t = setup(o);
+    t.tick(30);
+    assert.equal(replaces(t).length, 0, JSON.stringify(o));
+    assert.equal(t.intervals(), 0, JSON.stringify(o));
+  }
 });
 
 test('404: the email-link notice is generic and gives the contact address', () => {
@@ -156,77 +162,6 @@ function setup({ path: pathname = '/nope/', search = '', hash = '', base = '', r
 }
 const replaces = (t) => t.log.filter((x) => x[0] === 'replace');
 
-test('a plain missing page counts down from 10 and replaces the location with the home page', () => {
-  const t = setup();
-  assert.equal(t.nodes.timer.hidden, false);
-  assert.equal(t.nodes.count.textContent, '10');
-  t.tick(9);
-  assert.equal(t.nodes.count.textContent, '1');
-  assert.equal(t.nodes.unit.textContent, 'second');
-  assert.equal(replaces(t).length, 0);
-  t.tick(1);
-  assert.deepEqual(replaces(t), [['replace', '/']]);
-});
-
-test('the live status is written once at the start, never on each tick', () => {
-  const t = setup();
-  t.tick(5);
-  assert.equal(t.nodes.status.writes, 1);
-  assert.match(t.nodes.status.textContent, /home page in 10 seconds\. Press Stop/);
-});
-
-test('Stop, a key, a pointer, a wheel, a touch or focus stops it for good', () => {
-  const cases = [['stop', 'click'], ['doc', 'keydown'], ['doc', 'pointerdown'], ['doc', 'wheel'], ['doc', 'touchstart'], ['doc', 'focusin']];
-  for (const [where, type] of cases) {
-    const t = setup(where === 'stop' ? { active: 'stop' } : {});
-    t.fire(where === 'stop' ? t.nodes.stop : t.doc, type);
-    t.tick(20);
-    assert.equal(replaces(t).length, 0, type);
-    assert.ok(t.nodes.timer.classList.contains('is-stopped'), type);
-    assert.ok(t.nodes.stop.hidden && t.nodes.count.hidden && t.nodes.unit.hidden, type);
-    assert.equal(t.nodes.status.textContent, 'Automatic redirect stopped.', type);
-    assert.match(t.nodes.text.textContent, /^Automatic redirect stopped\. Choose where to go below\.$/, type);
-    if (where === 'stop') assert.equal(t.nodes.text.focused, 1);
-  }
-});
-
-test('a tab that starts hidden never counts down; hiding the tab stops it', () => {
-  const h = setup({ visibility: 'hidden' });
-  assert.equal(h.nodes.timer.hidden, true);
-  assert.equal(h.intervals(), 0);
-  const t = setup();
-  t.doc.visibilityState = 'hidden';
-  t.fire(t.doc, 'visibilitychange');
-  t.tick(20);
-  assert.equal(replaces(t).length, 0);
-});
-
-test('reduced motion, a query string or a fragment: no countdown', () => {
-  for (const o of [{ reduce: true }, { search: '?fbclid=x' }, { hash: '#part' }]) {
-    const t = setup(o);
-    assert.equal(t.nodes.timer.hidden, true, JSON.stringify(o));
-    assert.equal(t.intervals(), 0, JSON.stringify(o));
-    t.tick(20);
-    assert.equal(replaces(t).length, 0);
-  }
-});
-
-test('reload, back/forward and a page restored from the back/forward cache: no countdown', () => {
-  for (const navType of ['reload', 'back_forward']) {
-    const t = setup({ navType });
-    assert.equal(t.nodes.timer.hidden, true, navType);
-    assert.equal(t.intervals(), 0, navType);
-  }
-  const t = setup();
-  t.fire(t.win, 'pageshow', { persisted: true });
-  t.tick(20);
-  assert.equal(replaces(t).length, 0);
-  const p = setup();
-  p.fire(p.win, 'pagehide', {});
-  p.tick(20);
-  assert.equal(replaces(p).length, 0);
-});
-
 test('email-link paths show the notice, drop the code first and never redirect', () => {
   const T = 'A'.repeat(32);
   const cases = [['/newsletter/', { hash: '#c=' + T }], ['/manage/', { hash: '#l=' + T }], ['/manage/x/', { search: '?t=1' }], ['/repo/newsletter/', { hash: '#u=x', base: '/repo' }]];
@@ -234,7 +169,6 @@ test('email-link paths show the notice, drop the code first and never redirect',
     const t = setup({ path: p, ...o });
     assert.deepEqual(t.log[0], ['replaceState', p], p);
     assert.equal(t.nodes.flow.hidden, false, p);
-    assert.equal(t.nodes.timer.hidden, true, p);
     t.tick(20);
     assert.equal(replaces(t).length, 0, p);
   }
@@ -243,13 +177,6 @@ test('email-link paths show the notice, drop the code first and never redirect',
   assert.equal(plain.log.filter((x) => x[0] === 'replaceState').length, 0);
   const near = setup({ path: '/newsletters-old/' });
   assert.equal(near.nodes.flow.hidden, true);
-  assert.equal(near.nodes.timer.hidden, false);
-});
-
-test('under a basePath the redirect goes to the base home', () => {
-  const t = setup({ base: '/repo', path: '/repo/nope/' });
-  t.tick(10);
-  assert.deepEqual(replaces(t), [['replace', '/repo/']]);
 });
 
 test('Go back appears only when there is a page to go back to', () => {
@@ -488,23 +415,3 @@ test('posts: pictures fade in when loaded or failed, and at once when already co
   assert.ok(late.classes.has('is-loaded') && broken.classes.has('is-loaded'));
 });
 
-test('a real pointer move or a scroll stops the countdown; a small drift or the first position does not', () => {
-  const small = setup();
-  small.fire(small.doc, 'pointermove', { clientX: 100, clientY: 100 });
-  small.fire(small.doc, 'pointermove', { clientX: 105, clientY: 104 });
-  small.tick(3);
-  assert.equal(small.nodes.timer.classes.has('is-stopped'), false);
-  small.fire(small.doc, 'pointermove', { clientX: 100, clientY: 130 });
-  assert.equal(small.nodes.timer.classes.has('is-stopped'), true);
-  small.tick(20);
-  assert.equal(replaces(small).length, 0);
-  const sc = setup();
-  sc.fire(sc.win, 'scroll');
-  assert.equal(sc.nodes.timer.classes.has('is-stopped'), true);
-  sc.tick(20);
-  assert.equal(replaces(sc).length, 0);
-  const weird = setup();
-  weird.fire(weird.doc, 'pointermove', {});
-  weird.fire(weird.doc, 'pointermove', undefined);
-  assert.equal(weird.nodes.timer.classes.has('is-stopped'), false);
-});

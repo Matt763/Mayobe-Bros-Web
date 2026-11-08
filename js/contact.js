@@ -12,6 +12,7 @@
   var status = form.querySelector('.form-status');
   var button = form.querySelector('button[type="submit"]');
   var loaded = Date.now();
+  var human = typeof window !== 'undefined' && window.MBTurnstile ? window.MBTurnstile.attach(form) : null; // null when the page has no Turnstile key
   var sending = false;
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   // field: [fewest characters, most characters, label]. The message names the field and the problem, in a few words (see problem()).
@@ -64,7 +65,7 @@
     return out;
   }
   // Encodes text for a mailto link but stops once about `max` encoded characters are used, so the link stays short enough for mail apps.
-  var NOTE = '\n\n(message shortened, please paste the rest)';
+  var NOTE = '\n\n(message shortened)';
   function encodeLimited(text, max) {
     var out = '', i = 0, cut = false;
     while (i < text.length) {
@@ -78,7 +79,7 @@
   }
   function plainFallback() {
     status.className = 'form-status is-err';
-    status.textContent = 'Could not send. Email us at ' + mailto + '.';
+    status.textContent = 'Message not sent. Email us at ' + mailto + '.';
   }
   // The address itself is the link: it opens the visitor's mail app with the message already filled in.
   function fallback(f, lead) {
@@ -88,7 +89,7 @@
     a.href = href;
     a.textContent = mailto;
     status.className = 'form-status is-err';
-    status.textContent = lead || 'Could not send. Try again, or email ';
+    status.textContent = lead || 'Message not sent. Email us at ';
     status.appendChild(a);
     status.appendChild(doc.createTextNode('.'));
   }
@@ -120,21 +121,28 @@
         status.focus();
       } else if (r.status === 400 && r.body.field && RULES[r.body.field] && r.body.error) {
         fieldError(r.body.field, r.body.error);
-        setStatus('err', 'One field needs attention.');
+        setStatus('err', 'Invalid input.');
         f[r.body.field].focus();
+      } else if (r.status === 400 && r.body.field === 'check') {
+        setStatus('err', 'Complete the security check.');
+        status.focus();
       } else if (r.status === 429) {
-        showFallback(f, 'Too many attempts. Try again later, or email ');
+        showFallback(f, 'Too many attempts. Email us at ');
       } else {
         showFallback(f);
       }
     };
-    fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(payload) })
+    var send = function (tt) {
+      if (tt) payload.tt = tt;
+      return fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(payload) });
+    };
+    (human ? human.token().then(send) : send(''))
       .then(function (r) {
         return r.json().catch(function () { return {}; }).then(function (j) { return { status: r.status, ok: r.ok, body: j || {} }; });
       })
       .then(handle)
       .catch(function () { showFallback(f); })
-      .then(function () { sending = false; button.disabled = false; });
+      .then(function () { if (human) human.reset(); sending = false; button.disabled = false; });
   });
   form.addEventListener('input', function (e) {
     var k = e.target && e.target.name;

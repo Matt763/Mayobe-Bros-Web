@@ -23,9 +23,21 @@ export function slugify(text) {
 
 // A link or picture address from a post. javascript:, vbscript: and data: addresses (also when hidden with spaces, tabs, line breaks or control
 // characters, which browsers ignore inside the scheme) become "#", so pasted or drafted text can never run script from a click.
+const ENTITY = { colon: ':', tab: '\t', newline: '\n', nbsp: ' ', lpar: '(', rpar: ')', amp: '&', sol: '/', period: '.', num: '#', quest: '?', excl: '!', apos: "'", quot: '"' };
+const decodeEntities = (t) => t.replace(/&(?:#(\d{1,7})|#[xX]([0-9a-fA-F]{1,6})|([A-Za-z]{2,8}));?/g, (m, d, h, n) => {
+  if (n) return ENTITY[n.toLowerCase()] ?? m;
+  const cp = d ? Number(d) : parseInt(h, 16);
+  return cp > 0 && cp <= 0x10ffff ? String.fromCodePoint(cp) : '';
+});
+// Entities are decoded first (the browser decodes them inside href, so "javascript&colon;" is javascript:). A scheme that is not
+// http, https, mailto or tel is refused; relative paths, "#" and "?" addresses are kept.
 const cleanUrl = (u) => {
   const url = u.startsWith('<') && u.endsWith('>') ? u.slice(1, -1) : u;
-  return /^(?:javascript|vbscript|data):/i.test(url.replace(/[\u0000-\u0020\u007f-\u009f\u200b-\u200f\u2028\u2029\ufeff]/g, '')) ? '#' : url;
+  let flat = url;
+  for (let i = 0; i < 3; i++) flat = decodeEntities(flat);
+  flat = flat.replace(/[\u0000-\u0020\u007f-\u009f\u200b-\u200f\u2028\u2029\ufeff]/g, '');
+  const scheme = /^([A-Za-z][A-Za-z0-9+.-]*):/.exec(flat);
+  return scheme && !/^(?:https?|mailto|tel)$/i.test(scheme[1]) ? '#' : url;
 };
 const isExternal = (u) => /^https?:\/\//i.test(u);
 

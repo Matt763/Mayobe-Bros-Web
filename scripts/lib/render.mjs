@@ -407,7 +407,7 @@ ${body}
 ${footer()}
 ${SEARCH_MODAL()}
 <script src="${assetUrl('js/motion.js')}" defer></script>
-${meta.notFound ? `<script src="${assetUrl('js/notfound.js')}" defer></script>\n<script src="${assetUrl('js/notfound-posts.js')}" defer></script>\n` : ''}<script src="${assetUrl('js/site.js')}" defer></script>${meta.listen ? `\n<script src="${assetUrl('js/listen.js')}" defer></script>` : ''}${body.includes('class="pagination"') || body.includes('hero-listing') ? `\n<script src="${assetUrl('js/pager.js')}" defer></script>` : ''}${api ? `\n<script src="${assetUrl('js/engage.js')}" defer></script>` : ''}${api && meta.contact ? `\n<script src="${assetUrl('js/contact.js')}" defer></script>` : ''}${api && meta.manage ? `\n<script src="${assetUrl('js/manage.js')}" defer></script>` : ''}${newsletter ? `\n<script src="${assetUrl('js/subscribe.js')}" defer></script>` : ''}${newsletter && meta.newsletterPage ? `\n<script src="${assetUrl('js/newsletter.js')}" defer></script>` : ''}${cfToken && !meta.manage && !meta.newsletterPage ?`\n<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${cfToken}"}'></script>` : ''}
+${config.turnstileSiteKey ? `<script src="${assetUrl('js/turnstile.js')}" defer></script>\n` : ''}${meta.notFound ? `<script src="${assetUrl('js/notfound.js')}" defer></script>\n<script src="${assetUrl('js/notfound-posts.js')}" defer></script>\n` : ''}<script src="${assetUrl('js/site.js')}" defer></script>${meta.listen ? `\n<script src="${assetUrl('js/listen.js')}" defer></script>` : ''}${body.includes('class="pagination"') || body.includes('hero-listing') ? `\n<script src="${assetUrl('js/pager.js')}" defer></script>` : ''}${api ? `\n<script src="${assetUrl('js/engage.js')}" defer></script>` : ''}${api && meta.contact ? `\n<script src="${assetUrl('js/contact.js')}" defer></script>` : ''}${api && meta.manage ? `\n<script src="${assetUrl('js/manage.js')}" defer></script>` : ''}${newsletter ? `\n<script src="${assetUrl('js/subscribe.js')}" defer></script>` : ''}${newsletter && meta.newsletterPage ? `\n<script src="${assetUrl('js/newsletter.js')}" defer></script>` : ''}${cfToken && !meta.manage && !meta.newsletterPage ?`\n<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${cfToken}"}'></script>` : ''}
 </body>
 </html>
 `;
@@ -979,9 +979,9 @@ ${discover()}`;
     return `<form class="form" id="contact-form" action="${e(c.formAction || '#')}" method="post" novalidate data-mailto="${e(c.general)}" data-endpoint="${e(endpoint)}"${api ? ' data-mail-api' : ''}>
   <div class="form-row">
     ${field('name', 'Your name', '<input id="cf-name" name="name" type="text" autocomplete="name" required maxlength="50" placeholder="Your name" aria-describedby="cf-name-err">')}
-    ${field('email', 'Your email', '<input id="cf-email" name="email" type="email" autocomplete="email" required maxlength="254" placeholder="you@example.com" aria-describedby="cf-email-err">')}
+    ${field('email', 'Your email', '<input id="cf-email" name="email" type="email" autocomplete="email" required maxlength="254" placeholder="Email" aria-describedby="cf-email-err">')}
   </div>
-  ${field('subject', 'Subject', '<input id="cf-subject" name="subject" type="text" required maxlength="120" placeholder="How can we help?" aria-describedby="cf-subject-err">')}
+  ${field('subject', 'Subject', '<input id="cf-subject" name="subject" type="text" required maxlength="120" placeholder="Subject" aria-describedby="cf-subject-err">')}
   ${field('message', 'Message', '<textarea id="cf-message" name="message" rows="6" required maxlength="3000" placeholder="Write your message here" aria-describedby="cf-message-err"></textarea>')}
   ${endpoint ? '<div class="hp" aria-hidden="true"><label>Leave this field empty <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>' : ''}
   <button class="btn btn-primary btn-lg" type="submit">Send message ${icon('arrowRight', 18)}</button>
@@ -1031,6 +1031,8 @@ ${inner}
         // {{#newsletter}}...{{/newsletter}} only when the newsletter is on (newsletterAction "api" with a comments API); {{^newsletter}} when it is not
         .replace(/\{\{#newsletter\}\}([\s\S]*?)\{\{\/newsletter\}\}/g, (_m, t) => (newsletter ? t : ''))
         .replace(/\{\{\^newsletter\}\}([\s\S]*?)\{\{\/newsletter\}\}/g, (_m, t) => (newsletter ? '' : t))
+        .replace(/\{\{#turnstile\}\}([\s\S]*?)\{\{\/turnstile\}\}/g, (_m, t) => (config.turnstileSiteKey ? t : ''))
+        .replace(/\{\{\^turnstile\}\}([\s\S]*?)\{\{\/turnstile\}\}/g, (_m, t) => (config.turnstileSiteKey ? '' : t))
         .replace(/\{\{#cfanalytics\}\}([\s\S]*?)\{\{\/cfanalytics\}\}/g, (_m, t) => (cfToken ? t : ''))
         .replace(/\{\{\^cfanalytics\}\}([\s\S]*?)\{\{\/cfanalytics\}\}/g, (_m, t) => (cfToken ? '' : t))
         .replace(/\{\{#analytics\}\}([\s\S]*?)\{\{\/analytics\}\}/g, (_m, t) => (gtmId ? t : ''))
@@ -1074,7 +1076,7 @@ ${withIds.html}
     );
   }
 
-  /* The 404 page: no hero. Everything that needs JavaScript (the countdown card, the email-link notice, "Go back") ships hidden;
+  /* The 404 page: no hero. Everything that needs JavaScript (the email-link notice, "Go back") ships hidden; there is no countdown and no automatic redirect;
      js/notfound.js reveals the right parts. Every address goes through u(), because GitHub Pages serves this file at any missing path. */
   function notFound() {
     const mail = config.contact?.general || '';
@@ -1087,17 +1089,10 @@ ${withIds.html}
   <span class="nf-badge" aria-hidden="true">${icon('search', 44)}</span>
   <h1 class="nf-title">Page not found</h1>
   <p class="nf-text">We could not find the page you are looking for. It may have moved or been removed, or the address may be wrong.</p>
-  <div class="nf-card nf-timer" data-nf-timer hidden>
-    <p class="nf-timer-head"><span class="nf-dot" aria-hidden="true"></span><span data-nf-text tabindex="-1">Taking you to the home page in</span></p>
-    <p class="nf-count" data-nf-count></p>
-    <p class="nf-unit" data-nf-unit>seconds</p>
-    <button class="btn btn-outline btn-sm" type="button" data-nf-stop>Stop, stay on this page</button>
-  </div>
   <div class="nf-card nf-flow" data-nf-flow hidden>
     <h2 class="nf-card-title">This email link is not working right now</h2>
     <p>You opened a link from one of our emails, but the page it opens is not available at the moment. Nothing has been changed. Please try the link in the email again later. If it still does not work, email us at <a href="mailto:${e(mail)}">${e(mail)}</a> and tell us what you were trying to do.</p>
   </div>
-  <p class="sr-only" role="status" data-nf-status></p>
   <div class="nf-actions"><a class="btn btn-primary btn-lg" href="${u('/')}">${icon('home', 18)} Go to homepage</a><button class="btn btn-outline btn-lg" type="button" data-nf-back hidden>${icon('arrowLeft', 18)} Go back</button></div>
 </div>
   <div class="wrap nf-more" data-nf-posts data-per="9">
@@ -1222,7 +1217,7 @@ ${withIds.html}
   <form class="comment-form" novalidate>
     <div class="form-row">
       <div class="field"><label for="cm-name">Name</label><input id="cm-name" name="name" type="text" maxlength="50" autocomplete="nickname" required placeholder="Your name"></div>
-      <div class="field"><label for="cm-email">Email <span class="opt">(optional, never shown)</span></label><input id="cm-email" name="email" type="email" maxlength="120" autocomplete="email" placeholder="you@example.com"></div>
+      <div class="field"><label for="cm-email">Email <span class="opt">(optional, never shown)</span></label><input id="cm-email" name="email" type="email" maxlength="120" autocomplete="email" placeholder="Email"></div>
     </div>
     <div class="field"><label for="cm-body">Your comment</label><textarea id="cm-body" name="body" rows="4" maxlength="1500" required placeholder="Share your thoughts, question or experience"></textarea></div>
     <p class="sr-only" role="status" data-notify-live></p>
@@ -1235,7 +1230,7 @@ ${withIds.html}
     <input type="hidden" name="parent" value="">
     ${config.turnstileSiteKey ? '<div class="cf-turnstile-slot" data-turnstile-slot></div>' : ''}
     <div class="comment-actions"><button class="btn btn-primary" type="submit">Post comment ${icon('arrowRight', 16)}</button><button class="btn btn-outline" type="button" data-cancel-reply hidden>Cancel reply</button></div>
-    <p class="form-status" role="status" aria-live="polite"></p>
+    <p class="form-status" id="cm-status" role="status" aria-live="polite"></p>
   </form>
   <div class="comment-list" data-comment-list>${staticComments(p.slug)}</div>
 </section>`;

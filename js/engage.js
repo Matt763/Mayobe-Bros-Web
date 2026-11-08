@@ -45,10 +45,10 @@
   function call(path, opts) {
     return fetch(API + path, opts).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (j) {
-        if (!r.ok) { var e = new Error(typeof j.error === 'string' && j.error ? j.error : 'Something went wrong. Try again.'); e.status = r.status; throw e; }
+        if (!r.ok) { var e = new Error(typeof j.error === 'string' && j.error ? j.error : 'Something went wrong.'); e.status = r.status; throw e; }
         return j;
       });
-    }, function () { throw new Error('Could not connect. Try again.'); });
+    }, function () { throw new Error('Connection failed.'); });
   }
   function post(path, body) {
     return call(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -249,7 +249,7 @@
     }).catch(function (err) {
       likedIds[c.id] = was; c.likes = wasN;
       paintLike(btn, c);
-      liveSay(err.message || 'Could not save like. Try again.');
+      liveSay(err.message || 'Something went wrong.');
     }).then(function () { delete likePending[c.id]; });
   }
   function focusAfter(id, sel) {
@@ -449,7 +449,7 @@
           allComments = allComments.concat(j.comments || []);
           nextOffset = j.next || 0;
           add();
-        }).catch(function () { more.disabled = false; more.removeAttribute('aria-busy'); more.textContent = 'Could not load more. Try again.'; });
+        }).catch(function () { more.disabled = false; more.removeAttribute('aria-busy'); more.textContent = 'Something went wrong.'; });
       });
       list.appendChild(more);
     }
@@ -488,7 +488,7 @@
       showStats(j.stats);
       renderComments(j.comments, j.next);
     }).catch(function () {
-      if (list && !list.children.length) list.appendChild(el('p', 'comment-empty', 'Could not load comments.'));
+      if (list && !list.children.length) list.appendChild(el('p', 'comment-empty', 'Something went wrong.'));
     });
   }
 
@@ -520,6 +520,13 @@
     if (notifyRow) { form.elements.email.addEventListener('input', syncNotify); form.elements.email.addEventListener('change', syncNotify); syncNotify(); }
     ['focusin'].forEach(function (ev) { form.addEventListener(ev, loadTurnstile, { once: true }); });
     $('[data-cancel-reply]', form).addEventListener('click', function () { form.elements.parent.value = ''; this.hidden = true; setStatus('', ''); });
+    // a field's red edge goes as soon as it is edited, and the status line is tied to the fields for screen readers
+    ['name', 'body', 'email'].forEach(function (n) {
+      var x = form.elements[n];
+      if (!x) return;
+      if (status && status.id) x.setAttribute('aria-describedby', status.id);
+      x.addEventListener('input', function () { x.removeAttribute('aria-invalid'); if (status.classList.contains('is-err')) setStatus('', ''); });
+    });
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       var f = form.elements;

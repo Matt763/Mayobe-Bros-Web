@@ -45,6 +45,7 @@
     var q = function (s) { return form.querySelector(s); };
     var input = form.elements.email;
     var trap = form.elements.website;
+    var human = typeof window !== 'undefined' && window.MBTurnstile ? window.MBTurnstile.attach(form) : null; // null when the page has no Turnstile key
     var status = q('.foot-status');
     var button = q('button[type="submit"]');
     var label = q('.nl-btn-label');
@@ -145,12 +146,17 @@
       setState('sending');
       setLabel('Sending…');
       say('quiet', 'Sending…'); // read out by screen readers; the button already says it on screen
-      fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ email: email, website: trap ? String(trap.value || '') : '', elapsed: Math.max(0, Math.round(clock() - loaded)) }),
-        credentials: 'omit'
-      })
+      var send = function (tt) {
+        var payload = { email: email, website: trap ? String(trap.value || '') : '', elapsed: Math.max(0, Math.round(clock() - loaded)) };
+        if (tt) payload.tt = tt;
+        return fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify(payload),
+          credentials: 'omit'
+        });
+      };
+      (human ? human.token().then(send) : send(''))
         .then(function (r) {
           return r.json().catch(function () { return {}; }).then(function (j) { return { status: r.status, ok: r.ok, body: j || {} }; });
         })
@@ -162,16 +168,19 @@
           } else if (r.status === 429) {
             setState('idle');
             say('err', 'Too many attempts. Try again later.');
+          } else if (r.status === 400 && r.body.field === 'check') {
+            setState('idle');
+            say('err', 'Complete the security check.');
           } else if (r.status === 400 && r.body.field === 'email') {
             setState('idle');
             badAddress();
           } else {
             setState('idle');
-            say('err', 'Could not subscribe. Try again later, or use ', 'rss');
+            say('err', 'Something went wrong. Use ', 'rss');
           }
         })
-        .catch(function () { setState('idle'); say('err', 'Could not subscribe. Try again later, or use ', 'rss'); })
-        .then(function () { sending = false; button.disabled = false; button.removeAttribute('aria-busy'); setLabel('Subscribe'); });
+        .catch(function () { setState('idle'); say('err', 'Something went wrong. Use ', 'rss'); })
+        .then(function () { if (human) human.reset(); sending = false; button.disabled = false; button.removeAttribute('aria-busy'); setLabel('Subscribe'); });
     }
 
     form.addEventListener('submit', function (e) { e.preventDefault(); submit(); });

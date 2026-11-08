@@ -29,7 +29,15 @@ function resolve(urlPath) {
 http
   .createServer((req, res) => {
     // never expose source/config folders from the preview
-    const hidden = /^\/(\.git|content|scripts|node_modules)(\/|$)|^\/(site\.config\.json|package\.json|\.build-manifest\.json)$/.test(req.url.split('?')[0]);
+    // (any dot-file such as .admin-token, plus worker/ with its keys, docs/ and the build files)
+    const pathOnly = req.url.split('?')[0];
+    let decoded = pathOnly;
+    try { decoded = decodeURIComponent(pathOnly); } catch { /* resolve() refuses it */ }
+    const hostOk = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(req.headers.host || '') || !!process.env.HOST;
+    const hidden = !hostOk
+      || /(^|\/)\.(?!well-known(\/|$))/.test(decoded)
+      || /^\/(content|scripts|node_modules|worker|docs)(\/|$)/.test(decoded)
+      || /^\/(site\.config\.json|package\.json|package-lock\.json)$/.test(decoded);
     const file = hidden ? null : resolve(req.url);
     const target = file || path.join(ROOT, '404.html');
     res.writeHead(file ? 200 : 404, { 'Content-Type': TYPES[path.extname(target)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });

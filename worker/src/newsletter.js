@@ -10,7 +10,7 @@
 
 import { sendMail, validEmail, CAPS } from './mail.js';
 import { confirmSubscriptionEmail, welcomeEmail, farewellEmail, newPostEmail, oneLine } from './mail-templates.js';
-import { SLUG_RE, TOKEN_RE, now, reply, fail, sha, ipHash, newToken, hit, readJson, siteOrigin, siteOf, canonicalEmail, utcDay, DAY_TTL, later } from './util.js';
+import { SLUG_RE, TOKEN_RE, now, reply, fail, sha, ipHash, newToken, hit, readJson, siteOrigin, siteOf, canonicalEmail, utcDay, DAY_TTL, later, humanCheck } from './util.js';
 
 // One neutral wording for every link problem (wrong, expired, already used, removed) and one for every limit, so an answer never says
 // whether an address is on the list or which check failed.
@@ -54,11 +54,11 @@ async function startSubscription(env, ctx, address) {
   const key = canonicalEmail(address);
   const t = now();
   await env.DB.prepare("INSERT INTO newsletter_subscribers(email, email_key, status, created) VALUES(?, ?, 'pending', ?) ON CONFLICT(email_key) DO NOTHING").bind(address, key, t).run();
-  const row = await env.DB.prepare('SELECT id, status FROM newsletter_subscribers WHERE email_key = ?').bind(key).first();
+  const row = await env.DB.prepare('SELECT id, status, email FROM newsletter_subscribers WHERE email_key = ?').bind(key).first();
   if (!row || row.status === 'active') return; // already subscribed: the same answer, no mail
   if (row.status === 'unsubscribed') {
     await env.DB.batch([
-      env.DB.prepare("UPDATE newsletter_subscribers SET status = 'pending', email = ?, confirmed = NULL, unsubscribed = NULL, farewell_sent = 0 WHERE id = ? AND status = 'unsubscribed'").bind(address, row.id),
+      env.DB.prepare("UPDATE newsletter_subscribers SET status = 'pending', confirmed = NULL, unsubscribed = NULL, farewell_sent = 0 WHERE id = ? AND status = 'unsubscribed'").bind(row.id),
       env.DB.prepare('DELETE FROM newsletter_tokens WHERE subscriber_id = ?').bind(row.id),
     ]);
   }
@@ -72,7 +72,8 @@ async function startSubscription(env, ctx, address) {
     env.DB.prepare("INSERT INTO newsletter_tokens(hash, subscriber_id, kind, expires, created) VALUES(?, ?, 'confirm', ?, ?)").bind(await sha(token), row.id, t + CONFIRM_DAYS * 86400000, t),
   ]);
   const m = confirmSubscriptionEmail({ confirmUrl: `${siteOrigin(env)}/newsletter/#c=${token}` }, siteOf(env));
-  await sendMail(env, ctx, { kind: 'news', to: address, ...m, key: `nl-confirm-${row.id}-${day}` });
+  // always the address stored on the row, never the typed variant: a +tag or case change must not redirect someone else's confirmation
+  await sendMail(env, ctx, { kind: 'news', to: row.email || address, ...m, key: `nl-confirm-${row.id}-${day}` });
 }
 
 // One search.json entry as the data the newsletter templates take. Pictures come from the build's own email JPEGs
@@ -178,6 +179,7 @@ export async function newsletterRoute(request, env, ctx, path, cors) {
     // `elapsed` is measured by the browser (ms since the page loaded), so a visitor's clock that is set wrong does not matter.
     const elapsed = typeof b.elapsed === 'number' || (typeof b.elapsed === 'string' && b.elapsed.trim() !== '') ? Number(b.elapsed) : NaN;
     if (b.website || !Number.isFinite(elapsed) || elapsed < MIN_FORM_MS) return reply({ ok: true }, 200, cors);
+    if (!(await humanCheck(env, request, b.tt))) return reply({ error: 'Complete the security check.', field: 'check' }, 400, cors);
     if (!env.RESEND_API_KEY) return fail('Could not subscribe. Try again later.', 503, cors); // before anything is stored
     const address = cleanAddress(b.email);
     if (!address) return reply({ error: String(b.email ?? '').trim() ? 'Email looks incorrect.' : 'Email is required.', field: 'email' }, 400, cors);
@@ -282,6 +284,7 @@ async function cleanUp(env, t) {
     q(`DELETE FROM newsletter_tokens WHERE subscriber_id IN (${gone})`, gc),
     q(`DELETE FROM newsletter_deliveries WHERE subscriber_id IN (${gone})`, gc),
     q(`DELETE FROM newsletter_subscribers WHERE id IN (${gone})`, gc),
+    q('DELETE FROM manage_links WHERE expires IS NOT NULL AND expires < ?1', t), // emailed comment links and device tokens that have run out
     // newsletter_sent itself is never purged: it is what stops a post from being sent again
     q('DELETE FROM newsletter_deliveries WHERE slug IN (SELECT slug FROM newsletter_sent WHERE sent_at IS NOT NULL AND sent_at < ?1)', t - DELIVERY_DAYS * D),
   ]);
