@@ -189,7 +189,8 @@ test('mail-test --dry new-post links an article path that is in search.json', as
   for (const name of ['new-post', 'new-post-video', 'welcome']) {
     const r = await runMailTest([name, '--dry']);
     assert.equal(r.code, 0, r.stderr);
-    assert.match(r.stdout, /^subject: \[TEST\] /);
+    assert.match(r.stdout, /^subject: [A-Z]/);
+    assert.doesNotMatch(r.stdout, /\[\s*test\s*\]/i, `${name}: no test label in the subject or text`);
     const links = [...r.stdout.matchAll(/https:\/\/mayobebros\.com(\/post\/[a-z0-9/-]+\/)/g)].map((m) => m[1]).filter((u) => u !== '/post/');
     assert.ok(links.length, `${name}: no article link`);
     for (const u of links) assert.ok(paths.has(u), `${name}: ${u} is not in search.json`);

@@ -793,3 +793,20 @@ test('footer links are a different colour from the footer text, so they read as 
   assert.equal(links.length, 3);
   for (const m of links) assert.equal(m[1].toLowerCase(), LIGHT.footerLink.toLowerCase());
 });
+
+// A "[TEST]" label must never reach a reader. The only place that ever added one was the owner's test-send script, so the source is
+// scanned as well as every email the templates build.
+test('no email a reader can get carries a [test] label: not in any subject, html or text, and not in the sending code', () => {
+  const LABEL = /\[\s*test\s*\]/i;
+  for (const name of BUILDERS) {
+    for (const data of [LONG[name], SHORT[name]]) {
+      const r = T[name](data, SITE);
+      assert.doesNotMatch(r.subject, LABEL, `${name}: subject`);
+      assert.doesNotMatch(r.html, LABEL, `${name}: html`);
+      assert.doesNotMatch(r.text, LABEL, `${name}: text`);
+    }
+  }
+  const root = new URL('../../', import.meta.url);
+  const files = [...fs.readdirSync(new URL('worker/src/', root)).filter((f) => f.endsWith('.js')).map((f) => `worker/src/${f}`), 'scripts/mail-test.mjs', 'scripts/newsletter.mjs'];
+  for (const f of files) assert.doesNotMatch(fs.readFileSync(new URL(f, root), 'utf8'), LABEL, `${f} adds a [test] label`);
+});

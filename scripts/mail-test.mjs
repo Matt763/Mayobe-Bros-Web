@@ -66,7 +66,7 @@ if (!name || !TEMPLATES[name] || (!to && !flags.includes('--dry'))) { console.er
 const [builder, data, kind, pageLinks] = TEMPLATES[name];
 const built = T[builder](data, SITE);
 if (flags.includes('--dry')) {
-  console.log(`subject: [TEST] ${built.subject}\n\n${built.text}`);
+  console.log(`subject: ${built.subject}\n\n${built.text}`);
   process.exit(0);
 }
 if (pageLinks && !flags.includes('--pages-live')) {
@@ -79,8 +79,9 @@ if (!flags.includes('--yes')) {
 }
 
 const env = { DB: makeD1(), RESEND_API_KEY: process.env.RESEND_API_KEY || '', MAIL_FROM: process.env.MAIL_FROM, MAIL_FROM_SUPPORT: process.env.MAIL_FROM_SUPPORT };
+// The subject is exactly what a reader gets, with no label added (scripts/tests/email-templates.test.mjs fails if one is).
 // contact-owner carries a reply_to, which also checks Resend's field name
-const r = await sendMail(env, { waitUntil() {} }, { kind, to, subject: `[TEST] ${built.subject}`, html: built.html, text: built.text, replyTo: name === 'contact-owner' ? 'sample@example.com' : undefined, key: `mail-test-${name}-${Date.now()}` });
+const r = await sendMail(env, { waitUntil() {} }, { kind, to, subject: built.subject, html: built.html, text: built.text, replyTo: name === 'contact-owner' ? 'sample@example.com' : undefined, key: `mail-test-${name}-${Date.now()}` });
 if (r.ok) console.log(`sent: template=${name} status=${r.status} id=${r.id || '(none)'}`);
 else console.log(`not sent: template=${name} ${r.skipped ? `skipped=${r.skipped}` : `status=${r.status ?? 'none'} (see the error line above)`}`);
 process.exitCode = r.ok ? 0 : 1;
