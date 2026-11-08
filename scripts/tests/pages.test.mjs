@@ -231,3 +231,41 @@ test('the newsletter page and both scripts are never in a sitemap', () => {
   const { R } = renderWith({ newsletterAction: 'api' });
   for (const [, xml] of R.sitemaps()) assert.doesNotMatch(xml, /\/newsletter\//);
 });
+
+// {{latest-posts:N}}: the /manage/ and /newsletter/ pages end every answer with the newest articles, written at build time (no extra request).
+const newest = () => JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'search.json'), 'utf8'));
+const nextReads = (html) => { const m = html.match(/<section class="next-reads"[^>]*>[\s\S]*?<\/section>/); return m ? m[0] : ''; };
+const fakePosts = (list) => list.map((x) => ({ slug: x.s, path: x.u, title: x.t, category: { name: x.c, slug: 'c' }, label: null, date: new Date(x.d), image: x.i, excerpt: x.e, readingMinutes: 3, tags: x.g, featured: false, text: '' }));
+
+test('{{latest-posts:3}} renders the 3 newest posts as horizontal cards with real links on /manage/ and, with the newsletter on, on /newsletter/', () => {
+  const want = newest().slice(0, 3).map((x) => x.u);
+  const manage = nextReads(fs.readFileSync(path.join(ROOT, 'manage', 'index.html'), 'utf8'));
+  assert.ok(manage, '/manage/ has a next-reads section: run node scripts/build.mjs');
+  for (const sec of [manage]) {
+    assert.match(sec, /^<section class="next-reads" data-next hidden aria-labelledby="next-reads-h"><h2 id="next-reads-h">Read our latest articles<\/h2>/);
+    assert.equal((sec.match(/<article class="card card-h">/g) || []).length, 3);
+    assert.deepEqual([...sec.matchAll(/class="card-link" href="([^"]+)"/g)].map((m) => m[1]), want);
+    assert.match(sec, /href="\/post\/"[^>]*>See all articles</);
+  }
+  for (const u of want) assert.ok(fs.existsSync(path.join(ROOT, u, 'index.html')), `${u} is a real page`);
+  // the newsletter page is built only with the newsletter on, so render it directly
+  const config = { ...JSON.parse(fs.readFileSync(path.join(ROOT, 'site.config.json'), 'utf8')), newsletterAction: 'api', commentsApi: 'https://api.test/' };
+  const { data, body } = parseFrontMatter(fs.readFileSync(path.join(ROOT, 'content', 'pages', 'newsletter.html'), 'utf8'));
+  const pg = { slug: 'newsletter', title: String(data.title), heading: data.heading, subtitle: data.subtitle, description: String(data.description), kind: data.kind, menu: false, order: 91, hero: data.hero, updated: null, html: body };
+  const R = createRenderer({ config, categories: [], posts: fakePosts(newest()), pages: [pg], authors: [], versions: {} });
+  const nl = nextReads(R.staticPage(pg));
+  assert.equal((nl.match(/<article class="card card-h">/g) || []).length, 3);
+  assert.deepEqual([...nl.matchAll(/class="card-link" href="([^"]+)"/g)].map((m) => m[1]), want);
+  // inside the card, so it shows with the answer
+  const page = R.staticPage(pg);
+  const card = page.slice(page.indexOf('data-newsletter-page'), page.indexOf('<h2 id="what-we-send"'));
+  assert.ok(card.includes('class="next-reads"'), 'the next reads sit inside the newsletter card');
+});
+
+test('{{latest-posts:9}} is a build error', () => {
+  const config = JSON.parse(fs.readFileSync(path.join(ROOT, 'site.config.json'), 'utf8'));
+  const R = createRenderer({ config, categories: [], posts: fakePosts(newest()), pages: [], authors: [], versions: {} });
+  const pg = (n) => ({ slug: 'x-test', title: 'X', heading: '', subtitle: '', description: 'x', kind: 'wide', menu: false, order: 1, hero: '', updated: null, html: `<p>a</p>{{latest-posts:${n}}}` });
+  for (const n of [0, 7, 9, 'x', '']) assert.throws(() => R.staticPage(pg(n)), /latest-posts/, String(n));
+  assert.equal((R.staticPage(pg(6)).match(/<article class="card card-h">/g) || []).length, 6);
+});

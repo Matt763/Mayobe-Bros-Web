@@ -17,15 +17,20 @@ function el() {
   n.focus = () => { n.focused++; };
   n.addEventListener = (t, f) => { n.handlers[t] = f; };
   n.getAttribute = (k) => n.attrs[k] ?? null;
+  n.setAttribute = (k, v) => { n.attrs[k] = String(v); };
+  n.removeAttribute = (k) => { delete n.attrs[k]; };
   return n;
 }
 
 // fetchImpl(url, init) returns { status, body } or throws; storage: { fail: true } makes localStorage throw
-function setup({ hash = `#l=${TOKEN}`, fetchImpl, storage = {}, preset } = {}) {
+// timers: pass { setTimeout, clearTimeout } to control the 15 s request timeout
+function setup({ hash = `#l=${TOKEN}`, fetchImpl, storage = {}, preset, timers = {} } = {}) {
   const log = [];
-  const nodes = { title: el(), text: el(), go: el(), status: el(), help: el(), home: el() };
-  nodes.home.hidden = true;
-  const box = { querySelector: (s) => ({ '[data-manage-title]': nodes.title, '[data-manage-text]': nodes.text, '[data-manage-go]': nodes.go, '[data-manage-status]': nodes.status, '[data-manage-help]': nodes.help, '[data-manage-home]': nodes.home })[s] || null };
+  const nodes = { title: el(), text: el(), go: el(), status: el(), help: el(), next: el() };
+  nodes.next.hidden = true;
+  const box = el();
+  box.querySelector = (s) => ({ '[data-manage-title]': nodes.title, '[data-manage-text]': nodes.text, '[data-manage-go]': nodes.go, '[data-manage-status]': nodes.status, '[data-manage-help]': nodes.help, '[data-next]': nodes.next })[s] || null;
+  nodes.box = box;
   const store = new Map(preset ? [['mb_own', JSON.stringify(preset)]] : []);
   const localStorage = { getItem: (k) => { if (storage.fail) throw new Error('blocked'); return store.has(k) ? store.get(k) : null; }, setItem: (k, v) => { if (storage.fail) throw new Error('blocked'); store.set(k, v); } };
   const location = { hash, pathname: '/manage/', search: '', assign: (u) => log.push(['assign', u]), reload() {} };
@@ -40,6 +45,7 @@ function setup({ hash = `#l=${TOKEN}`, fetchImpl, storage = {}, preset } = {}) {
       return { ok: r.status >= 200 && r.status < 300, status: r.status, json: async () => { if (r.body === undefined) throw new Error('no json'); return r.body; } };
     },
     JSON, Object, Array, String, Number, Date, RegExp, Error,
+    setTimeout: timers.setTimeout || setTimeout, clearTimeout: timers.clearTimeout || clearTimeout, AbortController,
   };
   vm.createContext(ctx);
   vm.runInContext(SRC, ctx);
@@ -83,7 +89,7 @@ test('a failed lookup after success leaves no live button, announces it, and sen
     await press(t);
     assert.equal(t.nodes.go.hidden, true, 'button gone');
     assert.match(t.nodes.status.textContent, /This browser can now edit your comment/);
-    assert.equal(t.nodes.home.hidden, false, 'a link to all articles is shown');
+    assert.equal(t.nodes.next.hidden, false, 'the latest articles and a link to all articles are shown');
     assert.ok(t.nodes.title.focused > 0, 'focus moved to the heading');
     assert.equal(t.log.filter((e) => e[0] === 'assign').length, 0);
     assert.ok(t.store.has('mb_own'), 'the code stays stored');
@@ -143,4 +149,37 @@ test('a missing or malformed fragment shows an explanation and wires no button',
     assert.equal(t.nodes.go.handlers.click, undefined, hash);
     assert.equal(t.log.filter((e) => e[0] === 'fetch').length, 0);
   }
+});
+
+test('a timeout shows the network text and Try again', async () => {
+  const pending = [];
+  const timers = { setTimeout: (f, ms) => { pending.push({ f, ms }); return pending.length; }, clearTimeout: (id) => { if (pending[id - 1]) pending[id - 1].f = null; } };
+  const t = setup({ timers, fetchImpl: (_url, init) => new Promise((_res, rej) => { init.signal.addEventListener('abort', () => rej(new Error('aborted'))); }) });
+  t.nodes.go.handlers.click();
+  assert.equal(t.nodes.go.disabled, true);
+  assert.equal(t.nodes.go.attrs['aria-busy'], 'true');
+  assert.equal(pending[0].ms, 15000);
+  pending[0].f();
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(t.nodes.status.textContent, 'We could not reach the comments service. Check your connection, then press Try again.');
+  assert.equal(t.nodes.go.textContent, 'Try again');
+  assert.equal(t.nodes.go.hidden, false);
+  assert.equal(t.nodes.go.disabled, false);
+  assert.equal(t.nodes.go.attrs['aria-busy'], undefined);
+  t.nodes.go.handlers.click();
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(t.log.filter((e) => e[0] === 'fetch').length, 2, 'one press, one more POST');
+});
+
+test('next reads appear after reply emails are stopped', async () => {
+  const t = setup({ hash: `#u=${TOKEN}`, fetchImpl: async () => ({ status: 200, body: { ok: true } }) });
+  assert.equal(t.nodes.next.hidden, true, 'hidden while the button waits');
+  await press(t);
+  assert.match(t.nodes.title.textContent, /Reply emails stopped/);
+  assert.equal(t.nodes.next.hidden, false);
+  assert.equal(t.nodes.box.attrs['data-state'], 'ok');
+  const gone = setup({ fetchImpl: async () => ({ status: 404, body: {} }) });
+  await press(gone);
+  assert.equal(gone.nodes.next.hidden, false, 'after a 404');
+  assert.equal(setup({ hash: '', fetchImpl: exchangeOk() }).nodes.next.hidden, false, 'on the no-link screen');
 });

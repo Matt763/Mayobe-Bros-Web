@@ -1531,6 +1531,39 @@ main.is-switching .hero-listing + .section > .wrap > * { animation: none !import
 @media (max-width: 480px) { .manage-card { padding: 1.25rem; } }
 /* /manage/ is a task page: keep the picture short so the button is on the first screen */
 .page-manage .hero { min-height: 17rem; }
+/* /manage/ and /newsletter/: the card answers every press. js/manage.js and js/newsletter.js set data-state on the card:
+   mail (waiting for a press), busy, ok (big check mark), info (nothing to do, used or expired), err (could not reach the server). */
+.mc-badge { display: flex; align-items: center; justify-content: center; width: 3.25rem; height: 3.25rem; margin: 0 0 1rem; border-radius: 50%; background: var(--surface-2); color: var(--link); }
+.mc-i { display: none; }
+.manage-card[data-state="mail"] .mc-i-mail, .manage-card[data-state="busy"] .mc-i-mail, .manage-card[data-state="ok"] .mc-i-ok, .manage-card[data-state="info"] .mc-i-info, .manage-card[data-state="err"] .mc-i-err { display: block; }
+.manage-card[data-state="busy"] .mc-badge { animation: nl-wait-pulse 1.4s ease-in-out infinite; }
+.manage-card[data-state="ok"] .mc-badge { width: 4.5rem; height: 4.5rem; background: var(--ok); color: var(--surface); animation: mc-pop 0.5s var(--ease) both; }
+.manage-card[data-state="ok"] .mc-i-ok { width: 2.5rem; height: 2.5rem; }
+.manage-card[data-state="err"] .mc-badge { background: var(--err); color: var(--surface); }
+.manage-card[data-state="ok"] > h2 { font-size: clamp(1.85rem, 4.5vw, 2.4rem); }
+/* the heading or the busy button already says it: the status line is still read out, but not shown twice */
+.manage-card[data-state="ok"] .form-status, .manage-card[data-state="info"] .form-status, .manage-card[data-state="busy"] .form-status { position: absolute; width: 1px; height: 1px; min-height: 0; margin: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.manage-card { position: relative; }
+.manage-card .btn[aria-busy="true"] { cursor: progress; opacity: 1; }
+.manage-card .btn[aria-busy="true"]::before { content: ""; width: 1.05em; height: 1.05em; border: 2.5px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: nl-wait 0.8s linear infinite; }
+@keyframes nl-wait { to { transform: rotate(360deg); } }
+@keyframes nl-wait-pulse { 50% { opacity: 0.55; } }
+@keyframes mc-pop { 0% { transform: scale(0.6); opacity: 0; } 70% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .manage-card .mc-badge, .manage-card .btn[aria-busy="true"]::before { animation: none !important; } }
+/* {{latest-posts:N}}: the newest articles, shown with the answer */
+.next-reads { margin: 1.5rem 0 0; padding-top: 1.5rem; border-top: 1px solid var(--line-soft); }
+.manage-card .next-reads h2 { font-size: 1.3rem; font-weight: 800; margin: 0 0 1rem; }
+.next-grid { display: grid; gap: 0.75rem; }
+.next-reads .card-h { flex-direction: row; gap: 0.9rem; padding: 0.8rem; }
+.next-reads .card-h .card-thumb { width: 6rem; height: 4.5rem; aspect-ratio: auto; }
+.next-reads .card-h .card-title { font-size: 1.0625rem; line-height: 1.35; margin: 0 0 0.3rem; }
+.next-reads .card-link { color: inherit; text-decoration: none; }
+.next-reads .card-cat { font-size: 0.875rem; line-height: 1.4; }
+.next-reads .card-meta { font-size: 0.875rem; line-height: 1.4; }
+.next-reads .card-stats { display: none !important; }
+.next-reads .next-more { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 1.25rem 0 0; }
+.manage-card .next-more .btn { margin: 0; }
+@media (max-width: 400px) { .next-reads .card-h .card-thumb { width: 4.75rem; height: 3.75rem; } .next-reads .next-more .btn { flex: 1 1 100%; } }
 @media (max-width: 480px) { .notify-row { padding: 0.75rem; column-gap: 0.6rem; } .notify-row label { font-size: 0.9375rem; } .notify-row .notify-hint { grid-column: 1 / -1; font-size: 0.875rem; } }
 
 /* Motion for in-place page changes (js/motion.js, window.MBMotion). Only opacity and transform move; nothing touches html or body

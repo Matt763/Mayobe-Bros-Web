@@ -16,16 +16,21 @@ function el() {
   n.focus = () => { n.focused++; };
   n.addEventListener = (t, f) => { n.handlers[t] = f; };
   n.getAttribute = (k) => n.attrs[k] ?? null;
+  n.setAttribute = (k, v) => { n.attrs[k] = String(v); };
+  n.removeAttribute = (k) => { delete n.attrs[k]; };
   return n;
 }
 
-function setup({ hash = `#c=${TOKEN}`, search = '', fetchImpl = async () => ({ status: 200, body: { ok: true } }) } = {}) {
+// timers: pass { setTimeout, clearTimeout } to control the 15 s request timeout; AbortController is the real one unless given
+function setup({ hash = `#c=${TOKEN}`, search = '', fetchImpl = async () => ({ status: 200, body: { ok: true } }), timers = {} } = {}) {
   const log = [];
-  const nodes = { title: el(), text: el(), go: el(), status: el(), help: el(), home: el() };
+  const nodes = { title: el(), text: el(), go: el(), status: el(), help: el(), next: el() };
   nodes.go.hidden = true;
-  nodes.home.hidden = true;
-  const sel = { '[data-nl-title]': nodes.title, '[data-nl-text]': nodes.text, '[data-nl-go]': nodes.go, '[data-nl-status]': nodes.status, '[data-nl-help]': nodes.help, '[data-nl-home]': nodes.home };
-  const box = { querySelector: (s) => sel[s] || null };
+  nodes.next.hidden = true;
+  const sel = { '[data-nl-title]': nodes.title, '[data-nl-text]': nodes.text, '[data-nl-go]': nodes.go, '[data-nl-status]': nodes.status, '[data-nl-help]': nodes.help, '[data-next]': nodes.next };
+  const box = el();
+  box.querySelector = (s) => sel[s] || null;
+  nodes.box = box;
   const location = { hash, pathname: '/newsletter/', search, reload: () => log.push(['reload']) };
   const ctx = {
     document: { querySelector: (s) => (s === '[data-newsletter-page]' ? box : null), documentElement: { getAttribute: (k) => ({ 'data-api': 'https://api.test', 'data-base': '' })[k] ?? null } },
@@ -38,6 +43,7 @@ function setup({ hash = `#c=${TOKEN}`, search = '', fetchImpl = async () => ({ s
       return { ok: r.status >= 200 && r.status < 300, status: r.status, json: async () => { if (r.body === undefined) throw new Error('no json'); return r.body; } };
     },
     JSON, Object, String, Number, RegExp, Error,
+    setTimeout: timers.setTimeout || setTimeout, clearTimeout: timers.clearTimeout || clearTimeout, AbortController: timers.AbortController || AbortController,
   };
   vm.createContext(ctx);
   vm.runInContext(SRC, ctx);
@@ -59,7 +65,7 @@ test('nothing is fetched on load and the fragment leaves the address bar first',
 
 test('one press on Confirm makes one POST /v1/newsletter/confirm with the token', async () => {
   const t = setup();
-  assert.equal(t.nodes.title.textContent, 'Confirm your subscription');
+  assert.equal(t.nodes.title.textContent, 'One last step: confirm your subscription');
   assert.equal(t.nodes.go.textContent, 'Confirm my subscription');
   await press(t);
   assert.equal(fetches(t).length, 1);
@@ -71,7 +77,10 @@ test('one press on Confirm makes one POST /v1/newsletter/confirm with the token'
   assert.deepEqual(JSON.parse(body), { token: TOKEN });
   assert.equal(t.nodes.go.hidden, true, 'no button after success');
   assert.ok(t.nodes.title.focused > 0, 'focus on the new heading');
-  assert.match(t.nodes.status.textContent, /confirmed/i);
+  assert.equal(t.nodes.title.textContent, 'You are subscribed');
+  assert.match(t.nodes.text.textContent, /A welcome email with our latest articles is on its way\./);
+  assert.match(t.nodes.status.textContent, /subscribed/i);
+  assert.equal(t.nodes.box.attrs['data-state'], 'ok', 'the card shows the check mark');
   // a stray second click sends nothing
   t.nodes.go.handlers.click(); await new Promise((r) => setTimeout(r, 10));
   assert.equal(fetches(t).length, 1);
@@ -93,8 +102,8 @@ test('one press on Unsubscribe makes one POST /v1/newsletter/unsubscribe', async
 test('404 shows the expired-or-used message with focus on the heading and no button', async () => {
   const t = setup({ fetchImpl: async () => ({ status: 404, body: { error: 'x' } }) });
   await press(t);
-  assert.match(t.nodes.title.textContent, /expired or was already used/);
-  assert.match(t.nodes.status.textContent, /expired or was already used/);
+  assert.equal(t.nodes.title.textContent, 'This link was already used or has expired');
+  assert.match(t.nodes.status.textContent, /already used or has expired/);
   assert.equal(t.nodes.go.hidden, true);
   assert.ok(t.nodes.title.focused > 0);
   const u = setup({ hash: `#u=${TOKEN}`, fetchImpl: async () => ({ status: 404, body: { error: 'x' } }) });
@@ -128,6 +137,79 @@ test('no or a malformed fragment wires no button', () => {
     assert.ok(t.nodes.title.textContent.length > 0);
   }
   assert.match(setup({ hash: '#c=short' }).nodes.title.textContent, /does not look right/);
+});
+
+test('the confirm screen says it is the last step and that the press stops email scanners', () => {
+  const t = setup();
+  assert.equal(t.nodes.title.textContent, 'One last step: confirm your subscription');
+  assert.equal(t.nodes.text.textContent, 'You opened the link from our email. Press the button to finish. We ask for this press so that email scanners cannot sign anyone up.');
+  assert.equal(t.nodes.go.textContent, 'Confirm my subscription');
+  assert.equal(t.nodes.go.hidden, false);
+});
+
+test('next reads are hidden on load and shown after success, after 404 and on the no-fragment screen', async () => {
+  const ok = setup();
+  assert.equal(ok.nodes.next.hidden, true, 'hidden while the button waits');
+  await press(ok);
+  assert.equal(ok.nodes.next.hidden, false, 'after confirm');
+  const un = setup({ hash: `#u=${TOKEN}` });
+  assert.equal(un.nodes.next.hidden, true);
+  await press(un);
+  assert.equal(un.nodes.next.hidden, false, 'after unsubscribe');
+  const gone = setup({ fetchImpl: async () => ({ status: 404, body: {} }) });
+  await press(gone);
+  assert.equal(gone.nodes.next.hidden, false, 'after 404');
+  const err = setup({ fetchImpl: async () => { throw new Error('offline'); } });
+  await press(err);
+  assert.equal(err.nodes.next.hidden, true, 'not on a network error: the retry button stays the focus');
+  for (const hash of ['', '#c=short']) assert.equal(setup({ hash }).nodes.next.hidden, false, `on "${hash}"`);
+});
+
+test('the 404 text tells someone who already confirmed that they are subscribed', async () => {
+  const t = setup({ fetchImpl: async () => ({ status: 404, body: {} }) });
+  await press(t);
+  assert.equal(t.nodes.text.textContent, 'If you already pressed Confirm, you are subscribed and there is nothing more to do. If not, the link may be older than 7 days: sign up again with the form at the bottom of this page.');
+});
+
+test('a request with no answer for 15 s shows the network text and Try again; one press makes exactly one more POST', async () => {
+  const pending = [];
+  const timers = { setTimeout: (f, ms) => { pending.push({ f, ms }); return pending.length; }, clearTimeout: (id) => { if (pending[id - 1]) pending[id - 1].f = null; } };
+  // a fetch that never answers on its own; it rejects only when its signal is aborted
+  const fetchImpl = (_url, init) => new Promise((_res, rej) => { init.signal.addEventListener('abort', () => rej(new Error('aborted'))); });
+  const t = setup({ fetchImpl, timers });
+  t.nodes.go.handlers.click();
+  assert.equal(pending.length, 1);
+  assert.equal(pending[0].ms, 15000);
+  pending[0].f();
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(t.nodes.status.textContent, 'We could not reach our server. Check your connection, then press Try again.');
+  assert.equal(t.nodes.go.textContent, 'Try again');
+  assert.equal(t.nodes.go.hidden, false);
+  assert.equal(t.nodes.go.disabled, false);
+  assert.equal(t.nodes.go.attrs['aria-busy'], undefined);
+  assert.equal(fetches(t).length, 1);
+  t.nodes.go.handlers.click();
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(fetches(t).length, 2, 'one press, one more POST');
+});
+
+test('while waiting the button is disabled and aria-busy', async () => {
+  let answer;
+  const t = setup({ fetchImpl: () => new Promise((res) => { answer = res; }) });
+  t.nodes.go.handlers.click();
+  assert.equal(t.nodes.go.disabled, true);
+  assert.equal(t.nodes.go.attrs['aria-busy'], 'true');
+  assert.equal(t.nodes.go.textContent, 'Confirming...');
+  assert.equal(t.nodes.status.textContent, 'Confirming...');
+  // a second press while waiting sends nothing
+  t.nodes.go.handlers.click();
+  assert.equal(fetches(t).length, 1);
+  answer({ status: 200, body: { ok: true } });
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(t.nodes.go.attrs['aria-busy'], undefined);
+  const u = setup({ hash: `#u=${TOKEN}`, fetchImpl: () => new Promise(() => {}) });
+  u.nodes.go.handlers.click();
+  assert.equal(u.nodes.go.textContent, 'Unsubscribing...');
 });
 
 test('the script has exactly one fetch call, reached only from the button', () => {

@@ -924,6 +924,15 @@ ${discover()}`;
 </form>`;
   }
 
+  function latestPosts(n) {
+    const list = posts.slice(0, n);
+    if (!list.length) return '';
+    return `<section class="next-reads" data-next hidden aria-labelledby="next-reads-h"><h2 id="next-reads-h">Read our latest articles</h2>
+<div class="next-grid">${list.map((p, i) => card(p, i, 'horizontal', 'h3')).join('')}</div>
+<p class="next-more"><a class="btn btn-primary" href="${u('/post/')}">See all articles</a><a class="btn btn-outline" href="${u('/')}">Home page</a></p>
+</section>`;
+  }
+
   function staticPage(pg) {
     // {{#comments}}...{{/comments}} is kept only when the comments server is switched on; {{^comments}}...{{/comments}} only when it is not
     const fill = (h) =>
@@ -945,6 +954,12 @@ ${discover()}`;
         .replace(/\{\{site-url\}\}/g, e(siteUrl))
         .replace(/\{\{updated\}\}/g, fmtDate(pg.updated || new Date(), true));
     const withIds = addHeadingIds(fill(pg.html));
+    // {{latest-posts:N}} (N 1 to 6): the newest articles as horizontal cards, hidden until a page script shows them (/manage/, /newsletter/).
+    // Filled after the heading ids, so the card titles do not join the page's contents list.
+    withIds.html = withIds.html.replace(/\{\{latest-posts:([^}]*)\}\}/g, (_m, n) => {
+      if (!/^[1-6]$/.test(n)) throw new Error(`content/pages/${pg.slug}.html: {{latest-posts:${n}}} needs a number from 1 to 6`);
+      return latestPosts(Number(n));
+    });
     const isDoc = pg.kind === 'legal';
     const toc = withIds.toc.filter((t) => t.level === 2 || t.level === 3);
     const rail = pages.filter((p) => p.kind === 'legal' && p.slug !== pg.slug);
