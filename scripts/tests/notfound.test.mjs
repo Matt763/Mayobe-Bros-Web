@@ -407,6 +407,15 @@ test('posts: without MBMotion the swap is instant and the heading is scrolled in
   assert.equal(t.status.textContent, 'Page 2 of 3');
 });
 
+test('posts: local() accepts one leading slash only (no //, no backslash, no scheme)', () => {
+  const src = NP_SRC();
+  const m = src.match(/function local\(s\) \{[^\n]*\}/);
+  assert.ok(m);
+  const local = new Function(m[0] + '; return local;')();
+  assert.equal(local('/post/a/'), '/post/a/');
+  for (const bad of ['//evil.example/x', '/\\evil.example/x', '\\evil', 'https://evil.example', 'javascript:alert(1)', 'post/a/', '', null, 5]) assert.equal(local(bad), '', String(bad));
+});
+
 test('posts: a modified click is left to the browser; titles are escaped; under a basePath the index is fetched from the base', async () => {
   const t = runPosts({ data: INDEX, base: '/repo' });
   await t.settle();

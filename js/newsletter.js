@@ -60,7 +60,7 @@
     if (label) { button.textContent = label; button.hidden = false; } else { button.hidden = true; showNext(); }
   }
 
-  if (kind === 'c') show('mail', 'One last step: confirm your subscription', 'You opened the link from our email. Press the button to finish. We ask for this press so that email scanners cannot sign anyone up.', 'Confirm my subscription');
+  if (kind === 'c') show('mail', 'One last step: confirm your subscription', 'You opened the link from our email. Press the button to finish. We ask you to press it so that email scanners cannot sign anyone up.', 'Confirm my subscription');
   else if (kind === 'u') show('mail', 'Stop newsletter emails', 'Press the button and we will stop sending you newsletter emails. Nothing happens until you press it.', 'Unsubscribe');
   else if (!frag) show('info', 'Open the link from your email', 'This page works with the link in an email from us. To sign up, use the form at the bottom of this page.');
   else show('info', 'This link does not look right', 'It may have been cut short when it was copied. Open the link from the email again, or copy the whole address.');
@@ -92,7 +92,7 @@
         if (!r.ok) { fail(r.status); return; }
         secret = '';
         if (kind === 'u') outcome('ok', 'is-ok', 'You are unsubscribed', 'Thank you for reading. We will not send you newsletter emails any more. If you change your mind, you can sign up again with the form at the bottom of this page.', 'You are unsubscribed from our newsletter.', { noHelp: true });
-        else outcome('ok', 'is-ok', 'You are subscribed', 'Thank you. We will send you one email when we publish a new article, and every email has a link to stop. We are sending a welcome email with our latest articles. It can take a few minutes, and on a very busy day it may be skipped.', 'You are subscribed. Your subscription is confirmed.', { noHelp: true });
+        else outcome('ok', 'is-ok', 'You are subscribed', 'Thank you. We will send you one email when we publish a new article, and every email has a link to stop. We are sending a welcome email with our latest articles. It can take a few minutes, and on a very busy day it may be skipped.', 'Your subscription is confirmed.', { noHelp: true });
       })
       .catch(function () { busy = false; fail(0); });
   }

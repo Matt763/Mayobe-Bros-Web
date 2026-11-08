@@ -79,7 +79,7 @@ test('one press on Confirm makes one POST /v1/newsletter/confirm with the token'
   assert.ok(t.nodes.title.focused > 0, 'focus on the new heading');
   assert.equal(t.nodes.title.textContent, 'You are subscribed');
   assert.match(t.nodes.text.textContent, /We are sending a welcome email[\s\S]*it may be skipped\./);
-  assert.match(t.nodes.status.textContent, /subscribed/i);
+  assert.match(t.nodes.status.textContent, /^Your subscription is confirmed\.$/);
   assert.equal(t.nodes.box.attrs['data-state'], 'ok', 'the card shows the check mark');
   // a stray second click sends nothing
   t.nodes.go.handlers.click(); await new Promise((r) => setTimeout(r, 10));
@@ -142,7 +142,7 @@ test('no or a malformed fragment wires no button', () => {
 test('the confirm screen says it is the last step and that the press stops email scanners', () => {
   const t = setup();
   assert.equal(t.nodes.title.textContent, 'One last step: confirm your subscription');
-  assert.equal(t.nodes.text.textContent, 'You opened the link from our email. Press the button to finish. We ask for this press so that email scanners cannot sign anyone up.');
+  assert.equal(t.nodes.text.textContent, 'You opened the link from our email. Press the button to finish. We ask you to press it so that email scanners cannot sign anyone up.');
   assert.equal(t.nodes.go.textContent, 'Confirm my subscription');
   assert.equal(t.nodes.go.hidden, false);
 });

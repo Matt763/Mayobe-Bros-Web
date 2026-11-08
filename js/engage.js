@@ -450,7 +450,7 @@
     var to = low && M ? M.topOf(node) : 0;
     node.style.animation = '';
     if (!low) return;
-    if (M) M.glide(to); else node.scrollIntoView({ block: 'start' });
+    if (M) M.glide(to); else node.scrollIntoView({ behavior: 'instant', block: 'start' });
   }
   function startReply(c) {
     form.elements.parent.value = c.id;

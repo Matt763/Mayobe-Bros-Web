@@ -273,7 +273,7 @@
     // bring the top of the list into view: the cards are hidden at this moment, so the far part of the trip is one jump
     if (!wasAbove) return null;
     if (m) return m.glide(target, { covered: true });
-    listTop.scrollIntoView({ block: 'start' });
+    listTop.scrollIntoView({ behavior: 'instant', block: 'start' });
     return null;
   }
 
@@ -329,7 +329,7 @@
     // if the reader had scrolled far down, bring them back to the top of the new page (the content is hidden: covered)
     if (!farDown) return null;
     if (m) return m.glide(0, { covered: true });
-    hero.scrollIntoView({ block: 'start' });
+    hero.scrollIntoView({ behavior: 'instant', block: 'start' });
     return null;
   }
 

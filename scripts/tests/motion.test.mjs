@@ -373,7 +373,7 @@ test('pager.js: shared motion, no native smooth scroll, restoration handed back 
   assert.match(src, /MBMotion/);
   assert.match(src, /scrollRestoration = 'manual'/);
   assert.match(src, /pagehide[\s\S]{0,200}scrollRestoration = 'auto'/);
-  assert.doesNotMatch(src, /scrollIntoView\(\{ behavior|behavior: fx \? 'smooth'|minHeight|is-entering|announce\(\(nav/);
+  assert.doesNotMatch(src, /scrollIntoView\(\{ behavior: (?!'instant')|behavior: fx \? 'smooth'|minHeight|is-entering|announce\(\(nav/);
 });
 
 test('Show more buttons use the shared glide and never scroll by focus', () => {
@@ -387,4 +387,17 @@ test('Show more buttons use the shared glide and never scroll by focus', () => {
   const handler = engage.slice(at, engage.indexOf('list.appendChild', at));
   assert.doesNotMatch(handler, /renderComments\(/, 'Show more comments appends the next batch, it does not re-render the list');
   assert.match(engage, /MBMotion/);
+});
+
+test('without motion.js the fallbacks jump instantly, never the page-wide smooth scroll', () => {
+  for (const f of ['pager.js', 'notfound-posts.js', 'engage.js', 'site.js']) {
+    const src = fs.readFileSync(path.join(ROOT, 'js', f), 'utf8');
+    for (const m of src.matchAll(/(?:M|first|node|listTop|hero|title\.)\w*\.?scrollIntoView\(\{([^}]*)\}\)/g)) {
+      if (/'smooth'|reduceMotion|center/.test(m[1])) continue; // other flows (mini player, comment form)
+      assert.match(m[1], /behavior: 'instant'/, f + ': ' + m[0]);
+    }
+  }
+  const src = fs.readFileSync(path.join(ROOT, 'js', 'pager.js'), 'utf8');
+  assert.match(src, /listTop\.scrollIntoView\(\{ behavior: 'instant'/);
+  assert.match(src, /hero\.scrollIntoView\(\{ behavior: 'instant'/);
 });

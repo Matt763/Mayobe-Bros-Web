@@ -219,7 +219,7 @@
     first.focus({ preventScroll: true });
     if (first.getBoundingClientRect().top <= 0.6 * window.innerHeight) return;
     var M = window.MBMotion;
-    if (M) M.glide(M.topOf(first)); else first.scrollIntoView({ block: 'start' });
+    if (M) M.glide(M.topOf(first)); else first.scrollIntoView({ behavior: 'instant', block: 'start' });
   }
 
   var pageInput = $('#search-page-input');
@@ -1013,7 +1013,7 @@
         a.focus({ preventScroll: true });
         if (first.getBoundingClientRect().top > 0.6 * window.innerHeight) {
           var M = window.MBMotion;
-          if (M) M.glide(M.topOf(first)); else first.scrollIntoView({ block: 'start' });
+          if (M) M.glide(M.topOf(first)); else first.scrollIntoView({ behavior: 'instant', block: 'start' });
         }
       }
       // the rise starts 26 px lower, so it is added only after the cards were measured (same frame, nothing is painted between)

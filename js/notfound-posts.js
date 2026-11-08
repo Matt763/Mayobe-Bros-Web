@@ -31,7 +31,7 @@
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
   }
   // only addresses on this site, never javascript: or another origin
-  function local(s) { return typeof s === 'string' && /^\/(?!\/)/.test(s) ? s : ''; }
+  function local(s) { return typeof s === 'string' && /^\/(?![\/\\])/.test(s) ? s : ''; }
   function shuffle(a) {
     for (var i = a.length - 1; i > 0; i--) {
       var j = Math.floor(Math.random() * (i + 1));
@@ -124,7 +124,7 @@
       draw();
       announce('Page ' + page + ' of ' + total);
       if (userMoved) {
-        if (title && title.scrollIntoView) title.scrollIntoView({ block: 'start' });
+        if (title && title.scrollIntoView) title.scrollIntoView({ behavior: 'instant', block: 'start' });
         focusFirst();
       }
       return;
