@@ -57,7 +57,7 @@
     "executive": "mclean@mayobebros.com",
     "formAction": ""
   },
-  "newsletterAction": "",
+  "newsletterAction": "api",
   "social": {
     "facebook": "",
     "twitter": "",

@@ -328,10 +328,18 @@
   <div class="foot-cta">
     <div class="wrap foot-cta-in">
       <div>
-        <h2>Learn something useful every week</h2>
+        <h2>Get new articles by email</h2>
         <p>Clear, honest guides on education, money, business and technology in Tanzania. No spam, no paywall.</p>
       </div>
-      <div class="foot-cta-act"><a class="btn btn-primary btn-lg" href="/rss/"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg> Follow with RSS</a></div>
+      <div class="foot-cta-act"><form class="foot-form" action="/newsletter/" method="get" data-newsletter data-endpoint="https://mayobe-engage.mattmclean763.workers.dev/v1/newsletter/subscribe" novalidate hidden>
+          <label class="sr-only" for="foot-email">Email address</label>
+          <input id="foot-email" type="email" name="email" required maxlength="254" placeholder="Your email address" autocomplete="email" aria-describedby="foot-note">
+          <div class="hp" aria-hidden="true"><label>Leave this field empty <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
+          <button class="btn btn-primary" type="submit">Subscribe <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></button>
+          <p class="foot-status" role="status"></p>
+          <p class="foot-form-note" id="foot-note">One email when we publish a new article. Stop any time. See our <a href="/privacy-policy/#newsletter">Privacy Policy</a>.</p>
+        </form>
+        <noscript><p class="foot-form-note foot-nojs">Email sign-up needs JavaScript. You can follow new articles with RSS instead.</p><a class="btn btn-primary btn-lg" href="/rss/"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg> Follow with RSS</a></noscript></div>
     </div>
   </div>
   <div class="wrap">
@@ -371,6 +379,7 @@
 <script src="/js/site.js?v=9a7a455b" defer></script>
 <script src="/js/listen.js?v=8a95f609" defer></script>
 <script src="/js/engage.js?v=82bf8c43" defer></script>
+<script src="/js/subscribe.js?v=374a087e" defer></script>
 <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "8278babd2d454653881df2e2a030ad02"}'></script>
 </body>
 </html>

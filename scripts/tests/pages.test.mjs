@@ -126,7 +126,8 @@ import { createRenderer, newsletterOn, newsletterSetting } from '../lib/render.m
 import { parseFrontMatter } from '../lib/frontmatter.mjs';
 
 function renderWith(over = {}) {
-  const config = { ...JSON.parse(fs.readFileSync(path.join(ROOT, 'site.config.json'), 'utf8')), ...over };
+  // The "off" state is tested whatever site.config.json says (it is "api" once the newsletter is live): a test turns it on by passing newsletterAction.
+  const config = { ...JSON.parse(fs.readFileSync(path.join(ROOT, 'site.config.json'), 'utf8')), newsletterAction: '', ...over };
   const on = newsletterOn(config);
   const dir = path.join(ROOT, 'content', 'pages');
   const pages = fs.readdirSync(dir).filter((f) => f.endsWith('.html')).map((f) => {
@@ -149,9 +150,9 @@ test('newsletterAction must be "" or "api"; the --newsletter flag turns it on', 
   assert.equal(newsletterOn({ commentsApi: 'https://api.test', newsletterAction: '' }), false);
 });
 
-test('no newsletter page, no subscribe script and no newsletter wording in the footer or privacy policy', () => {
+test('with the newsletter off: no newsletter page, no subscribe script and no newsletter wording in the footer or privacy policy', () => {
   const committed = JSON.parse(fs.readFileSync(path.join(ROOT, 'site.config.json'), 'utf8'));
-  assert.equal(committed.newsletterAction, '', 'git keeps the newsletter off until the owner switches it on');
+  assert.ok(['', 'api'].includes(committed.newsletterAction), 'newsletterAction is "" (off) or "api" (live since 2026-11-08)');
   const { page, on, pages } = renderWith();
   assert.equal(on, false);
   assert.equal(pages.some((p) => p.slug === 'newsletter'), false, 'the page is not built');
