@@ -24,7 +24,7 @@
 
   // the card's picture: mail (waiting for a press), busy, ok (check mark), info (nothing to do / already used), err (could not reach)
   function state(s) { box.setAttribute('data-state', s); }
-  function say(cls, msg) { status.className = 'form-status' + (cls ? ' ' + cls : ''); status.textContent = msg; }
+  function say(cls, msg) { status.className = 'form-status st-status' + (cls ? ' ' + cls : ''); status.textContent = msg; }
   function showNext() { if (next) next.hidden = false; }
   function idle(label) { button.disabled = false; button.removeAttribute('aria-busy'); button.textContent = label; }
   // A final state: the sentence is announced in the status region, the button is gone, the latest articles appear,
@@ -44,9 +44,11 @@
   function fail(code) {
     if (code === 404) {
       if (kind === 'u') outcome('info', 'is-err', 'We could not find that subscription', 'The link may be old, or the address may already have been removed from our list. If you still get our emails, write to us and we will remove it.', 'We could not find that subscription.');
-      else outcome('info', 'is-err', 'This link was already used or has expired', 'If you already pressed Confirm, you are subscribed and there is nothing more to do. If not, the link may be older than 7 days: sign up again with the form at the bottom of this page.', 'This link was already used or has expired.');
+      else outcome('info', 'is-err', 'This link was already used or has expired', 'If you already pressed Confirm, you are subscribed and there is nothing more to do. If not, the link may be older than 7 days: sign up again with the form at the bottom of any page on our site.', 'This link was already used or has expired.');
       return;
     }
+    title.textContent = code === 429 ? 'Too many tries' : 'We could not reach our server';
+    text.textContent = code === 429 ? 'Please wait a little, then press Try again. Nothing was changed.' : 'Check your connection, then press Try again. Nothing was changed.';
     button.hidden = false;
     idle('Try again');
     state('err');
@@ -62,7 +64,7 @@
 
   if (kind === 'c') show('mail', 'One last step: confirm your subscription', 'You opened the link from our email. Press the button to finish. We ask you to press it so that email scanners cannot sign anyone up.', 'Confirm my subscription');
   else if (kind === 'u') show('mail', 'Stop newsletter emails', 'Press the button and we will stop sending you newsletter emails. Nothing happens until you press it.', 'Unsubscribe');
-  else if (!frag) show('info', 'Open the link from your email', 'This page works with the link in an email from us. To sign up, use the form at the bottom of this page.');
+  else if (!frag) show('info', 'Open the link from your email', 'This page works with the link in an email from us. To sign up, use the form at the bottom of any page on our site.');
   else show('info', 'This link does not look right', 'It may have been cut short when it was copied. Open the link from the email again, or copy the whole address.');
 
   // One POST that gives up after 15 seconds. The first answer wins: a late reply after the timeout is ignored.
@@ -91,7 +93,7 @@
         busy = false;
         if (!r.ok) { fail(r.status); return; }
         secret = '';
-        if (kind === 'u') outcome('ok', 'is-ok', 'You are unsubscribed', 'Thank you for reading. We will not send you newsletter emails any more. If you change your mind, you can sign up again with the form at the bottom of this page.', 'You are unsubscribed from our newsletter.', { noHelp: true });
+        if (kind === 'u') outcome('ok', 'is-ok', 'You are unsubscribed', 'Thank you for reading. We will not send you newsletter emails any more. If you change your mind, you can sign up again with the form at the bottom of any page on our site.', 'You are unsubscribed from our newsletter.', { noHelp: true });
         else outcome('ok', 'is-ok', 'You are subscribed', 'Thank you. We will send you one email when we publish a new article, and every email has a link to stop. We are sending a welcome email with our latest articles. It can take a few minutes, and on a very busy day it may be skipped.', 'Your subscription is confirmed.', { noHelp: true });
       })
       .catch(function () { busy = false; fail(0); });

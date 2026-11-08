@@ -168,7 +168,7 @@ test('next reads are hidden on load and shown after success, after 404 and on th
 test('the 404 text tells someone who already confirmed that they are subscribed', async () => {
   const t = setup({ fetchImpl: async () => ({ status: 404, body: {} }) });
   await press(t);
-  assert.equal(t.nodes.text.textContent, 'If you already pressed Confirm, you are subscribed and there is nothing more to do. If not, the link may be older than 7 days: sign up again with the form at the bottom of this page.');
+  assert.equal(t.nodes.text.textContent, 'If you already pressed Confirm, you are subscribed and there is nothing more to do. If not, the link may be older than 7 days: sign up again with the form at the bottom of any page on our site.');
 });
 
 test('a request with no answer for 15 s shows the network text and Try again; one press makes exactly one more POST', async () => {
@@ -217,4 +217,8 @@ test('the script has exactly one fetch call, reached only from the button', () =
   assert.match(SRC, /addEventListener\('click',\s*go\)/);
   assert.equal([...SRC.matchAll(/(?<!function )\bgo\(\)/g)].length, 0, 'go() is never called directly');
   assert.match(SRC, /history\.replaceState/);
+});
+
+test('the status line keeps its st-status class when the script rewrites it (the stylesheet hides it in the ok, info and busy states)', () => {
+  assert.match(fs.readFileSync(new URL('../../js/newsletter.js', import.meta.url), 'utf8'), /status\.className = 'form-status st-status'/);
 });

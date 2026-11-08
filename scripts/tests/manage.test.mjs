@@ -246,3 +246,15 @@ test('review link: a hidden tab waits until it is shown; a cut-short or foreign 
     assert.equal(b.log.filter((e) => e[0] === 'fetch').length, 0, hash);
   }
 });
+
+test('the status line keeps its st-status class when the script rewrites it (the stylesheet hides it in the ok, info and busy states)', () => {
+  assert.match(SRC, /status\.className = 'form-status st-status'/);
+});
+
+test('a network error changes the heading and the sentence too, so the page never keeps saying "Opening your comment..."', async () => {
+  const t = setup({ fetchImpl: async () => { throw new Error('offline'); } });
+  await press(t);
+  assert.equal(t.nodes.title.textContent, 'We could not reach the server');
+  assert.match(t.nodes.text.textContent, /Nothing was changed/);
+  assert.equal(t.nodes.go.textContent, 'Try again');
+});

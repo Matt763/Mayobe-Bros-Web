@@ -20,11 +20,16 @@ function el(extra = {}) {
   n.hasAttribute = (k) => k in n.attrs;
   n.addEventListener = (t, f) => { n.handlers[t] = f; };
   n.appendChild = (c) => { n.children.push(c); return c; };
+  n.removeAttribute = (k) => { delete n.attrs[k]; };
+  n.classes = new Set();
+  n.classList = { add: (c) => n.classes.add(c), remove: (c) => n.classes.delete(c) };
+  n.offsetWidth = 1;
   return n;
 }
 
 // The status text as a person sees it: its own text plus any link or text nodes added after it.
 const shown = (s) => s.textContent + s.children.map((c) => c.textContent ?? c.text ?? '').join('');
+const state = (t) => t.form.attrs['data-state'];
 
 function setup({ fetchImpl = async () => ({ status: 200, body: { ok: true } }), email = 'neema@example.com', attrs = {} } = {}) {
   const log = [];
@@ -32,10 +37,18 @@ function setup({ fetchImpl = async () => ({ status: 200, body: { ok: true } }), 
   const website = el({ name: 'website', value: '' });
   const status = el();
   const button = el();
-  const form = el({ hidden: true, attrs: { 'data-newsletter': '', 'data-endpoint': ENDPOINT, ...attrs } });
+  const label = el({ textContent: 'Subscribe' });
+  const field = el();
+  const panelForm = el();
+  const panelDone = el({ attrs: { inert: '', 'aria-hidden': 'true' } });
+  const title = el();
+  const body = el();
+  const again = el();
+  const form = el({ hidden: true, attrs: { 'data-newsletter': '', 'data-endpoint': ENDPOINT, 'data-state': 'idle', ...attrs } });
   form.elements = { email: input, website };
   form.reset = () => { log.push(['reset']); input.value = ''; website.value = ''; };
-  form.querySelector = (s) => (s === '.foot-status' ? status : s.startsWith('button') ? button : null);
+  const nodes = { '.foot-status': status, 'button[type="submit"]': button, '.nl-btn-label': label, '.nl-field': field, '[data-nl-form]': panelForm, '[data-nl-done]': panelDone, '[data-nl-title]': title, '[data-nl-body]': body, '[data-nl-again]': again };
+  form.querySelector = (s) => nodes[s] ?? null;
   let clock = LOADED_AT;
   const ctx = {
     document: {
@@ -57,7 +70,7 @@ function setup({ fetchImpl = async () => ({ status: 200, body: { ok: true } }), 
   vm.runInContext(SRC, ctx);
   clock = LOADED_AT + 9000; // the visitor types for a while before pressing Subscribe
   const submit = async () => { form.handlers.submit({ preventDefault: () => log.push(['prevent']) }); await new Promise((r) => setTimeout(r, 20)); };
-  return { log, input, website, status, button, form, submit };
+  return { log, input, website, status, button, label, field, panelForm, panelDone, title, body, again, form, submit };
 }
 const fetches = (t) => t.log.filter((l) => l[0] === 'fetch');
 
@@ -72,7 +85,9 @@ test('an empty submit shows a message and sends nothing', async () => {
   const t = setup({ email: '   ' });
   await t.submit();
   assert.equal(fetches(t).length, 0);
-  assert.match(shown(t.status), /Please enter an email address/);
+  assert.match(shown(t.status), /does not look right/);
+  assert.ok(t.field.classes.has('is-nudge'), 'the field nudges');
+  assert.equal(state(t), 'idle');
 });
 
 test('a valid submit posts JSON {email, website:"", ts} once, disables the button while sending, shows the success text and clears the field', async () => {
@@ -80,6 +95,10 @@ test('a valid submit posts JSON {email, website:"", ts} once, disables the butto
   const t = setup({ fetchImpl: () => new Promise((r) => { release = () => r({ status: 200, body: { ok: true } }); }) });
   t.form.handlers.submit({ preventDefault() {} });
   assert.equal(t.button.disabled, true, 'disabled while sending');
+  assert.equal(state(t), 'sending');
+  assert.equal(t.label.textContent, 'Sending…');
+  assert.match(t.status.className, /is-quiet/, 'the live region says it; the button shows it');
+  assert.equal(t.button.attrs['aria-busy'], 'true');
   t.form.handlers.submit({ preventDefault() {} }); // a second press does nothing
   assert.equal(fetches(t).length, 1);
   const [, url, body, init] = fetches(t)[0];
@@ -94,10 +113,18 @@ test('a valid submit posts JSON {email, website:"", ts} once, disables the butto
   assert.equal(body.elapsed, 9000, 'elapsed = ms since the page loaded');
   release();
   await new Promise((r) => setTimeout(r, 20));
-  assert.equal(shown(t.status), 'Almost done. If this address can get our emails, we have sent it a link to confirm. Please check your inbox and spam folder.');
-  assert.match(t.status.className, /is-ok/);
+  assert.equal(state(t), 'sent', 'the confirmation card is shown');
+  assert.equal(shown(t.status), '', 'the card says it, not the live region');
+  const said = t.body.textContent + t.body.children.map((c) => c.textContent ?? c.text ?? '').join('');
+  assert.equal(said, 'If this address can receive our emails, a link to confirm is on its way:neema@example.comOpen it and press the button to finish.');
+  assert.equal(t.body.children[0].tag, 'strong', 'the address is a text node inside <strong>, never HTML');
+  assert.equal(t.body.children[0].textContent, 'neema@example.com');
+  assert.equal('inert' in t.panelDone.attrs, false, 'the card can be reached');
+  assert.equal('inert' in t.panelForm.attrs, true, 'the hidden form cannot be tabbed to');
+  assert.ok(t.title.focused > 0, 'focus moves to the card heading');
   assert.equal(t.input.value, '', 'field cleared');
   assert.equal(t.button.disabled, false);
+  assert.equal(t.label.textContent, 'Subscribe');
 });
 
 test('the honeypot value is sent as it is', async () => {
@@ -113,7 +140,7 @@ test('a bad address shows a message and fetches nothing', async () => {
     const t = setup({ email });
     await t.submit();
     assert.equal(fetches(t).length, 0, email);
-    assert.match(shown(t.status), /email address that looks right/, email);
+    assert.match(shown(t.status), /does not look right/, email);
     assert.match(t.status.className, /is-err/);
     assert.equal(t.input.attrs['aria-invalid'], 'true');
     assert.ok(t.input.focused > 0, 'focus goes to the field');
@@ -124,6 +151,7 @@ test('429 and 503 and a network error show their messages and re-enable the butt
   let t = setup({ fetchImpl: async () => ({ status: 429, body: { error: 'x' } }) });
   await t.submit();
   assert.equal(shown(t.status), 'Too many tries. Please wait an hour and try again.');
+  assert.equal(state(t), 'idle');
   assert.equal(t.button.disabled, false);
   assert.equal(t.input.value, 'neema@example.com', 'the address is kept');
   const generic = 'Sorry, that did not go through. Please try again later, or follow us with RSS.';
@@ -135,6 +163,7 @@ test('429 and 503 and a network error show their messages and re-enable the butt
     assert.ok(link, 'RSS is a link');
     assert.equal(link.href, '/rss/');
     assert.match(t.status.className, /is-err/);
+    assert.equal(state(t), 'idle');
     assert.equal(t.button.disabled, false);
   }
 });
@@ -142,8 +171,56 @@ test('429 and 503 and a network error show their messages and re-enable the butt
 test('a 400 naming the email field asks for a better address', async () => {
   const t = setup({ fetchImpl: async () => ({ status: 400, body: { error: 'That email address does not look right.', field: 'email' } }) });
   await t.submit();
-  assert.match(shown(t.status), /email address that looks right/);
+  assert.match(shown(t.status), /does not look right/);
   assert.equal(t.input.attrs['aria-invalid'], 'true');
+});
+
+test('a slip in a big provider name is offered back once; pressing Subscribe again sends the address as typed', async () => {
+  const t = setup({ email: 'neema@gmial.com' });
+  await t.submit();
+  assert.equal(fetches(t).length, 0, 'nothing sent on the first press');
+  assert.equal(shown(t.status), 'Did you mean neema@gmail.com? Yes, use it');
+  assert.match(t.status.className, /is-warn/);
+  assert.equal(t.status.children.find((c) => c.tag === 'button').type, 'button');
+  assert.equal(state(t), 'idle');
+  await t.submit();
+  assert.equal(fetches(t).length, 1, 'the second press sends it');
+  assert.equal(fetches(t)[0][2].email, 'neema@gmial.com');
+});
+
+test('"Yes, use it" puts the suggestion in the field and sends it', async () => {
+  const t = setup({ email: 'neema@gmail.con' });
+  await t.submit();
+  t.status.children.find((c) => c.tag === 'button').handlers.click();
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(fetches(t).length, 1);
+  assert.equal(fetches(t)[0][2].email, 'neema@gmail.com');
+});
+
+test('only near-misses of common providers are questioned: real and unrelated domains go straight through', async () => {
+  for (const email of ['a@gmail.com', 'a@yahoo.co.uk', 'a@gmx.com', 'a@company.co.tz', 'a@outlook.com', 'a@mail.ru']) {
+    const t = setup({ email });
+    await t.submit();
+    assert.equal(fetches(t).length, 1, email);
+  }
+  for (const [typed, hint] of [['a@gnail.com', 'a@gmail.com'], ['a@hotmial.com', 'a@hotmail.com'], ['a@yaho.com', 'a@yahoo.com'], ['a@outlok.com', 'a@outlook.com'], ['a@gmail.co', 'a@gmail.com'], ['a@icloud.cm', 'a@icloud.com']]) {
+    const t = setup({ email: typed });
+    await t.submit();
+    assert.equal(fetches(t).length, 0, typed);
+    assert.equal(shown(t.status), `Did you mean ${hint}? Yes, use it`, typed);
+  }
+});
+
+test('"Use a different address" brings the form back, focuses the field and hides the card', async () => {
+  const t = setup();
+  await t.submit();
+  assert.equal(state(t), 'sent');
+  const before = t.input.focused;
+  t.again.handlers.click();
+  assert.equal(state(t), 'idle');
+  assert.ok(t.input.focused > before, 'focus returns to the field');
+  assert.equal('inert' in t.panelForm.attrs, false);
+  assert.equal('inert' in t.panelDone.attrs, true);
 });
 
 test('without an endpoint the script does nothing', () => {

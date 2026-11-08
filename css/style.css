@@ -657,25 +657,85 @@ body.no-scroll { overflow: hidden; }
 .foot-cta p { margin-top: 0.4rem; color: #e8efff; font-size: 1.125rem; max-width: 42rem; }
 .foot-cta .btn-primary { background: #fff; color: #0f1f5c; }
 .foot-cta .btn-primary:hover { background: #dbe6ff; }
-.foot-form { display: flex; flex-wrap: wrap; gap: 0.6rem; }
-.foot-form input { min-width: min(100%, 18rem); padding: 0.85rem 1.2rem; border-radius: 999px; border: 2px solid rgba(255, 255, 255, 0.6); background: rgba(255, 255, 255, 0.12); color: #fff; font-size: 1.0625rem; }
-.foot-form input::placeholder { color: #e2eaff; opacity: 1; }
-.foot-form input:focus { outline: none; background: #fff; color: #0b1220; }
 .foot-status { flex-basis: 100%; font-size: 1rem; font-weight: 700; }
-/* newsletter form (js/subscribe.js): 44 px targets, a white focus ring that shows on the blue band, white status text (at least 4.5:1 on every part of the gradient) */
-.foot-form { max-width: 36rem; }
 .foot-form[hidden] { display: none; } /* shown by js/subscribe.js; without JavaScript the <noscript> RSS button stands in */
 .foot-cta .foot-nojs { margin: 0 0 0.75rem; }
-.foot-form input[type="email"] { flex: 1 1 16rem; min-height: 2.75rem; }
-.foot-form .btn { min-height: 2.75rem; }
-.foot-form input:focus-visible, .foot-form .btn:focus-visible, .foot-form a:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
-.foot-form input[aria-invalid="true"] { border-color: #fff; border-style: dashed; }
-.foot-cta .foot-status { margin: 0; color: #fff; }
-.foot-cta .foot-status:empty { display: none; }
-.foot-cta .foot-status.is-err { padding-left: 0.75rem; border-left: 4px solid #ffd0d0; }
-.foot-cta .foot-status.is-ok { padding-left: 0.75rem; border-left: 4px solid #b9f5cf; }
-.foot-cta .foot-form-note { flex-basis: 100%; margin: 0; font-size: 0.95rem; color: #e8efff; }
 .foot-cta .foot-form a { color: #fff; text-decoration: underline; text-underline-offset: 2px; }
+/* Newsletter sign-up (js/subscribe.js). One white capsule on the blue band (white on blue is the strongest contrast the band has) with the
+   button inside it. The form's data-state is idle, sending or sent. The "Check your inbox" card sits in the SAME grid cell as the form and
+   they cross-fade, so nothing resizes or shifts. Only opacity and transform animate (plus the check's stroke); with reduced motion the
+   movement is replaced by a plain fade. Keyframe names start with nlf- so no other block can replace them. */
+.nl-form { display: block; width: min(100%, 34rem); }
+.nl-stack { display: grid; }
+.nl-panel { grid-area: 1 / 1; align-self: center; min-width: 0; transition: opacity 0.38s var(--ease) 0.06s, transform 0.38s var(--ease) 0.06s, visibility 0s; }
+.nl-form[data-state="sent"] .nl-panel-form,
+.nl-form:not([data-state="sent"]) .nl-panel-done { opacity: 0; transform: translateY(10px); visibility: hidden; pointer-events: none; transition: opacity 0.24s ease, transform 0.24s ease, visibility 0s linear 0.24s; }
+.nl-panel-form { display: flex; flex-direction: column; gap: 0.7rem; }
+.nl-field { display: flex; align-items: center; gap: 0.35rem; padding: 0.3rem 0.3rem 0.3rem 1.15rem; background: #fff; border-radius: 999px; box-shadow: 0 12px 30px -14px rgba(5, 12, 45, 0.6); transition: transform 0.3s var(--ease); }
+.nl-field:focus-within { outline: 3px solid #fff; outline-offset: 3px; transform: translateY(-1px); }
+.nl-field:has(input[aria-invalid="true"]) { box-shadow: inset 0 0 0 2px #b42318, 0 12px 30px -14px rgba(5, 12, 45, 0.6); }
+.nl-field.is-nudge { animation: nlf-nudge 0.4s var(--ease); }
+.nl-ico { display: inline-flex; flex: none; color: #1e3a9e; }
+.nl-form input[type="email"] { flex: 1 1 auto; min-width: 0; min-height: 3rem; padding: 0 0.5rem; border: 0; border-radius: 0; background: transparent; color: #0b1220; font-size: 1.0625rem; }
+.nl-form input[type="email"]::placeholder { color: #4a5568; opacity: 1; }
+.nl-form input[type="email"]:focus, .nl-form input[type="email"]:focus-visible { outline: none; }
+.nl-btn { display: inline-flex; flex: none; align-items: center; justify-content: center; gap: 0.5rem; min-height: 3rem; padding: 0 1.4rem; border: 0; border-radius: 999px; background: #1e3a9e; color: #fff; font: inherit; font-weight: 800; cursor: pointer; transition: transform 0.2s var(--ease), background-color 0.2s ease; }
+.nl-btn:hover { background: #142a78; }
+.nl-btn:active { transform: scale(0.97); }
+.nl-btn:focus-visible { outline: 3px solid #142a78; outline-offset: 2px; }
+.nl-btn:disabled { cursor: progress; }
+.nl-btn-ico { display: inline-flex; transition: transform 0.25s var(--ease); }
+.nl-btn:hover .nl-btn-ico { transform: translateX(3px); }
+.nl-spin { display: none; width: 1.1em; height: 1.1em; border: 2.5px solid currentColor; border-right-color: transparent; border-radius: 50%; }
+.nl-form[data-state="sending"] .nl-btn-ico { display: none; }
+.nl-form[data-state="sending"] .nl-spin { display: inline-block; animation: nlf-rot 0.8s linear infinite; }
+.nl-form[data-state="sending"] .nl-field { opacity: 0.92; }
+.nl-status { margin: 0; color: #fff; font-weight: 600; }
+.nl-status:empty { display: none; }
+.nl-status.is-quiet { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* in the live region, not on screen */
+.nl-status.is-err, .nl-status.is-warn { display: flex; align-items: flex-start; gap: 0.6rem; }
+.nl-status.is-err::before, .nl-status.is-warn::before { content: "!" / ""; flex: none; display: inline-grid; place-items: center; width: 1.4rem; height: 1.4rem; margin-top: 0.05rem; border-radius: 50%; background: #ffd0d0; color: #7a1212; font-size: 0.95rem; font-weight: 900; line-height: 1; }
+.nl-status.is-warn::before { background: #fff3c4; color: #5c4400; content: "?" / ""; }
+.nl-link { padding: 0; border: 0; background: none; color: #fff; font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.nl-link:hover { text-decoration-thickness: 2px; }
+.nl-link:focus-visible { outline: 3px solid #fff; outline-offset: 3px; border-radius: 3px; }
+.foot-cta .foot-form-note { margin: 0; padding-left: 1.15rem; font-size: 0.95rem; color: #e8efff; }
+.nl-panel-done { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 0.9rem; padding: 0.95rem 1.2rem; border: 1px solid rgba(255, 255, 255, 0.4); border-radius: 1.5rem; background: rgba(255, 255, 255, 0.1); }
+.nl-check { display: inline-flex; }
+.nl-check svg { display: block; }
+.nl-check-ring { stroke: #b9f5cf; stroke-width: 3; stroke-dasharray: 145; stroke-dashoffset: 145; }
+.nl-check-tick { stroke: #b9f5cf; stroke-width: 4; stroke-dasharray: 40; stroke-dashoffset: 40; }
+.nl-form[data-state="sent"] .nl-check { animation: nlf-pop 0.55s var(--ease) both; }
+.nl-form[data-state="sent"] .nl-check-ring { animation: nlf-draw 0.7s var(--ease) 0.12s forwards; }
+.nl-form[data-state="sent"] .nl-check-tick { animation: nlf-tick 0.4s var(--ease) 0.62s forwards; }
+.nl-done-title { margin: 0; color: #fff; font-size: 1.2rem; font-weight: 900; line-height: 1.25; }
+.nl-done-title:focus { outline: none; }
+.nl-done-title:focus-visible { outline: 3px solid #fff; outline-offset: 4px; border-radius: 4px; }
+.foot-cta .nl-done-body { margin: 0.2rem 0 0; font-size: 0.975rem; line-height: 1.45; color: #fff; overflow-wrap: anywhere; }
+.nl-done-body strong { display: block; margin: 0.15rem 0 0.2rem; font-weight: 800; overflow-wrap: anywhere; }
+.foot-cta .nl-done-help { margin: 0.35rem 0 0; font-size: 0.875rem; line-height: 1.45; color: #e8efff; }
+@keyframes nlf-rot { to { transform: rotate(360deg); } }
+@keyframes nlf-draw { to { stroke-dashoffset: 0; } }
+@keyframes nlf-tick { to { stroke-dashoffset: 0; } }
+@keyframes nlf-pop { from { opacity: 0; transform: scale(0.82); } to { opacity: 1; transform: scale(1); } }
+@keyframes nlf-nudge { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-6px); } 45% { transform: translateX(5px); } 70% { transform: translateX(-3px); } }
+@keyframes nlf-dim { 50% { opacity: 0.35; } }
+@media (max-width: 29rem) {
+  .nl-field { flex-direction: column; align-items: stretch; gap: 0.4rem; padding: 0.5rem; border-radius: 1.6rem; }
+  .nl-ico { display: none; }
+  .nl-form input[type="email"] { padding: 0 0.9rem; }
+  .nl-btn { width: 100%; }
+  .foot-cta .foot-form-note { padding-left: 0.4rem; }
+  .nl-panel-done { grid-template-columns: minmax(0, 1fr); align-items: start; padding: 1rem 1.1rem; gap: 0.55rem; } /* the check sits above the words so a long address fits on one line */
+}
+@media (prefers-reduced-motion: reduce) {
+  .nl-panel, .nl-form[data-state="sent"] .nl-panel-form, .nl-form:not([data-state="sent"]) .nl-panel-done { transform: none; transition: opacity 0.15s linear, visibility 0s linear 0.15s; }
+  .nl-form[data-state="sent"] .nl-panel-done, .nl-form:not([data-state="sent"]) .nl-panel-form { transition: opacity 0.15s linear, visibility 0s; }
+  .nl-field, .nl-field:focus-within, .nl-btn, .nl-btn-ico { transition: none; transform: none; }
+  .nl-field.is-nudge, .nl-form[data-state="sent"] .nl-check, .nl-form[data-state="sent"] .nl-check-ring, .nl-form[data-state="sent"] .nl-check-tick { animation: none; }
+  .nl-form[data-state="sent"] .nl-check-ring, .nl-form[data-state="sent"] .nl-check-tick { stroke-dashoffset: 0; }
+  .nl-form[data-state="sending"] .nl-spin { animation: nlf-dim 1.2s ease-in-out infinite; }
+}
 .foot-grid { display: grid; gap: 2.5rem; grid-template-columns: minmax(0, 1fr); padding-block: clamp(2.5rem, 5vw, 4.5rem); }
 @media (min-width: 640px) { .foot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 1100px) { .foot-grid { grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 1fr)); gap: clamp(2rem, 4vw, 5rem); } }
@@ -1525,39 +1585,76 @@ main.is-switching .hero-listing + .section > .wrap > * { animation: none !import
 
 /* Comment emails: the "email me" checkbox on the comment form, and the /manage/ page */
 .notify-row { display: grid; grid-template-columns: 1.5rem 1fr; column-gap: 0.75rem; row-gap: 0.25rem; align-items: start; margin: 0 0 1rem; padding: 0.9rem 1rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
-.notify-row[hidden], .manage-card [hidden] { display: none !important; }
+.notify-row[hidden], .manage-card [hidden], .st-card [hidden] { display: none !important; }
 .notify-row .notify-box { width: 1.5rem; height: 1.5rem; margin: 0.1rem 0 0; accent-color: var(--btn-bg); cursor: pointer; }
 .notify-row .notify-box:focus-visible { outline: 3px solid var(--ring, #2f6bff); outline-offset: 3px; }
 .notify-row label { font-weight: 600; line-height: 1.45; cursor: pointer; color: var(--text); }
 .notify-row .notify-hint { grid-column: 2; margin: 0; font-size: 0.9375rem; line-height: 1.5; color: var(--text-3); }
-.manage-card { max-width: 38rem; margin: 0 auto; padding: 1.75rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
-.manage-card h2 { margin-top: 0; }
-.manage-card .btn { margin: 0.5rem 0 1rem; min-height: 3rem; }
-.manage-card .form-status { margin: 0 0 0.5rem; }
-.manage-help { margin: 1rem 0 0; padding-top: 1rem; border-top: 1px solid var(--line-soft); font-size: 0.9375rem; color: var(--text-3); }
-.manage-help a { color: var(--link); text-underline-offset: 3px; }
-@media (max-width: 480px) { .manage-card { padding: 1.25rem; } }
-/* /manage/ is a task page: keep the picture short so the button is on the first screen */
-.page-manage .hero { min-height: 17rem; }
-/* /manage/ and /newsletter/: the card answers every press. js/manage.js and js/newsletter.js set data-state on the card:
-   mail (waiting for a press), busy, ok (big check mark), info (nothing to do, used or expired), err (could not reach the server). */
-.mc-badge { display: flex; align-items: center; justify-content: center; width: 3.25rem; height: 3.25rem; margin: 0 0 1rem; border-radius: 50%; background: var(--surface-2); color: var(--link); }
-.mc-i { display: none; }
-.manage-card[data-state="mail"] .mc-i-mail, .manage-card[data-state="busy"] .mc-i-mail, .manage-card[data-state="ok"] .mc-i-ok, .manage-card[data-state="info"] .mc-i-info, .manage-card[data-state="err"] .mc-i-err { display: block; }
-.manage-card[data-state="busy"] .mc-badge { animation: nl-wait-pulse 1.4s ease-in-out infinite; }
-.manage-card[data-state="ok"] .mc-badge { width: 4.5rem; height: 4.5rem; background: var(--ok); color: var(--surface); animation: mc-pop 0.5s var(--ease) both; }
-.manage-card[data-state="ok"] .mc-i-ok { width: 2.5rem; height: 2.5rem; }
-.manage-card[data-state="err"] .mc-badge { background: var(--err); color: var(--surface); }
-.manage-card[data-state="ok"] > h2 { font-size: clamp(1.85rem, 4.5vw, 2.4rem); }
+/* Status pages (/manage/ and /newsletter/, kind: status): what an email link opens. A bare, always-light page: a thin brand bar, the logo,
+   one card with the answer, one quiet line of links. js/manage.js and js/newsletter.js set data-state on the card:
+   mail (waiting for a press), busy, ok (big check), info (nothing to do, used or expired), err (could not reach the server).
+   Motion: the logo, the card and then each line rise in one after another; a new state replays the lines (the animation name changes
+   between the two groups, so it restarts only when the state really changes); the check draws itself. Only opacity and transform move
+   (plus the check's stroke); with reduced motion everything is simply there. Keyframes are named st- so nothing else can replace them. */
+.page-status { min-height: 100vh; min-height: 100svh; background: #fff; color: var(--text); }
+.page-status::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 26rem; max-height: 60vh; background: radial-gradient(65% 100% at 50% 0%, #eaf0ff 0%, rgba(255, 255, 255, 0) 100%); pointer-events: none; }
+.st-bar { position: fixed; inset: 0 0 auto 0; z-index: 2; height: 4px; background: linear-gradient(90deg, #3f9b4d 0 50%, #1e3a9e 50% 100%); }
+.st { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; min-height: 100vh; min-height: 100svh; padding: clamp(1.5rem, 5vh, 3rem) max(1rem, env(safe-area-inset-right)) max(1.5rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left)); }
+.st-logo { display: block; margin: clamp(0.5rem, 3vh, 1.5rem) 0 clamp(1.5rem, 5vh, 3rem); border-radius: 6px; animation: st-fade 0.7s var(--ease) both; }
+.st-logo img { display: block; width: auto; height: clamp(2rem, 7vw, 2.75rem); }
+.st-logo:focus-visible { outline: 3px solid var(--ring, #2f6bff); outline-offset: 6px; }
+.st-card { position: relative; width: min(100%, 34rem); margin: auto 0; padding: clamp(1.75rem, 6vw, 3rem) clamp(1.25rem, 6vw, 3rem); text-align: center; background: #fff; border: 1px solid var(--line-soft); border-radius: 1.75rem; box-shadow: 0 1px 2px rgba(15, 31, 92, 0.05), 0 28px 64px -34px rgba(20, 42, 120, 0.38); animation: st-fade 0.6s var(--ease) 0.08s both; }
+.st-badge { position: relative; display: grid; place-items: center; width: 5rem; height: 5rem; margin: 0 auto 1.4rem; border-radius: 50%; background: #eef3ff; color: #1e3a9e; animation: st-pop 0.6s var(--ease) 0.2s both; }
+.st-i { display: none; grid-area: 1 / 1; }
+.st-card[data-state="mail"] .st-i-mail, .st-card[data-state="busy"] .st-i-mail, .st-card[data-state="ok"] .st-i-ok, .st-card[data-state="info"] .st-i-info, .st-card[data-state="err"] .st-i-err { display: block; }
+.st-spin { display: none; position: absolute; inset: -6px; border: 3px solid transparent; border-top-color: #1e3a9e; border-radius: 50%; }
+.st-card[data-state="busy"] .st-spin { display: block; animation: st-spin 0.9s linear infinite; }
+.st-card[data-state="info"] .st-badge { background: #eef3ff; color: #1e3a9e; }
+.st-card[data-state="err"] .st-badge { background: #fdeceb; color: var(--err); animation-name: st-pop-b; }
+.st-card[data-state="ok"] .st-badge { background: linear-gradient(145deg, #12a068, #0b7a4b); box-shadow: 0 14px 30px -12px rgba(11, 122, 75, 0.7); animation-name: st-pop-b; animation-delay: 0s; }
+.st-card[data-state="ok"] .st-badge::after { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 2px solid #12a068; opacity: 0; animation: st-ripple 1.1s var(--ease) 0.25s 1 both; }
+.st-ring { stroke: #fff; stroke-width: 2.5; stroke-dasharray: 145; stroke-dashoffset: 145; opacity: 0.55; }
+.st-tick { stroke: #fff; stroke-width: 4; stroke-dasharray: 40; stroke-dashoffset: 40; }
+.st-card[data-state="ok"] .st-ring { animation: st-draw 0.7s var(--ease) 0.1s forwards; }
+.st-card[data-state="ok"] .st-tick { animation: st-draw 0.45s var(--ease) 0.55s forwards; }
+.st-kicker { margin: 0 0 0.6rem; color: #1e3a9e; font-size: 0.78rem; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; }
+.st-kicker:empty { display: none; }
+.st-title { margin: 0; color: var(--text); font-size: clamp(1.55rem, 5.4vw, 2.1rem); font-weight: 800; line-height: 1.2; letter-spacing: -0.01em; text-wrap: balance; }
+.st-title:focus { outline: none; }
+.st-title:focus-visible { outline: 3px solid var(--ring, #2f6bff); outline-offset: 6px; border-radius: 6px; }
+.st-text { max-width: 28rem; margin: 0.9rem auto 0; color: var(--text-2); font-size: 1.0625rem; line-height: 1.65; text-wrap: pretty; overflow-wrap: anywhere; }
+.st-btn { min-width: 14rem; min-height: 3.1rem; margin: 1.75rem 0 0; }
+.st-btn[aria-busy="true"] { cursor: progress; opacity: 1; }
+.st-btn[aria-busy="true"]::before { content: ""; width: 1.05em; height: 1.05em; margin-right: 0.5rem; border: 2.5px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: st-spin 0.8s linear infinite; }
+.st-status { margin: 1rem 0 0; font-size: 0.9375rem; line-height: 1.5; }
+.st-status:empty { display: none; }
+.st-status.is-err { color: var(--err); }
+.st-status.is-ok { color: var(--ok); }
 /* the heading or the busy button already says it: the status line is still read out, but not shown twice */
-.manage-card[data-state="ok"] .form-status, .manage-card[data-state="info"] .form-status, .manage-card[data-state="busy"] .form-status { position: absolute; width: 1px; height: 1px; min-height: 0; margin: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.manage-card { position: relative; }
-.manage-card .btn[aria-busy="true"] { cursor: progress; opacity: 1; }
-.manage-card .btn[aria-busy="true"]::before { content: ""; width: 1.05em; height: 1.05em; border: 2.5px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: nl-wait 0.8s linear infinite; }
-@keyframes nl-wait { to { transform: rotate(360deg); } }
-@keyframes nl-wait-pulse { 50% { opacity: 0.55; } }
-@keyframes mc-pop { 0% { transform: scale(0.6); opacity: 0; } 70% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); } }
-@media (prefers-reduced-motion: reduce) { .manage-card .mc-badge, .manage-card .btn[aria-busy="true"]::before { animation: none !important; } }
+.st-card[data-state="ok"] .st-status, .st-card[data-state="info"] .st-status, .st-card[data-state="busy"] .st-status, .st-card[data-state="err"] .st-status { position: absolute; width: 1px; height: 1px; min-height: 0; margin: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.st-help { margin: 1.75rem 0 0; padding-top: 1.1rem; border-top: 1px solid var(--line-soft); color: var(--text-3); font-size: 0.9rem; line-height: 1.55; }
+.st-help a, .st-links a { color: var(--link); text-underline-offset: 3px; }
+.st-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.35rem 0.7rem; margin: 1.5rem 0 0; color: var(--text-3); font-size: 0.875rem; animation: st-fade 0.8s var(--ease) 0.5s both; }
+.st-links a:focus-visible, .st-help a:focus-visible { outline: 3px solid var(--ring, #2f6bff); outline-offset: 3px; border-radius: 3px; }
+.st-sw { animation: st-rise-a 0.6s var(--ease) calc(0.28s + var(--i, 0) * 0.07s) both; }
+.st-card[data-state="busy"] .st-sw, .st-card[data-state="err"] .st-sw { animation-name: st-rise-b; }
+.st-card[data-state="busy"] .st-sw { animation-duration: 0.01s; animation-delay: 0s; } /* waiting: the words stay where they are */
+@keyframes st-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes st-pop { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
+@keyframes st-pop-b { 0% { opacity: 0; transform: scale(0.7); } 70% { opacity: 1; transform: scale(1.06); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes st-rise-a { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes st-rise-b { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes st-draw { to { stroke-dashoffset: 0; } }
+@keyframes st-ripple { 0% { opacity: 0.55; transform: scale(1); } 100% { opacity: 0; transform: scale(1.7); } }
+@keyframes st-spin { to { transform: rotate(360deg); } }
+@keyframes st-dim { 50% { opacity: 0.35; } }
+@media (max-width: 30rem) { .st-btn { width: 100%; min-width: 0; } .st-badge { width: 4.4rem; height: 4.4rem; margin-bottom: 1.15rem; } }
+@media (max-height: 34rem) { .st-logo { margin-block: 0.25rem 1rem; } .st-card { margin-top: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .st-logo, .st-card, .st-badge, .st-sw, .st-links, .st-card[data-state="ok"] .st-badge::after { animation: none !important; }
+  .st-ring, .st-tick { animation: none !important; stroke-dashoffset: 0 !important; }
+  .st-card[data-state="busy"] .st-spin, .st-btn[aria-busy="true"]::before { animation: st-dim 1.2s ease-in-out infinite !important; }
+}
 /* {{latest-posts:N}}: the newest articles, shown with the answer */
 .next-reads { margin: 1.5rem 0 0; padding-top: 1.5rem; border-top: 1px solid var(--line-soft); }
 .manage-card .next-reads h2 { font-size: 1.3rem; font-weight: 800; margin: 0 0 1rem; }

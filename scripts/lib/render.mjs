@@ -154,7 +154,7 @@ export function createRenderer(ctx) {
 
   // <title> gets the brand when it still fits in search results; og:title and twitter:title never do: WhatsApp's own guide says the title
   // must be "without any branding" (the app prints the domain under it), and it shows at most 2 lines, so the brand would only push words out.
-  function head({ title, description, path, share = '', imageAlt = '', type = 'website', jsonLd = [], noindex = false, article = null, preload = '', noReferrer = false }) {
+  function head({ title, description, path, share = '', imageAlt = '', type = 'website', jsonLd = [], noindex = false, article = null, preload = '', noReferrer = false, bare = false }) {
     // the brand is added only when the whole title still fits in search results (about 60 characters)
     const branded = `${title} | ${config.name}`;
     const fullTitle = title === config.title || branded.length > 62 ? title : branded;
@@ -178,9 +178,9 @@ export function createRenderer(ctx) {
 <link rel="canonical" href="${url}">
 <meta name="robots" content="${robots}">${noReferrer ? '\n<meta name="referrer" content="no-referrer">' : ''}
 <meta name="author" content="${e(config.author)}">
-<meta name="color-scheme" content="light dark">
+${bare ? '<meta name="color-scheme" content="light">\n<meta name="theme-color" content="#ffffff">' : `<meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#070b14" media="(prefers-color-scheme: dark)">${config.verification?.yandex ? `\n<meta name="yandex-verification" content="${e(config.verification.yandex)}">` : ''}${adsenseId ? `\n<meta name="google-adsense-account" content="${e(adsenseId)}">` : ''}${config.verification?.google ? `\n<meta name="google-site-verification" content="${e(config.verification.google)}">` : ''}${config.verification?.bing ? `\n<meta name="msvalidate.01" content="${e(config.verification.bing)}">` : ''}
+<meta name="theme-color" content="#070b14" media="(prefers-color-scheme: dark)">`}${config.verification?.yandex ? `\n<meta name="yandex-verification" content="${e(config.verification.yandex)}">` : ''}${adsenseId ? `\n<meta name="google-adsense-account" content="${e(adsenseId)}">` : ''}${config.verification?.google ? `\n<meta name="google-site-verification" content="${e(config.verification.google)}">` : ''}${config.verification?.bing ? `\n<meta name="msvalidate.01" content="${e(config.verification.bing)}">` : ''}
 <link rel="icon" href="${u('/favicon.ico')}" sizes="16x16 32x32 48x48">
 <link rel="icon" href="${u('/assets/img/favicon-48.png')}" type="image/png" sizes="48x48">
 <link rel="icon" href="${u('/assets/img/favicon-32.png')}" type="image/png" sizes="32x32">
@@ -199,7 +199,7 @@ export function createRenderer(ctx) {
 <meta name="twitter:title" content="${e(title)}">
 <meta name="twitter:description" content="${e(description)}">
 <meta name="twitter:image" content="${img}">${si.alt ? `\n<meta name="twitter:image:alt" content="${e(si.alt)}">` : ''}${art}${preload ? `\n<link rel="preload" as="image" href="${preload}"${topicSet(preload) ? ` imagesrcset="${topicSet(preload)}" imagesizes="100vw"` : ''} fetchpriority="high">` : ''}${api ? `\n<link rel="preconnect" href="${new URL(api).origin}" crossorigin>` : ''}
-<script>(function(){var d=document.documentElement,t=null;d.classList.add('js');try{t=localStorage.getItem('theme')}catch(e){}if(t==='dark')d.classList.add('dark');else if(t==='light')d.classList.add('light');else if(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)d.classList.add('dark')})();</script>
+${bare ? "<script>document.documentElement.classList.add('js')</script>" : `<script>(function(){var d=document.documentElement,t=null;d.classList.add('js');try{t=localStorage.getItem('theme')}catch(e){}if(t==='dark')d.classList.add('dark');else if(t==='light')d.classList.add('light');else if(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)d.classList.add('dark')})();</script>`}
 <link rel="stylesheet" href="${assetUrl('css/style.css')}">${jsonLd.map((j) => `\n<script type="application/ld+json">${json(j)}</script>`).join('')}`;
   }
 
@@ -281,13 +281,28 @@ export function createRenderer(ctx) {
     // the newsletter form: hidden in the HTML and shown by js/subscribe.js, which sends it. Without JavaScript nothing can be sent
     // (no address in a URL or a log); the <noscript> line after it offers RSS instead.
     const cta = newsletter
-      ? `<form class="foot-form" action="${u('/newsletter/')}" method="get" data-newsletter data-endpoint="${e(api)}/v1/newsletter/subscribe" novalidate hidden>
-          <label class="sr-only" for="foot-email">Email address</label>
-          <input id="foot-email" type="email" name="email" required maxlength="254" placeholder="Your email address" autocomplete="email" aria-describedby="foot-note">
-          <div class="hp" aria-hidden="true"><label>Leave this field empty <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
-          <button class="btn btn-primary" type="submit">Subscribe ${icon('arrowRight', 16)}</button>
-          <p class="foot-status" role="status"></p>
-          <p class="foot-form-note" id="foot-note">One email when we publish a new article. Stop any time. See our <a href="${u('/privacy-policy/#newsletter')}">Privacy Policy</a>.</p>
+      ? `<form class="foot-form nl-form" action="${u('/newsletter/')}" method="get" data-newsletter data-endpoint="${e(api)}/v1/newsletter/subscribe" data-state="idle" novalidate hidden>
+          <div class="nl-stack">
+            <div class="nl-panel nl-panel-form" data-nl-form>
+              <label class="sr-only" for="foot-email">Email address</label>
+              <div class="nl-field">
+                <span class="nl-ico" aria-hidden="true">${icon('mail', 20)}</span>
+                <input id="foot-email" type="email" name="email" required maxlength="254" placeholder="Your email address" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" enterkeyhint="send" aria-describedby="foot-status foot-note">
+                <button class="nl-btn" type="submit"><span class="nl-btn-label">Subscribe</span><span class="nl-btn-ico" aria-hidden="true">${icon('arrowRight', 18)}</span><span class="nl-spin" aria-hidden="true"></span></button>
+              </div>
+              <div class="hp" aria-hidden="true"><label>Leave this field empty <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
+              <p class="foot-status nl-status" id="foot-status" role="status"></p>
+              <p class="foot-form-note" id="foot-note">One email when we publish a new article. Stop any time. See our <a href="${u('/privacy-policy/#newsletter')}">Privacy Policy</a>.</p>
+            </div>
+            <div class="nl-panel nl-panel-done" data-nl-done inert aria-hidden="true">
+              <span class="nl-check" aria-hidden="true"><svg viewBox="0 0 52 52" width="46" height="46" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle class="nl-check-ring" cx="26" cy="26" r="23"/><path class="nl-check-tick" d="M15.5 27.5l7.5 7.5 14-16"/></svg></span>
+              <div class="nl-done-text">
+                <h3 class="nl-done-title" tabindex="-1" data-nl-title>Check your inbox</h3>
+                <p class="nl-done-body" data-nl-body>If this address can receive our emails, a link to confirm is on its way:<strong>firstname.lastname@example.com</strong>Open it and press the button to finish.</p>
+                <p class="nl-done-help">Nothing after a few minutes? Look in spam or Promotions. <button class="nl-link" type="button" data-nl-again>Use a different address</button></p>
+              </div>
+            </div>
+          </div>
         </form>
         <noscript><p class="foot-form-note foot-nojs">Email sign-up needs JavaScript. You can follow new articles with RSS instead.</p><a class="btn btn-primary btn-lg" href="${u('/rss/')}">${icon('rss', 18)} Follow with RSS</a></noscript>`
       : `<a class="btn btn-primary btn-lg" href="${u('/rss/')}">${icon('rss', 18)} Follow with RSS</a>`;
@@ -933,6 +948,29 @@ ${discover()}`;
 </section>`;
   }
 
+  /* Pages that confirm something from an email link (/manage/: comment links and the team's Approve / Ignore; /newsletter/: confirm and
+     unsubscribe) are "status" pages (kind: status in content/pages): a bare, always-light page with only the logo, one card with the
+     answer, and one quiet line of links. No header, hero, footer, article list, cookie notice or search: nothing here but the
+     purpose. The card is drawn by js/manage.js or js/newsletter.js (data-state: mail, busy, ok, info, err) and css/style.css (.page-status). */
+  function statusPage(pg, inner) {
+    const meta = { title: pg.title, description: pg.description, path: `/${pg.slug}/`, noindex: true, noReferrer: true, bare: true, jsonLd: [] };
+    return `<!doctype html>
+<html lang="${config.language}" data-base="${base}"${api ? ` data-api="${e(api)}"` : ''}>
+<head>
+${head(meta)}
+</head>
+<body class="page-status">
+<div class="st-bar" aria-hidden="true"></div>
+<main id="main" class="st">
+  <a class="st-logo" href="${u('/')}" aria-label="${e(config.name)} home"><img src="${resolveImage(config.logoSmall || config.logo)}" alt="${e(config.name)}" width="500" height="98"></a>
+${inner}
+  <p class="st-links"><a href="${u('/')}">Go to ${e(config.name)}</a><span aria-hidden="true">&middot;</span><a href="${u('/contact/')}">Contact us</a><span aria-hidden="true">&middot;</span><a href="${u('/privacy-policy/')}">Privacy</a></p>
+</main>${api && pg.slug === 'manage' ? `\n<script src="${assetUrl('js/manage.js')}" defer></script>` : ''}${newsletter && pg.slug === 'newsletter' ? `\n<script src="${assetUrl('js/newsletter.js')}" defer></script>` : ''}
+</body>
+</html>
+`;
+  }
+
   function staticPage(pg) {
     // {{#comments}}...{{/comments}} is kept only when the comments server is switched on; {{^comments}}...{{/comments}} only when it is not
     const fill = (h) =>
@@ -960,6 +998,7 @@ ${discover()}`;
       if (!/^[1-6]$/.test(n)) throw new Error(`content/pages/${pg.slug}.html: {{latest-posts:${n}}} needs a number from 1 to 6`);
       return latestPosts(Number(n));
     });
+    if (pg.kind === 'status') return statusPage(pg, withIds.html);
     const isDoc = pg.kind === 'legal';
     const toc = withIds.toc.filter((t) => t.level === 2 || t.level === 3);
     const rail = pages.filter((p) => p.kind === 'legal' && p.slug !== pg.slug);

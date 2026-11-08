@@ -171,14 +171,17 @@ test('with the newsletter on: footer form, honeypot, privacy link, and a noindex
   const about = page('about');
   const footer = footerOf(about);
   const form = footer.match(/<form[^>]*>/)[0];
-  assert.match(form, /class="foot-form"/);
+  assert.match(form, /class="foot-form nl-form"/);
+  assert.match(form, /data-state="idle"/);
   assert.match(form, /action="\/newsletter\/"/);
   assert.match(form, /method="get"/);
   assert.match(form, /data-newsletter/);
   assert.match(form, /data-endpoint="https:\/\/api\.test\/v1\/newsletter\/subscribe"/);
   assert.match(footer, /<input[^>]*type="email"[^>]*name="email"[^>]*required/);
   assert.match(footer, /<div[^>]*aria-hidden="true"[^>]*>[\s\S]*?<input[^>]*name="website"[^>]*tabindex="-1"[^>]*autocomplete="off"/);
-  assert.match(footer, /<p class="foot-status" role="status"/);
+  assert.match(footer, /<p class="foot-status nl-status" id="foot-status" role="status"/);
+  assert.match(footer, /<div class="nl-panel nl-panel-done" data-nl-done inert aria-hidden="true">/, 'the confirmation card starts out of reach');
+  assert.match(footer, /<input[^>]*type="email"[^>]*inputmode="email"[^>]*autocapitalize="none"[^>]*spellcheck="false"/);
   assert.match(footer, /One email when we publish a new article\. Stop any time\. See our <a href="\/privacy-policy\/[^"]*">Privacy Policy<\/a>\./);
   assert.doesNotMatch(footer, /Follow with RSS<\/a>\s*<\/div>/, 'the RSS button is replaced by the form');
   // no promise of how often: the heading over the form names no frequency
@@ -238,34 +241,57 @@ test('the newsletter page and both scripts are never in a sitemap', () => {
   for (const [, xml] of R.sitemaps()) assert.doesNotMatch(xml, /\/newsletter\//);
 });
 
-// {{latest-posts:N}}: the /manage/ and /newsletter/ pages end every answer with the newest articles, written at build time (no extra request).
+// {{latest-posts:N}} is still a building block (the newest articles as horizontal cards, hidden until a page script shows them), but the
+// pages that confirm something from an email (/manage/, /newsletter/) no longer use it: they are bare status pages.
 const newest = () => JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'search.json'), 'utf8'));
 const nextReads = (html) => { const m = html.match(/<section class="next-reads"[^>]*>[\s\S]*?<\/section>/); return m ? m[0] : ''; };
 const fakePosts = (list) => list.map((x) => ({ slug: x.s, path: x.u, title: x.t, category: { name: x.c, slug: 'c' }, label: null, date: new Date(x.d), image: x.i, excerpt: x.e, readingMinutes: 3, tags: x.g, featured: false, text: '' }));
 
-test('{{latest-posts:3}} renders the 3 newest posts as horizontal cards with real links on /manage/ and, with the newsletter on, on /newsletter/', () => {
+test('{{latest-posts:3}} renders the 3 newest posts as horizontal cards with real links', () => {
   const want = newest().slice(0, 3).map((x) => x.u);
-  const manage = nextReads(fs.readFileSync(path.join(ROOT, 'manage', 'index.html'), 'utf8'));
-  assert.ok(manage, '/manage/ has a next-reads section: run node scripts/build.mjs');
-  for (const sec of [manage]) {
-    assert.match(sec, /^<section class="next-reads" data-next hidden aria-labelledby="next-reads-h"><h2 id="next-reads-h">Read our latest articles<\/h2>/);
-    assert.equal((sec.match(/<article class="card card-h">/g) || []).length, 3);
-    assert.deepEqual([...sec.matchAll(/class="card-link" href="([^"]+)"/g)].map((m) => m[1]), want);
-    assert.match(sec, /href="\/post\/"[^>]*>See all articles</);
-  }
+  const config = JSON.parse(fs.readFileSync(path.join(ROOT, 'site.config.json'), 'utf8'));
+  const R = createRenderer({ config, categories: [], posts: fakePosts(newest()), pages: [], authors: [], versions: {} });
+  const sec = nextReads(R.staticPage({ slug: 'x-test', title: 'X', heading: '', subtitle: '', description: 'x', kind: 'wide', menu: false, order: 1, hero: '', updated: null, html: '<p>a</p>{{latest-posts:3}}' }));
+  assert.match(sec, /^<section class="next-reads" data-next hidden aria-labelledby="next-reads-h"><h2 id="next-reads-h">Read our latest articles<\/h2>/);
+  assert.equal((sec.match(/<article class="card card-h">/g) || []).length, 3);
+  assert.deepEqual([...sec.matchAll(/class="card-link" href="([^"]+)"/g)].map((m) => m[1]), want);
+  assert.match(sec, /href="\/post\/"[^>]*>See all articles</);
   for (const u of want) assert.ok(fs.existsSync(path.join(ROOT, u, 'index.html')), `${u} is a real page`);
-  // the newsletter page is built only with the newsletter on, so render it directly
+});
+
+// What an email link opens: only the purpose. No navigation, no hero, no article list, no footer, no cookie notice, no search, always light.
+function statusHtml(slug) {
   const config = { ...JSON.parse(fs.readFileSync(path.join(ROOT, 'site.config.json'), 'utf8')), newsletterAction: 'api', commentsApi: 'https://api.test/' };
-  const { data, body } = parseFrontMatter(fs.readFileSync(path.join(ROOT, 'content', 'pages', 'newsletter.html'), 'utf8'));
-  const pg = { slug: 'newsletter', title: String(data.title), heading: data.heading, subtitle: data.subtitle, description: String(data.description), kind: data.kind, menu: false, order: 91, hero: data.hero, updated: null, html: body };
+  const dir = path.join(ROOT, 'content', 'pages');
+  const { data, body } = parseFrontMatter(fs.readFileSync(path.join(dir, `${slug}.html`), 'utf8'));
+  const pg = { slug, title: String(data.title), heading: data.heading || '', subtitle: data.subtitle || '', description: String(data.description || ''), kind: data.kind, menu: false, order: Number(data.order ?? 90), hero: data.hero || '', updated: null, html: body };
   const R = createRenderer({ config, categories: [], posts: fakePosts(newest()), pages: [pg], authors: [], versions: {} });
-  const nl = nextReads(R.staticPage(pg));
-  assert.equal((nl.match(/<article class="card card-h">/g) || []).length, 3);
-  assert.deepEqual([...nl.matchAll(/class="card-link" href="([^"]+)"/g)].map((m) => m[1]), want);
-  // inside the card, so it shows with the answer
-  const page = R.staticPage(pg);
-  const card = page.slice(page.indexOf('data-newsletter-page'), page.indexOf('<h2 id="what-we-send"'));
-  assert.ok(card.includes('class="next-reads"'), 'the next reads sit inside the newsletter card');
+  return { pg, html: R.staticPage(pg) };
+}
+test('/manage/ and /newsletter/ are bare status pages: logo, one card, a quiet line of links, nothing else', () => {
+  for (const slug of ['manage', 'newsletter']) {
+    const { pg, html } = statusHtml(slug);
+    assert.equal(pg.kind, 'status', slug);
+    assert.match(html, /<body class="page-status">/, slug);
+    assert.match(html, /<meta name="robots" content="noindex/, slug);
+    assert.match(html, /<meta name="referrer" content="no-referrer">/, slug);
+    assert.match(html, /<meta name="color-scheme" content="light">/, `${slug}: always light`);
+    assert.doesNotMatch(html, /prefers-color-scheme: dark|localStorage\.getItem\('theme'\)/, `${slug}: no theme switching`);
+    assert.match(html, /<a class="st-logo"[^>]*><img src="[^"]*logo[^"]*" alt="Mayobe Bros"/, slug);
+    assert.equal((html.match(/<h1\b/g) || []).length, 1, `${slug}: one h1`);
+    assert.match(html, /<section class="st-card"/, slug);
+    for (const bad of ['<header', 'site-header', 'class="hero', 'hero-img', '<footer', 'foot-cta', 'next-reads', 'data-next', 'search-modal', 'class="cookie', 'js/site.js', 'js/motion.js', 'data-cookie-settings', 'cloudflareinsights']) {
+      assert.ok(!html.includes(bad), `${slug}: must not contain ${bad}`);
+    }
+    assert.match(html, /<p class="st-links">/, slug);
+    assert.match(html, new RegExp(`js/${slug === 'manage' ? 'manage' : 'newsletter'}\\.js`), `${slug}: its own script`);
+    assert.equal((html.match(/<script src=/g) || []).length, 1, `${slug}: that is the only script`);
+  }
+  // every state the script can show has its picture
+  const { html } = statusHtml('manage');
+  for (const i of ['st-i-mail', 'st-i-ok', 'st-i-info', 'st-i-err', 'st-spin']) assert.ok(html.includes(i), i);
+  assert.match(html, /data-state="mail"/);
+  assert.match(html, /role="status" aria-live="polite" data-manage-status/);
 });
 
 test('{{latest-posts:9}} is a build error', () => {
@@ -284,7 +310,6 @@ test('the privacy and newsletter pages say how email pictures load and that open
   assert.match(news, /pictures/);
   assert.match(news, /GitHub Pages/);
   assert.match(news, /We do not count who opens our emails or clicks their links\./);
-  assert.match(body(on.page('newsletter')), /with its title, a picture, a short summary and a link/);
   const off = renderWith({ commentsApi: 'https://api.test/' });
   const offPrivacy = body(off.page('privacy-policy'));
   assert.doesNotMatch(offPrivacy, /Our emails show pictures/);

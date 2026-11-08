@@ -10,7 +10,7 @@
   var box = doc.querySelector('[data-manage]');
   if (!box || API === '/v1') return;
   var $ = function (s) { return box.querySelector(s); };
-  var title = $('[data-manage-title]'), text = $('[data-manage-text]'), button = $('[data-manage-go]'), status = $('[data-manage-status]'), help = $('[data-manage-help]'), next = $('[data-next]');
+  var title = $('[data-manage-title]'), text = $('[data-manage-text]'), button = $('[data-manage-go]'), status = $('[data-manage-status]'), help = $('[data-manage-help]'), next = $('[data-next]'), kicker = $('[data-st-kicker]');
   var WAIT_MS = 15000;
 
   // Read the secret from the address bar once, then take it out of the address (and so out of history and the back button).
@@ -40,7 +40,8 @@
 
   // the card's picture: mail (waiting for a press), busy, ok (check mark), info (nothing to do / expired), err (could not reach)
   function state(s) { box.setAttribute('data-state', s); }
-  function say(cls, msg) { status.className = 'form-status' + (cls ? ' ' + cls : ''); status.textContent = msg; }
+  function tag(t) { if (kicker) kicker.textContent = t; } // the small line above the heading
+  function say(cls, msg) { status.className = 'form-status st-status' + (cls ? ' ' + cls : ''); status.textContent = msg; }
   function showNext() { if (next) next.hidden = false; }
   function idle(label) { button.disabled = false; button.removeAttribute('aria-busy'); button.textContent = label; }
   // A final state: the sentence is announced in the status region, the action button is gone, the latest articles appear (opts.next),
@@ -61,6 +62,8 @@
     if (code === 404) outcome('is-err', 'This link has expired or is not valid', 'Review links work for 7 days. Open the comment list on your computer (node scripts/comments.mjs list) to approve it.', 'This link has expired or is not valid.', { next: true });
     else if (code === 409) outcome('is-err', 'The author deleted this comment', 'It cannot be approved any more.', 'The author deleted this comment.', { next: true });
     else {
+      title.textContent = code === 429 ? 'Too many tries' : 'We could not reach the server';
+      text.textContent = code === 429 ? 'Please wait a little, then press Try again. Nothing was changed.' : 'Check your connection, then press Try again. Nothing was changed.';
       button.hidden = false;
       idle('Try again');
       state('err');
@@ -75,6 +78,8 @@
       else outcome('is-err', 'This link has expired or was removed', 'Links in our emails work for 7 days. If you still want to edit or delete your comment, write to us and we will help.', 'This link has expired or was removed.', { next: true });
       return;
     }
+    title.textContent = code === 429 ? 'Too many tries' : 'We could not reach the server';
+    text.textContent = code === 429 ? 'Please wait a little, then press Try again. Nothing was changed.' : 'Check your connection, then press Try again. Nothing was changed.';
     button.hidden = false;
     idle('Try again');
     state('err');
@@ -88,6 +93,7 @@
     if (label) { button.textContent = label; button.hidden = false; } else { button.hidden = true; showNext(); }
   }
 
+  tag(kind === 'l' ? 'Your comment' : kind === 'u' ? 'Reply emails' : kind === 'r' ? 'Team review' : 'Mayobe Bros');
   if (kind === 'l') show('mail', 'Open your comment', 'Press the button to let this browser edit or delete the comment you wrote. Nothing happens until you press it.', 'Open my comment');
   else if (kind === 'u') show('mail', 'Stop reply emails', 'Press the button and we will stop sending you emails about replies to this comment. Your comment stays on the site.', 'Stop reply emails');
   else if (kind === 'r') show('busy', secret.charAt(secret.indexOf('.') + 1) === 'a' ? 'Approving the comment...' : 'Leaving the comment as it is...', 'One moment.');
