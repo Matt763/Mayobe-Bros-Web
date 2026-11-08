@@ -1,7 +1,7 @@
 // Mayobe Bros comments + reactions API.  Cloudflare Worker + D1 (SQLite).  No dependencies.
 //
 //   GET  /v1/stats?slugs=a,b,c              counts for many posts at once (browser-cached 10 s)
-//   GET  /v1/posts/:slug                    approved comments (+ a blank "deleted" placeholder for a deleted comment that has replies) + counts (always fresh)
+//   GET  /v1/posts/:slug[?offset=N]         approved comments, newest conversation first, 20 conversations a page (`more` + `next` when another page exists; + a blank "deleted" placeholder for a deleted comment that has replies) + counts (always fresh)
 //   GET  /v1/posts/:slug/mine?cid=<id>      this visitor's own reaction (never cached)
 //   POST /v1/posts/:slug/react              { cid, type: "like"|"amazed"|"sad"|"angry"|null }
 //   POST /v1/posts/:slug/comments           { name, email?, body, parent?, cid, website (honeypot), ts }  -> { ok, status, comment, id, token }
@@ -39,6 +39,7 @@ export const REACTIONS = ['like', 'amazed', 'sad', 'angry'];
 const COL = { like: 'r_like', amazed: 'r_amazed', sad: 'r_sad', angry: 'r_angry' };
 const CID_RE = /^[A-Za-z0-9-]{16,64}$/;
 const LINK_RE = /(https?:\/\/|www\.|\b[a-z0-9-]+\.(?:com|net|org|info|biz|xyz|top|click|link|ru|cn|co\.tz|go\.tz|tk|ml|ga|cf|gq)\b|t\.me\/|bit\.ly)/i;
+const COMMENT_PAGE = 20; // conversations per GET /v1/posts/:slug
 const LINK_DAYS = 7; // an emailed manage link works for this long
 const NOT_FOUND = 'That comment could not be found.'; // the one answer for a wrong token, a missing comment, a team comment and so on, so nothing can be probed
 
@@ -356,23 +357,30 @@ async function handle(request, env, ctx) {
   if ((m = path.match(/^\/v1\/posts\/([^/]+)$/)) && method === 'GET') {
     const slug = m[1];
     if (!(await slugKnown(env, slug))) return fail('Unknown post.', 404, cors);
-    const rows = await env.DB.prepare("SELECT id, parent_id, name, body, created, team, likes, edited_at, status, approved_by FROM comments WHERE slug = ? AND status IN ('approved', 'deleted') ORDER BY created ASC LIMIT 500").bind(slug).all();
-    const all = rows.results || [];
+    // Conversations (a comment with its replies) come newest first, COMMENT_PAGE at a time: ?offset=N asks for the next page. A post with
+    // thousands of comments never sends them all at once, and the newest are never cut off. `more` says whether another page exists.
+    const offset = Math.min(100000, Math.max(0, Math.floor(Number(url.searchParams.get('offset'))) || 0));
+    const COLS = 'id, parent_id, name, body, created, team, likes, edited_at, status, approved_by';
+    const topRows = ((await env.DB.prepare(`SELECT ${COLS} FROM comments WHERE slug = ? AND parent_id IS NULL AND status IN ('approved', 'deleted') ORDER BY created DESC, id DESC LIMIT ? OFFSET ?`).bind(slug, COMMENT_PAGE + 1, offset).all()).results || []);
+    const more = topRows.length > COMMENT_PAGE;
+    const pageRows = topRows.slice(0, COMMENT_PAGE);
+    const replyRows = pageRows.length
+      ? ((await env.DB.prepare(`SELECT ${COLS} FROM comments WHERE slug = ? AND parent_id IN (${pageRows.map(() => '?').join(',')}) AND status IN ('approved', 'deleted') ORDER BY created ASC, id ASC LIMIT 1000`).bind(slug, ...pageRows.map((c) => c.id)).all()).results || [])
+      : [];
     // a deleted comment that still has replies stays as a blank tombstone (its text and name were erased when it was deleted)
     const pub = (c) => c.status === 'deleted'
       ? { id: c.id, name: '', body: 'This comment was deleted.', at: c.created, deleted: true, likes: 0 }
       : { id: c.id, name: c.name, body: c.body, at: c.created, likes: c.likes || 0, ...(c.edited_at ? { edited: c.edited_at } : {}), ...(c.team ? { team: true } : {}), ...(c.approved_by ? { ab: 1 } : {}) };
-    const tops = all.filter((c) => !c.parent_id).map((c) => ({ ...pub(c), replies: [] }));
+    const tops = pageRows.map((c) => ({ ...pub(c), replies: [] }));
     const byId = Object.fromEntries(tops.map((c) => [c.id, c]));
-    for (const c of all) if (c.parent_id && byId[c.parent_id]) byId[c.parent_id].replies.push(pub(c));
-    tops.reverse(); // newest conversation first, replies oldest first
+    for (const c of replyRows) if (byId[c.parent_id]) byId[c.parent_id].replies.push(pub(c));
     // with a valid visitor id, also say which of these comments that visitor liked (the key is absent without one)
     const cid = url.searchParams.get('cid') || '';
     const liked = CID_RE.test(cid)
       ? ((await env.DB.prepare("SELECT l.comment_id AS id FROM comment_likes l JOIN comments c ON c.id = l.comment_id WHERE l.voter = ? AND c.slug = ? AND c.status = 'approved'").bind(cid, slug).all()).results || []).map((r) => r.id)
       : null;
     // always revalidate: a visitor who just reacted or whose comment was just approved must see it on reload
-    return reply({ stats: await getStats(env, slug), comments: tops, ...(liked ? { liked } : {}) }, 200, cors, 'no-cache');
+    return reply({ stats: await getStats(env, slug), comments: tops, ...(more ? { more: true, next: offset + pageRows.length } : {}), ...(liked ? { liked } : {}) }, 200, cors, 'no-cache');
   }
 
   if ((m = path.match(/^\/v1\/posts\/([^/]+)\/mine$/)) && method === 'GET') {

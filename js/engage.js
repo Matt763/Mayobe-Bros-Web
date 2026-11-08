@@ -417,34 +417,50 @@
     return wrap;
   }
   // Comments appear 10 conversations at a time (a conversation = a comment with its replies); a button shows the next 10.
-  var COMMENT_BATCH = 10, shownTop = COMMENT_BATCH, allComments = [];
-  function renderComments(items) {
+  // The Worker sends 20 conversations a page, newest first; when all loaded ones are shown and it says there is more (`next`), the same
+  // button fetches the next page, so a post with thousands of comments stays light and its newest comments are never cut off.
+  var COMMENT_BATCH = 10, shownTop = COMMENT_BATCH, allComments = [], nextOffset = 0;
+  function renderComments(items, next) {
     if (!list) return;
     allComments = items;
+    nextOffset = next || 0;
     list.textContent = '';
     if (!items.length) { list.appendChild(el('p', 'comment-empty', 'No comments yet. Be the first to share your thoughts.')); return; }
     items.slice(0, shownTop).forEach(function (c) { list.appendChild(commentNode(c, true)); });
-    if (items.length > shownTop) {
+    if (items.length > shownTop || nextOffset) {
       var more = el('button', 'btn btn-outline comments-more', moreText());
       more.type = 'button';
       // only the next batch is added (before the button), so the comments already shown do not replay their entrance
       more.addEventListener('click', function () {
-        var from = shownTop, first = null;
-        shownTop += COMMENT_BATCH;
-        allComments.slice(from, shownTop).forEach(function (c) {
-          var n = commentNode(c, true);
-          if (!first) first = n;
-          list.insertBefore(n, more);
-        });
-        if (allComments.length > shownTop) more.textContent = moreText(); else more.remove();
-        bringIn(first);
+        var add = function () {
+          var from = shownTop, first = null;
+          shownTop += COMMENT_BATCH;
+          allComments.slice(from, shownTop).forEach(function (c) {
+            var n = commentNode(c, true);
+            if (!first) first = n;
+            list.insertBefore(n, more);
+          });
+          if (allComments.length > shownTop || nextOffset) more.textContent = moreText(); else more.remove();
+          more.disabled = false; more.removeAttribute('aria-busy');
+          bringIn(first);
+        };
+        if (allComments.length > shownTop || !nextOffset) { add(); return; }
+        // everything loaded is on screen: ask the Worker for the next page first
+        more.disabled = true; more.setAttribute('aria-busy', 'true');
+        call('/posts/' + slug + '?offset=' + nextOffset + (cidIfAny() ? '&cid=' + encodeURIComponent(cidIfAny()) : '')).then(function (j) {
+          (j.liked || []).forEach(function (id) { likedIds[id] = true; });
+          allComments = allComments.concat(j.comments || []);
+          nextOffset = j.next || 0;
+          add();
+        }).catch(function () { more.disabled = false; more.removeAttribute('aria-busy'); more.textContent = 'Could not load more. Press to try again'; });
       });
       list.appendChild(more);
     }
   }
   function moreText() {
+    if (nextOffset && allComments.length <= shownTop) return 'Show more comments';
     var left = allComments.slice(shownTop).reduce(function (n, c) { return n + 1 + (c.replies ? c.replies.length : 0); }, 0);
-    return 'Show more comments (' + left + ' left)';
+    return 'Show more comments' + (nextOffset ? '' : ' (' + left + ' left)');
   }
   // the new comments rise in on their own (.comment in css/style.css); focus the first one without letting the browser scroll
   // and glide to it when it sits low on the screen (js/motion.js). Without MBMotion: one plain jump.
@@ -473,7 +489,7 @@
       likedIds = {};
       (j.liked || []).forEach(function (id) { likedIds[id] = true; });
       showStats(j.stats);
-      renderComments(j.comments);
+      renderComments(j.comments, j.next);
     }).catch(function () {
       if (list && !list.children.length) list.appendChild(el('p', 'comment-empty', 'Comments could not be loaded right now. Please refresh in a moment.'));
     });

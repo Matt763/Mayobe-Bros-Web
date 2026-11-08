@@ -26,6 +26,17 @@ import { makeD1 } from './lib/d1-shim.mjs';
 const port = Number(process.argv[2] || 8787);
 const sites = process.argv.slice(3).length ? process.argv.slice(3) : ['http://127.0.0.1:8000'];
 const env = { DB: makeD1(), ADMIN_TOKEN: 'dev-admin-token-1234', REVIEW_SECRET: 'dev-review-secret-for-local-tests-only', REVIEW_EMAILS: 'review@example.test', HASH_SALT: 'dev', ALLOWED_ORIGINS: sites.join(','), SITE_ORIGIN: sites[0] };
+if (process.env.DEV_SEED) {
+  const [seedSlug, seedN] = process.env.DEV_SEED.split(':');
+  env.DB.raw.exec(`INSERT OR IGNORE INTO posts(slug, created) VALUES('${seedSlug.replace(/[^a-z0-9-]/g, '')}', 1)`);
+  const ins = env.DB.raw.prepare("INSERT INTO comments(slug, parent_id, name, body, status, created, cid, team) VALUES(?, ?, ?, ?, 'approved', ?, 'seed', 0)");
+  const base = Date.now() - 86400000;
+  for (let i = 1; i <= Math.min(5000, Number(seedN) || 0); i++) {
+    const r = ins.run(seedSlug, null, `Reader ${i}`, `Seeded comment number ${i}.`, base + i * 1000);
+    if (i % 4 === 0) ins.run(seedSlug, Number(r.lastInsertRowid), 'Replier', `A reply to number ${i}.`, base + i * 1000 + 500);
+  }
+  env.DB.raw.exec(`UPDATE post_stats SET comments = (SELECT COUNT(*) FROM comments WHERE slug = '${seedSlug.replace(/[^a-z0-9-]/g, '')}')`);
+}
 const LOG = process.env.DEV_MAIL_LOG === '1';
 const REAL = process.env.DEV_MAIL_REAL === '1';
 const RESEND = 'https://api.resend.com/emails';
