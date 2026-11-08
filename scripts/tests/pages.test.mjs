@@ -259,7 +259,7 @@ test('{{latest-posts:3}} renders the 3 newest posts as horizontal cards with rea
   for (const u of want) assert.ok(fs.existsSync(path.join(ROOT, u, 'index.html')), `${u} is a real page`);
 });
 
-// What an email link opens: only the purpose. No navigation, no hero, no article list, no footer, no cookie notice, no search, always light.
+// What an email link opens: only the purpose. No navigation, no hero, no article list, no footer, no cookie notice, no search. Light or dark like the device, with a theme button.
 function statusHtml(slug) {
   const config = { ...JSON.parse(fs.readFileSync(path.join(ROOT, 'site.config.json'), 'utf8')), newsletterAction: 'api', commentsApi: 'https://api.test/' };
   const dir = path.join(ROOT, 'content', 'pages');
@@ -275,8 +275,10 @@ test('/manage/ and /newsletter/ are bare status pages: logo, one card, a quiet l
     assert.match(html, /<body class="page-status">/, slug);
     assert.match(html, /<meta name="robots" content="noindex/, slug);
     assert.match(html, /<meta name="referrer" content="no-referrer">/, slug);
-    assert.match(html, /<meta name="color-scheme" content="light">/, `${slug}: always light`);
-    assert.doesNotMatch(html, /prefers-color-scheme: dark|localStorage\.getItem\('theme'\)/, `${slug}: no theme switching`);
+    assert.match(html, /<meta name="color-scheme" content="light dark">/, `${slug}: follows the device`);
+    assert.match(html, /localStorage\.getItem\('theme'\)/, `${slug}: the same stored choice as the rest of the site`);
+    assert.match(html, /<button class="icon-btn theme-btn st-theme"[^>]*data-theme-toggle/, `${slug}: has the theme button`);
+    assert.match(html, /js\/status-theme\.js/, `${slug}: loads the theme script`);
     assert.match(html, /<a class="st-logo"[^>]*><img src="[^"]*logo[^"]*" alt="Mayobe Bros"/, slug);
     assert.equal((html.match(/<h1\b/g) || []).length, 1, `${slug}: one h1`);
     assert.match(html, /<section class="st-card"/, slug);
@@ -285,7 +287,7 @@ test('/manage/ and /newsletter/ are bare status pages: logo, one card, a quiet l
     }
     assert.match(html, /<p class="st-links">/, slug);
     assert.match(html, new RegExp(`js/${slug === 'manage' ? 'manage' : 'newsletter'}\\.js`), `${slug}: its own script`);
-    assert.equal((html.match(/<script src=/g) || []).length, 1, `${slug}: that is the only script`);
+    assert.equal((html.match(/<script src=/g) || []).length, 2, `${slug}: its own script and the theme script, nothing else`);
   }
   // every state the script can show has its picture
   const { html } = statusHtml('manage');

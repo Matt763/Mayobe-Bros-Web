@@ -28,7 +28,7 @@ export const LIGHT = {
   imageAlt: '#364154',   // alt text inside a picture slot
   footer: '#060a14',     // the site's near-black footer
   footerText: '#d3dcee',
-  footerLink: '#ffffff', // underlined
+  footerLink: '#a8c8ff', // underlined; the site's own dark-theme link blue, so links stand out from the near-white footer text
   footerRule: '#1f2d4d', // hairline inside the footer (decorative)
   wordmark: '#ffffff',   // "Mayobe" in the footer name
   footerAccent: '#a8c8ff', // "Bros" in the footer name, like the light-blue "Bros" in the site's hero title

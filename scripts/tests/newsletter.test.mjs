@@ -539,6 +539,38 @@ test('each post email has the unsubscribe headers, a visible /newsletter/#u= lin
   assert.ok(m.body.html.includes('What the reader learns.'));
 });
 
+// every "Unsubscribe" link in the footer of a real newsletter email is the reader's own page link (never the /contact/ the template falls back to),
+// it is the same one the header and the plain text carry, and using it really unsubscribes that reader
+const unsubAnchors = (html) => [...html.matchAll(/<a href="([^"]*)"[^>]*>Unsubscribe<\/a>/g)].map((m) => m[1]);
+test('the footer Unsubscribe link in the welcome and in an article email is the real one and it works', async () => {
+  const { r } = await confirmed('real-link@example.com');
+  assert.equal(r.status, 200);
+  const welcome = sent[0];
+  const wu = tokenFrom(welcome, 'newsletter/#u=');
+  assert.deepEqual(unsubAnchors(welcome.body.html), [`https://mayobebros.com/newsletter/#u=${wu}`], 'welcome: one Unsubscribe link, the real one');
+  assert.ok(welcome.body.text.includes(`Unsubscribe: https://mayobebros.com/newsletter/#u=${wu}`));
+  assert.equal(welcome.body.headers['List-Unsubscribe'], `<https://worker.test/v1/newsletter/one-click?t=${wu}>`);
+  assert.equal(welcome.body.html.includes('/contact/#u='), false);
+  // the token in that link unsubscribes this reader, once
+  const out = await call('/v1/newsletter/unsubscribe', { body: { token: wu } });
+  assert.equal(out.status, 200);
+  assert.equal(rows("SELECT status FROM newsletter_subscribers WHERE email = 'real-link@example.com'")[0].status, 'unsubscribed');
+});
+
+test('an article email carries the real Unsubscribe link in the footer and the plain text, and its token belongs to that reader', async () => {
+  await seeded();
+  sendOn();
+  const id = addSub('footer-link@example.com');
+  searchList = [...OLD_LIST, entry('footer-post', dayOf(0), { t: 'Footer Post', e: 'Short excerpt.' })];
+  await run();
+  assert.equal(sent.length, 1);
+  const m = sent[0];
+  const u = tokenFrom(m, 'newsletter/#u=');
+  assert.deepEqual(unsubAnchors(m.body.html), [`https://mayobebros.com/newsletter/#u=${u}`]);
+  assert.ok(m.body.text.includes(`Unsubscribe: https://mayobebros.com/newsletter/#u=${u}`));
+  assert.equal(rows('SELECT subscriber_id FROM newsletter_tokens WHERE hash = ?', sha(u))[0].subscriber_id, id);
+});
+
 test('a post dated tomorrow is ignored; an unknown post dated 8 days ago (a renamed slug) is recorded as seeded and never emailed', async () => {
   await seeded();
   sendOn();

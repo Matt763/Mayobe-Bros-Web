@@ -784,3 +784,12 @@ test('a thumbnail is named by the post title; the hero and the lead keep the cov
   // with pictures blocked the alt text of a wide picture does not touch the left edge
   for (const t of [lead, hero]) assert.match(t, /text-indent:\d+px/);
 });
+
+test('footer links are a different colour from the footer text, so they read as links, and keep their underline', () => {
+  assert.notEqual(LIGHT.footerLink.toLowerCase(), LIGHT.footerText.toLowerCase());
+  assert.ok(contrast(LIGHT.footerLink, LIGHT.footer) >= 7, 'at least 7:1 on the footer');
+  const r = T.confirmSubscriptionEmail({ confirmUrl: 'https://mayobebros.com/newsletter/#c=x' }, SITE);
+  const links = [...r.html.matchAll(/<a href="[^"]*" style="color:([^;]+);text-decoration:underline;">(Visit Mayobe Bros|Privacy policy|Contact us)<\/a>/g)];
+  assert.equal(links.length, 3);
+  for (const m of links) assert.equal(m[1].toLowerCase(), LIGHT.footerLink.toLowerCase());
+});

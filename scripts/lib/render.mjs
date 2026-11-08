@@ -222,9 +222,9 @@ export function createRenderer(ctx) {
 <link rel="canonical" href="${url}">
 <meta name="robots" content="${robots}">${noReferrer ? '\n<meta name="referrer" content="no-referrer">' : ''}
 <meta name="author" content="${e(config.author)}">
-${bare ? '<meta name="color-scheme" content="light">\n<meta name="theme-color" content="#ffffff">' : `<meta name="color-scheme" content="light dark">
+<meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#070b14" media="(prefers-color-scheme: dark)">`}${config.verification?.yandex ? `\n<meta name="yandex-verification" content="${e(config.verification.yandex)}">` : ''}${adsenseId ? `\n<meta name="google-adsense-account" content="${e(adsenseId)}">` : ''}${config.verification?.google ? `\n<meta name="google-site-verification" content="${e(config.verification.google)}">` : ''}${config.verification?.bing ? `\n<meta name="msvalidate.01" content="${e(config.verification.bing)}">` : ''}
+<meta name="theme-color" content="#070b14" media="(prefers-color-scheme: dark)">${config.verification?.yandex ? `\n<meta name="yandex-verification" content="${e(config.verification.yandex)}">` : ''}${adsenseId ? `\n<meta name="google-adsense-account" content="${e(adsenseId)}">` : ''}${config.verification?.google ? `\n<meta name="google-site-verification" content="${e(config.verification.google)}">` : ''}${config.verification?.bing ? `\n<meta name="msvalidate.01" content="${e(config.verification.bing)}">` : ''}
 <link rel="icon" href="${u('/favicon.ico')}" sizes="16x16 32x32 48x48">
 <link rel="icon" href="${u('/assets/img/favicon-48.png')}" type="image/png" sizes="48x48">
 <link rel="icon" href="${u('/assets/img/favicon-32.png')}" type="image/png" sizes="32x32">
@@ -243,7 +243,7 @@ ${bare ? '<meta name="color-scheme" content="light">\n<meta name="theme-color" c
 <meta name="twitter:title" content="${e(title)}">
 <meta name="twitter:description" content="${e(description)}">
 <meta name="twitter:image" content="${img}">${si.alt ? `\n<meta name="twitter:image:alt" content="${e(si.alt)}">` : ''}${art}${preload ? `\n<link rel="preload" as="image" href="${preload}"${topicSet(preload) ? ` imagesrcset="${topicSet(preload)}" imagesizes="100vw"` : ''} fetchpriority="high">` : ''}${api ? `\n<link rel="preconnect" href="${new URL(api).origin}" crossorigin>` : ''}
-${bare ? "<script>document.documentElement.classList.add('js')</script>" : `<script>(function(){var d=document.documentElement,t=null;d.classList.add('js');try{t=localStorage.getItem('theme')}catch(e){}if(t==='dark')d.classList.add('dark');else if(t==='light')d.classList.add('light');else if(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)d.classList.add('dark')})();</script>`}
+<script>(function(){var d=document.documentElement,t=null;d.classList.add('js');try{t=localStorage.getItem('theme')}catch(e){}if(t==='dark')d.classList.add('dark');else if(t==='light')d.classList.add('light');else if(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)d.classList.add('dark')})();</script>
 <link rel="stylesheet" href="${assetUrl('css/style.css')}">${jsonLd.map((j) => `\n<script type="application/ld+json">${json(j)}</script>`).join('')}`;
     return withPolicy(out, bare, noReferrer);
   }
@@ -1000,7 +1000,7 @@ ${discover()}`;
   }
 
   /* Pages that confirm something from an email link (/manage/: comment links and the team's Approve / Ignore; /newsletter/: confirm and
-     unsubscribe) are "status" pages (kind: status in content/pages): a bare, always-light page with only the logo, one card with the
+     unsubscribe) are "status" pages (kind: status in content/pages): a bare page (light or dark like the device, with a toggle) with only the logo, one card with the
      answer, and one quiet line of links. No header, hero, footer, article list, cookie notice or search: nothing here but the
      purpose. The card is drawn by js/manage.js or js/newsletter.js (data-state: mail, busy, ok, info, err) and css/style.css (.page-status). */
   function statusPage(pg, inner) {
@@ -1012,11 +1012,13 @@ ${head(meta)}
 </head>
 <body class="page-status">
 <div class="st-bar" aria-hidden="true"></div>
+<button class="icon-btn theme-btn st-theme" type="button" data-theme-toggle aria-label="Switch to dark mode" title="Dark mode">${icon('sun', 20, 'i-sun')}${icon('moon', 20, 'i-moon')}</button>
 <main id="main" class="st">
   <a class="st-logo" href="${u('/')}" aria-label="${e(config.name)} home"><img src="${resolveImage(config.logoSmall || config.logo)}" alt="${e(config.name)}" width="500" height="98"></a>
 ${inner}
   <p class="st-links"><a href="${u('/')}">Go to ${e(config.name)}</a><span aria-hidden="true">&middot;</span><a href="${u('/contact/')}">Contact us</a><span aria-hidden="true">&middot;</span><a href="${u('/privacy-policy/')}">Privacy</a></p>
-</main>${api && pg.slug === 'manage' ? `\n<script src="${assetUrl('js/manage.js')}" defer></script>` : ''}${newsletter && pg.slug === 'newsletter' ? `\n<script src="${assetUrl('js/newsletter.js')}" defer></script>` : ''}
+</main>
+<script src="${assetUrl('js/status-theme.js')}" defer></script>${api && pg.slug === 'manage' ? `\n<script src="${assetUrl('js/manage.js')}" defer></script>` : ''}${newsletter && pg.slug === 'newsletter' ? `\n<script src="${assetUrl('js/newsletter.js')}" defer></script>` : ''}
 </body>
 </html>
 `;

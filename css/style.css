@@ -25,6 +25,9 @@
   --err: #a11212;
   --header-bg: rgba(255, 255, 255, 0.94);
   --logo-filter: none;
+  --st-glow: #eaf0ff; --st-glow-0: rgba(234, 240, 255, 0); /* the confirmation pages (/manage/, /newsletter/) */
+  --st-badge: #eef3ff; --st-err-bg: #fdeceb;
+  --st-card-shadow: 0 1px 2px rgba(15, 31, 92, 0.05), 0 28px 64px -34px rgba(20, 42, 120, 0.38);
   --img-dim: 1;
   --shadow-sm: 0 1px 2px rgba(11, 18, 32, 0.08);
   --shadow-md: 0 6px 16px -4px rgba(11, 18, 32, 0.14), 0 2px 6px rgba(11, 18, 32, 0.06);
@@ -67,6 +70,7 @@
   --m-angry: #ff8559; --m-angry-deep: #b43410;
   --header-bg: rgba(7, 11, 20, 0.94);
   --logo-filter: brightness(0) invert(1);
+  --st-glow: #16295a; --st-glow-0: rgba(22, 41, 90, 0); --st-badge: #182545; --st-err-bg: #3a1a22; --st-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 28px 64px -34px rgba(0, 0, 0, 0.9);
   --img-dim: 0.92;
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
   --shadow-md: 0 6px 16px -4px rgba(0, 0, 0, 0.6);
@@ -99,6 +103,7 @@
   --m-angry: #ff8559; --m-angry-deep: #b43410;
     --header-bg: rgba(7, 11, 20, 0.94);
     --logo-filter: brightness(0) invert(1);
+    --st-glow: #16295a; --st-glow-0: rgba(22, 41, 90, 0); --st-badge: #182545; --st-err-bg: #3a1a22; --st-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 28px 64px -34px rgba(0, 0, 0, 0.9);
     --img-dim: 0.92;
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
     --shadow-md: 0 6px 16px -4px rgba(0, 0, 0, 0.6);
@@ -1638,34 +1643,38 @@ main.is-switching .hero-listing + .section > .wrap > * { animation: none !import
 .notify-row .notify-box:focus-visible { outline: 3px solid var(--ring, #2f6bff); outline-offset: 3px; }
 .notify-row label { font-weight: 600; line-height: 1.45; cursor: pointer; color: var(--text); }
 .notify-row .notify-hint { grid-column: 2; margin: 0; font-size: 0.9375rem; line-height: 1.5; color: var(--text-3); }
-/* Status pages (/manage/ and /newsletter/, kind: status): what an email link opens. A bare, always-light page: a thin brand bar, the logo,
+/* Status pages (/manage/ and /newsletter/, kind: status): what an email link opens. A bare page that follows the device's light or dark setting (the button at the top right overrides it): a thin brand bar, the logo,
    one card with the answer, one quiet line of links. js/manage.js and js/newsletter.js set data-state on the card:
    mail (waiting for a press), busy, ok (big check), info (nothing to do, used or expired), err (could not reach the server).
    Motion: the logo, the card and then each line rise in one after another; a new state replays the lines (the animation name changes
    between the two groups, so it restarts only when the state really changes); the check draws itself. Only opacity and transform move
    (plus the check's stroke); with reduced motion everything is simply there. Keyframes are named st- so nothing else can replace them. */
-.page-status { min-height: 100vh; min-height: 100svh; background: #fff; color: var(--text); }
-.page-status::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 26rem; max-height: 60vh; background: radial-gradient(65% 100% at 50% 0%, #eaf0ff 0%, rgba(255, 255, 255, 0) 100%); pointer-events: none; }
+.page-status { min-height: 100vh; min-height: 100svh; background: var(--bg); color: var(--text); }
+.page-status::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 26rem; max-height: 60vh; background: radial-gradient(65% 100% at 50% 0%, var(--st-glow) 0%, var(--st-glow-0) 100%); pointer-events: none; }
 .st-bar { position: fixed; inset: 0 0 auto 0; z-index: 2; height: 4px; background: linear-gradient(90deg, #3f9b4d 0 50%, #1e3a9e 50% 100%); }
+/* the theme button: top right, clear of the card; 2.9rem = 46 px, above the 44 px touch minimum */
+.st-theme { position: fixed; z-index: 3; top: max(0.6rem, env(safe-area-inset-top)); right: max(0.6rem, env(safe-area-inset-right)); color: var(--text); background: var(--surface); border: 1px solid var(--line-soft); box-shadow: var(--shadow-sm); animation: st-fade 0.7s var(--ease) 0.3s both; }
+.st-theme:hover { background: var(--surface-2); }
+.st-theme:focus-visible { outline: 3px solid var(--ring, #2f6bff); outline-offset: 3px; }
 .st { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; min-height: 100vh; min-height: 100svh; padding: clamp(1.5rem, 5vh, 3rem) max(1rem, env(safe-area-inset-right)) max(1.5rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left)); }
 .st-logo { display: block; margin: clamp(0.5rem, 3vh, 1.5rem) 0 clamp(1.5rem, 5vh, 3rem); border-radius: 6px; animation: st-fade 0.7s var(--ease) both; }
 .st-logo img { display: block; width: auto; height: clamp(2rem, 7vw, 2.75rem); }
 .st-logo:focus-visible { outline: 3px solid var(--ring, #2f6bff); outline-offset: 6px; }
-.st-card { position: relative; width: min(100%, 34rem); margin: auto 0; padding: clamp(1.75rem, 6vw, 3rem) clamp(1.25rem, 6vw, 3rem); text-align: center; background: #fff; border: 1px solid var(--line-soft); border-radius: 1.75rem; box-shadow: 0 1px 2px rgba(15, 31, 92, 0.05), 0 28px 64px -34px rgba(20, 42, 120, 0.38); animation: st-fade 0.6s var(--ease) 0.08s both; }
-.st-badge { position: relative; display: grid; place-items: center; width: 5rem; height: 5rem; margin: 0 auto 1.4rem; border-radius: 50%; background: #eef3ff; color: #1e3a9e; animation: st-pop 0.6s var(--ease) 0.2s both; }
+.st-card { position: relative; width: min(100%, 34rem); margin: auto 0; padding: clamp(1.75rem, 6vw, 3rem) clamp(1.25rem, 6vw, 3rem); text-align: center; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 1.75rem; box-shadow: var(--st-card-shadow); animation: st-fade 0.6s var(--ease) 0.08s both; }
+.st-badge { position: relative; display: grid; place-items: center; width: 5rem; height: 5rem; margin: 0 auto 1.4rem; border-radius: 50%; background: var(--st-badge); color: var(--link); animation: st-pop 0.6s var(--ease) 0.2s both; }
 .st-i { display: none; grid-area: 1 / 1; }
 .st-card[data-state="mail"] .st-i-mail, .st-card[data-state="busy"] .st-i-mail, .st-card[data-state="ok"] .st-i-ok, .st-card[data-state="info"] .st-i-info, .st-card[data-state="err"] .st-i-err { display: block; }
-.st-spin { display: none; position: absolute; inset: -6px; border: 3px solid transparent; border-top-color: #1e3a9e; border-radius: 50%; }
+.st-spin { display: none; position: absolute; inset: -6px; border: 3px solid transparent; border-top-color: var(--link); border-radius: 50%; }
 .st-card[data-state="busy"] .st-spin { display: block; animation: st-spin 0.9s linear infinite; }
-.st-card[data-state="info"] .st-badge { background: #eef3ff; color: #1e3a9e; }
-.st-card[data-state="err"] .st-badge { background: #fdeceb; color: var(--err); animation-name: st-pop-b; }
+.st-card[data-state="info"] .st-badge { background: var(--st-badge); color: var(--link); }
+.st-card[data-state="err"] .st-badge { background: var(--st-err-bg); color: var(--err); animation-name: st-pop-b; }
 .st-card[data-state="ok"] .st-badge { background: linear-gradient(145deg, #12a068, #0b7a4b); box-shadow: 0 14px 30px -12px rgba(11, 122, 75, 0.7); animation-name: st-pop-b; animation-delay: 0s; }
 .st-card[data-state="ok"] .st-badge::after { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 2px solid #12a068; opacity: 0; animation: st-ripple 1.1s var(--ease) 0.25s 1 both; }
 .st-ring { stroke: #fff; stroke-width: 2.5; stroke-dasharray: 145; stroke-dashoffset: 145; opacity: 0.55; }
 .st-tick { stroke: #fff; stroke-width: 4; stroke-dasharray: 40; stroke-dashoffset: 40; }
 .st-card[data-state="ok"] .st-ring { animation: st-draw 0.7s var(--ease) 0.1s forwards; }
 .st-card[data-state="ok"] .st-tick { animation: st-draw 0.45s var(--ease) 0.55s forwards; }
-.st-kicker { margin: 0 0 0.6rem; color: #1e3a9e; font-size: 0.78rem; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; }
+.st-kicker { margin: 0 0 0.6rem; color: var(--link); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; }
 .st-kicker:empty { display: none; }
 .st-title { margin: 0; color: var(--text); font-size: clamp(1.55rem, 5.4vw, 2.1rem); font-weight: 800; line-height: 1.2; letter-spacing: -0.01em; text-wrap: balance; }
 .st-title:focus { outline: none; }
@@ -1699,7 +1708,7 @@ main.is-switching .hero-listing + .section > .wrap > * { animation: none !import
 @media (max-width: 30rem) { .st-btn { width: 100%; min-width: 0; } .st-badge { width: 4.4rem; height: 4.4rem; margin-bottom: 1.15rem; } }
 @media (max-height: 34rem) { .st-logo { margin-block: 0.25rem 1rem; } .st-card { margin-top: 0; } }
 @media (prefers-reduced-motion: reduce) {
-  .st-logo, .st-card, .st-badge, .st-sw, .st-links, .st-card[data-state="ok"] .st-badge::after { animation: none !important; }
+  .st-logo, .st-theme, .st-card, .st-badge, .st-sw, .st-links, .st-card[data-state="ok"] .st-badge::after { animation: none !important; }
   .st-ring, .st-tick { animation: none !important; stroke-dashoffset: 0 !important; }
   .st-card[data-state="busy"] .st-spin, .st-btn[aria-busy="true"]::before { animation: st-dim 1.2s ease-in-out infinite !important; }
 }
