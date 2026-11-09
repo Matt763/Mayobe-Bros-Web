@@ -3,6 +3,8 @@
 //   GET  /v1/stats?slugs=a,b,c              counts for many posts at once (browser-cached 10 s)
 //   GET  /v1/posts/:slug[?offset=N]         approved comments, newest conversation first, 20 conversations a page (`more` + `next` when another page exists; + a blank "deleted" placeholder for a deleted comment that has replies) + counts (always fresh)
 //   GET  /v1/posts/:slug/mine?cid=<id>      this visitor's own reaction (never cached)
+//   POST /v1/read                           { slug, p? }  one engaged read of an article (the browser sends it after 20 s on screen and 40% scrolled; p = it arrived from /popular/). Always answers { ok: true }; counted once per visitor per article per day (src/reads.js)
+//   GET  /v1/admin/popular                  (Authorization: Bearer ADMIN_TOKEN)  the most-read order { ready, ranked: [slug...], rows: [{ slug, reads, days, score }] }; the numbers are for the owner only, the site shows the order
 //   POST /v1/posts/:slug/react              { cid, type: "like"|"amazed"|"sad"|"angry"|null }
 //   POST /v1/posts/:slug/comments           { name, email?, body, parent?, cid, website (honeypot), ts }  -> { ok, status, comment, id, token }
 //                                           `token` is the commenter's secret to edit or delete this comment; it is shown once (only its SHA-256 is stored)
@@ -28,8 +30,9 @@
 
 import { screen, looksLikeTeam } from './moderation.js';
 import { looksLikeQuestion } from './question.js';
-import { SLUG_RE, TOKEN_RE, enc, now, reply, fail, sha, ipHash, same, newToken, hit, readJson, siteOrigin, siteOf, canonicalEmail, utcDay, DAY_TTL, later, humanCheck } from './util.js';
+import { SLUG_RE, TOKEN_RE, enc, now, reply, fail, sha, ipHash, visitorNet, same, newToken, hit, readJson, siteOrigin, siteOf, canonicalEmail, utcDay, DAY_TTL, later, humanCheck } from './util.js';
 import { newsletterRoute, newsletterAdmin, runNewsletter } from './newsletter.js';
+import { looksLikeBot, looksTooBare, readerCode, PER_NETWORK_ARTICLE, countRead, alreadyCounted, popularNow, purgeReads } from './reads.js';
 import { sendMail, validEmail } from './mail.js';
 import { checkReviewToken, reviewLinks } from './review.js';
 import { manageLinkEmail, replyNoticeEmail, ownerAlertEmail, contactOwnerEmail, contactVisitorEmail, CONTACT_TYPES } from './mail-templates.js';
@@ -356,6 +359,24 @@ async function handle(request, env, ctx) {
     return reply({ ok: true, result: r, id: row.id, ...(await where()), stats: await getStats(env, row.slug) }, 200, cors);
   }
 
+  // One engaged read of an article. The visitor never learns whether it counted (bots, repeats and limits all answer the same).
+  if (method === 'POST' && path === '/v1/read') {
+    const b = await readJson(request, 400);
+    const slug = typeof b.slug === 'string' ? b.slug : '';
+    if (!SLUG_RE.test(slug) || slug.length > 140) return fail(NOT_SENT, 400, cors);
+    const ua = request.headers.get('User-Agent') || '';
+    if (looksLikeBot(ua) || looksTooBare(ua) || !env.HASH_SALT) return reply({ ok: true }, 200, cors); // no secret = no safe code: count nothing
+    if (!(await slugKnown(env, slug))) return fail('Article not found.', 404, cors);
+    const ih = await ipHash(request, env);
+    if (!(await hit(env, ctx, `read:${ih}`, 150, DAY_TTL))) return reply({ ok: true }, 200, cors); // far more than any reader opens in a day
+    const net = visitorNet(request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown');
+    const code = await readerCode(env, slug, net, ua);
+    if (await alreadyCounted(env, slug, code)) return reply({ ok: true }, 200, cors); // a reload or a second look: nothing to do (and it does not use up the allowance below)
+    if (!(await hit(env, ctx, `readp:${slug}:${ih}`, PER_NETWORK_ARTICLE, DAY_TTL))) return reply({ ok: true }, 200, cors); // one network adds at most a few new visitors to one article a day
+    await countRead(env, slug, code, b.p === 1 || b.p === true);
+    return reply({ ok: true }, 200, cors);
+  }
+
   let m;
   if (method === 'GET' && path === '/v1/stats') {
     const slugs = (url.searchParams.get('slugs') || '').split(',').map((s) => s.trim()).filter((s) => SLUG_RE.test(s)).slice(0, 60);
@@ -645,6 +666,7 @@ async function handle(request, env, ctx) {
     if (!(await isAdmin(request, env))) return fail('Unauthorized.', 401, cors);
     const nla = await newsletterAdmin(request, env, ctx, path, url, cors);
     if (nla) return nla;
+    if (method === 'GET' && path === '/v1/admin/popular') return reply(await popularNow(env), 200, cors);
     if (method === 'GET' && path === '/v1/admin/comments') {
       const status = ['pending', 'approved', 'spam'].includes(url.searchParams.get('status')) ? url.searchParams.get('status') : 'pending';
       const limit = Math.min(200, Math.max(1, Number(url.searchParams.get('limit')) || 50));
@@ -716,6 +738,7 @@ export default {
   },
   // Cron Trigger (wrangler.jsonc "triggers"): the daily newsletter run. runNewsletter never throws.
   scheduled(event, env, ctx) {
-    ctx.waitUntil(runNewsletter(env, ctx));
+    // one job: the newsletter run (its result is what a caller sees) and the clean-up of the "most read" counters (visitor codes after two days, daily totals after sixty)
+    ctx.waitUntil(Promise.all([runNewsletter(env, ctx), purgeReads(env)]).then(([result]) => result));
   },
 };

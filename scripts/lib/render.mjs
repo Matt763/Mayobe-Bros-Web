@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { escapeHtml as e, addHeadingIds } from './markdown.mjs';
 import { emailAlt } from './email-images.mjs';
 import { skeletonCss, skeletonScript, skeletonHtml } from './skeleton.mjs';
+import { popularOrder } from './popular.mjs';
 
 /* ------------------------------------------------------------------ icons */
 const ICONS = {
@@ -98,7 +99,7 @@ export function newsletterSetting(action, flag = false) {
 export const newsletterOn = (config) => !!(config.commentsApi || '').trim() && config.newsletterAction === 'api';
 
 export function createRenderer(ctx) {
-  const { config, categories, posts, pages, authors, versions, heroSets = {}, shareCards = new Map(), emailImages = new Map(), qa = {} } = ctx;
+  const { config, categories, posts, pages, authors, versions, heroSets = {}, shareCards = new Map(), emailImages = new Map(), qa = {}, popularRanked = [] } = ctx;
   const base = (config.basePath || '').replace(/\/$/, '');
   const siteUrl = config.siteUrl.replace(/\/$/, '');
   const api = (config.commentsApi || '').replace(/\/$/, '');
@@ -245,7 +246,7 @@ export function createRenderer(ctx) {
 <meta name="twitter:description" content="${e(description)}">
 <meta name="twitter:image" content="${img}">${si.alt ? `\n<meta name="twitter:image:alt" content="${e(si.alt)}">` : ''}${art}${preload ? `\n<link rel="preload" as="image" href="${preload}"${topicSet(preload) ? ` imagesrcset="${topicSet(preload)}" imagesizes="100vw"` : ''} fetchpriority="high">` : ''}${api ? `\n<link rel="preconnect" href="${new URL(api).origin}" crossorigin>` : ''}
 <script>(function(){var d=document.documentElement,t=null;d.classList.add('js');try{t=localStorage.getItem('theme')}catch(e){}if(t==='dark')d.classList.add('dark');else if(t==='light')d.classList.add('light');else if(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)d.classList.add('dark')})();</script>
-${skeleton ? `<style>${skeletonCss}</style>\n<script>${skeletonScript}</script>\n<link rel="preload" as="style" href="${assetUrl('css/style.css')}">` : `<link rel="stylesheet" href="${assetUrl('css/style.css')}">`}${jsonLd.map((j) => `\n<script type="application/ld+json">${json(j)}</script>`).join('')}`;
+${skeleton ? `<style>${skeletonCss}</style>\n<script>${skeletonScript(assetUrl('css/style.css'))}</script>\n<link rel="preload" as="style" href="${assetUrl('css/style.css')}">` : `<link rel="stylesheet" href="${assetUrl('css/style.css')}">`}${jsonLd.map((j) => `\n<script type="application/ld+json">${json(j)}</script>`).join('')}`;
     return withPolicy(out, bare, noReferrer);
   }
 
@@ -351,7 +352,7 @@ ${skeleton ? `<style>${skeletonCss}</style>\n<script>${skeletonScript}</script>\
     const socials = [['facebook', 'Facebook'], ['twitter', 'X'], ['instagram', 'Instagram'], ['linkedin', 'LinkedIn'], ['whatsapp', 'WhatsApp Channel']].filter(([k]) => config.social?.[k]);
     const li = (href, label) => `<li><a class="foot-link" href="${href}">${e(label)}</a></li>`;
     const legal = pages.filter((p) => p.kind === 'legal');
-    const company = [['About us', '/about/'], ['Contact', '/contact/'], ['Work with us', '/advertise/'], ...authors.map((a) => [`${a.name} (author)`, `/author/${a.slug}/`])];
+    const company = [['About us', '/about/'], ['Contact', '/contact/'], ['Work with us', '/advertise/'], ['Authors', '/author/']];
     // the newsletter form: hidden in the HTML and shown by js/subscribe.js, which sends it. Without JavaScript nothing can be sent
     // (no address in a URL or a log); the <noscript> line after it offers RSS instead.
     const cta = newsletter
@@ -401,14 +402,14 @@ ${skeleton ? `<style>${skeletonCss}</style>\n<script>${skeletonScript}</script>\
 ${head({ ...meta, skeleton: !meta.notFound })}
 </head>
 <body class="${meta.bodyClass || ''}"${ads ? ' data-ads="1"' : ''}>
-${meta.notFound ? '' : `${skeletonHtml(meta.bodyClass === 'page-home')}\n<link rel="stylesheet" href="${assetUrl('css/style.css')}">\n`}${header(cur)}
+${meta.notFound ? '' : `${skeletonHtml(meta.bodyClass === 'page-post')}\n<link rel="stylesheet" href="${assetUrl('css/style.css')}">\n`}${header(cur)}
 <main id="main">
 ${body}
 </main>
 ${footer()}
 ${SEARCH_MODAL()}
 <script src="${assetUrl('js/motion.js')}" defer></script>
-${config.turnstileSiteKey ? `<script src="${assetUrl('js/turnstile.js')}" defer></script>\n` : ''}${meta.notFound ? `<script src="${assetUrl('js/notfound.js')}" defer></script>\n<script src="${assetUrl('js/notfound-posts.js')}" defer></script>\n` : ''}<script src="${assetUrl('js/site.js')}" defer></script>${meta.listen ? `\n<script src="${assetUrl('js/listen.js')}" defer></script>` : ''}${body.includes('class="pagination"') || body.includes('hero-listing') ? `\n<script src="${assetUrl('js/pager.js')}" defer></script>` : ''}${api ? `\n<script src="${assetUrl('js/engage.js')}" defer></script>` : ''}${api && meta.contact ? `\n<script src="${assetUrl('js/contact.js')}" defer></script>` : ''}${api && meta.manage ? `\n<script src="${assetUrl('js/manage.js')}" defer></script>` : ''}${newsletter ? `\n<script src="${assetUrl('js/subscribe.js')}" defer></script>` : ''}${newsletter && meta.newsletterPage ? `\n<script src="${assetUrl('js/newsletter.js')}" defer></script>` : ''}${cfToken && !meta.manage && !meta.newsletterPage ?`\n<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${cfToken}"}'></script>` : ''}
+${config.turnstileSiteKey ? `<script src="${assetUrl('js/turnstile.js')}" defer></script>\n` : ''}${meta.notFound ? `<script src="${assetUrl('js/notfound.js')}" defer></script>\n<script src="${assetUrl('js/notfound-posts.js')}" defer></script>\n` : ''}<script src="${assetUrl('js/site.js')}" defer></script>${meta.listen ? `\n<script src="${assetUrl('js/listen.js')}" defer></script>` : ''}${body.includes('class="pagination"') || body.includes('hero-listing') ? `\n<script src="${assetUrl('js/pager.js')}" defer></script>` : ''}${api ? `\n<script src="${assetUrl('js/engage.js')}" defer></script>` : ''}${api && meta.listen ? `\n<script src="${assetUrl('js/reads.js')}" defer></script>` : ''}${api && meta.contact ? `\n<script src="${assetUrl('js/contact.js')}" defer></script>` : ''}${api && meta.manage ? `\n<script src="${assetUrl('js/manage.js')}" defer></script>` : ''}${newsletter ? `\n<script src="${assetUrl('js/subscribe.js')}" defer></script>` : ''}${newsletter && meta.newsletterPage ? `\n<script src="${assetUrl('js/newsletter.js')}" defer></script>` : ''}${cfToken && !meta.manage && !meta.newsletterPage ?`\n<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${cfToken}"}'></script>` : ''}
 </body>
 </html>
 `;
@@ -427,13 +428,16 @@ ${config.turnstileSiteKey ? `<script src="${assetUrl('js/turnstile.js')}" defer>
   };
   const smallTopic = (src) => (/\/assets\/img\/topics\/[a-z0-9-]+-\d+\.webp$/.test(src || '') ? src.replace(/-\d+\.webp$/, '-1280.webp') : src);
 
-  function hero({ image, title, sub = '', crumbs = null, extra = '', kind = 'page', h1 = true, kicker = '', alt = '', titleAttrs = '' }) {
+  // "Popular posts": the order comes from scripts/lib/popular.mjs (most-read order saved by `node scripts/popular-sync.mjs`, else editor's picks first).
+  const { mostRead } = popularOrder(posts, popularRanked);
+  const popularList = () => popularOrder(posts, popularRanked).list;
+
+  function hero({ image, title, sub = '', extra = '', kind = 'page', h1 = true, kicker = '', alt = '', titleAttrs = '' }) {
     const tag = h1 ? 'h1' : 'h2';
     return `<section class="hero hero-${kind}${/\/img\/heroes\//.test(image) ? ' hero-art' : ''}">
   <img class="hero-img" src="${image}"${topicSet(image) ? ` srcset="${topicSet(image)}" sizes="100vw"` : ''} alt="${e(alt)}" fetchpriority="high" decoding="async">
   <div class="hero-scrim" aria-hidden="true"></div>
   <div class="hero-inner wrap">
-    ${crumbs ? breadcrumbs(crumbs) : ''}
     ${kicker ? `<p class="hero-kicker">${kicker}</p>` : ''}
     <${tag} class="hero-title"${titleAttrs}>${title}</${tag}>
     ${sub ? `<p class="hero-sub">${e(sub)}</p>` : ''}
@@ -703,7 +707,7 @@ ${config.turnstileSiteKey ? `<script src="${assetUrl('js/turnstile.js')}" defer>
 </section>
 ${picks.length ? `<section class="section section-alt" data-reveal>
   <div class="wrap">
-    ${sectionHead("Editor's picks", 'See all', u('/popular/'), `<span class="kicker">${icon('star', 16)} Hand-picked</span>`)}
+    ${sectionHead("Editor's picks", 'All articles', u('/post/'), `<span class="kicker">${icon('star', 16)} Hand-picked</span>`)}
     ${grid(picks, 'small')}
   </div>
 </section>` : ''}
@@ -763,9 +767,6 @@ ${discover()}`;
     const chips = c.labels.length
       ? `<div class="chips hero-chips" role="list"><a role="listitem" class="chip${label ? '' : ' is-active'}" href="${u(`/category/${c.slug}/`)}">All</a>${c.labels.map((l) => `<a role="listitem" class="chip${label?.slug === l.slug ? ' is-active' : ''}" href="${u(`/category/${c.slug}/${l.slug}/`)}">${e(l.name)}</a>`).join('')}</div>`
       : '';
-    const crumbs = [['Home', u('/')], ['Categories', u('/category/')]];
-    if (label) crumbs.push([c.name, u(`/category/${c.slug}/`)], [label.name, '']);
-    else crumbs.push([c.name, '']);
     const title = label ? `${label.name} in ${c.name}` : c.name;
     const desc = (label ? label.description : c.description) || c.description || `Browse ${title} articles on ${config.name}.`;
     const img = heroFor(label ? `${c.slug}/${label.slug}` : c.slug, (label && label.image) || c.image);
@@ -838,13 +839,13 @@ ${discover()}`;
   }
 
   function popular(pageNo = 1, pageCount = 1, list = null, total = 0) {
-    list = list || [...posts.filter((p) => p.featured), ...posts.filter((p) => !p.featured)].slice(0, perPage);
+    list = list || popularList().slice(0, perPage);
     total = total || list.length;
     const hrefFor = (n) => u(n === 1 ? '/popular/' : `/popular/page/${n}/`);
     return listingShell(
-      { title: pageNo > 1 ? `Popular posts, page ${pageNo}` : 'Popular posts', description: describe(`Our editors' picks and most useful articles on ${config.name}.`, 'Plain-English guides for readers in Tanzania.', pageNo), noindex: !posts.some((x) => x.featured), path: pageNo === 1 ? '/popular/' : `/popular/page/${pageNo}/`, adKind: 'category' },
+      { title: pageNo > 1 ? `Popular posts, page ${pageNo}` : 'Popular posts', description: describe(mostRead ? `The articles readers open most on ${config.name} come first, then editor's picks and the latest.` : `Our editors' picks and most useful articles on ${config.name}.`, 'Plain-English guides for readers in Tanzania.', pageNo), noindex: !(mostRead || posts.some((x) => x.featured)), path: pageNo === 1 ? '/popular/' : `/popular/page/${pageNo}/`, adKind: 'category' },
       { type: 'popular' },
-      { image: heroFor('popular'), title: 'Popular posts', sub: "Editors' picks first, then the latest stories." },
+      { image: heroFor('popular'), title: 'Popular posts', sub: mostRead ? 'The articles our readers open most come first, then editor\'s picks and the latest.' : "Editors' picks first, then the latest stories." },
       `${list.length ? grid(list, 'normal', '', 'h2') : '<p class="empty">No posts published yet.</p>'}${pagination(pageNo, pageCount, hrefFor, { count: total, perPage })}`,
     );
   }
@@ -875,6 +876,20 @@ ${discover()}`;
   const SOCIAL_LABEL = { facebook: 'Facebook', twitter: 'X', instagram: 'Instagram', linkedin: 'LinkedIn' };
   const authorSocials = (a) => Object.keys(SOCIAL_LABEL).map((k) => [k, String((a.social || {})[k] || '').trim()]).filter(([, v]) => /^https?:\/\//i.test(v));
   const listText = (items) => (items.length > 1 ? `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}` : items[0] || '');
+
+  // /author/: who writes here, one card per author (the footer's "Authors" link). Every number is counted from the real articles.
+  function authorsIndex() {
+    const card = (a) => {
+      const n = posts.filter((x) => x.author === a.name).length;
+      return `<a class="au-card" href="${u(`/author/${a.slug}/`)}">${authorAvatar(a, 'ap-sm')}<span class="au-text"><span class="au-name">${e(a.name)}</span>${a.role ? `<span class="au-role">${e(a.role)}</span>` : ''}<span class="au-count">${n} ${n === 1 ? 'article' : 'articles'}</span></span><span class="au-go" aria-hidden="true">${icon('arrowRight', 18)}</span></a>`;
+    };
+    return listingShell(
+      { title: 'Authors', description: describe(`The people who research and write the articles on ${config.name}.`, 'Choose an author to read their page and articles.', 1), path: '/author/', noindex: true, adKind: 'page' },
+      {},
+      { image: heroFor('authors'), title: 'Authors', sub: 'Choose an author to see their page and articles.' },
+      `<div class="au-grid">${authors.map(card).join('')}</div>`,
+    );
+  }
 
   function authorPage(a, list, pageNo = 1, pageCount = 1, total = list.length) {
     const hrefFor = (n) => u(n === 1 ? `/author/${a.slug}/` : `/author/${a.slug}/page/${n}/`);
@@ -1456,7 +1471,7 @@ ${listenPlayer()}
       ({ loc, lastmod, info, xml: `  <url><loc>${xml(loc)}</loc><lastmod>${day(lastmod)}</lastmod>${changefreq ? `<changefreq>${changefreq}</changefreq><priority>${priority}</priority>` : ''}${extra}</url>` });
 
     const pageUrls = [url(abs('/'), newest, 'daily', '1.0', '', { title: 'Home' }), url(abs('/post/'), newest, 'daily', '0.8', '', { title: 'All posts' })];
-    if (posts.some((x) => x.featured)) pageUrls.push(url(abs('/popular/'), newest, 'weekly', '0.6', '', { title: 'Popular posts' }));
+    if (mostRead || posts.some((x) => x.featured)) pageUrls.push(url(abs('/popular/'), newest, 'weekly', '0.6', '', { title: 'Popular posts' }));
     pageUrls.push(url(abs('/category/'), newest, 'weekly', '0.6', '', { title: 'Categories' }), url(abs('/label/'), newest, 'weekly', '0.4', '', { title: 'Topics' }));
     for (const t of tagTopics) if (t.list.length >= 3) pageUrls.push(url(abs(`/tag/${t.slug}/`), when(t.list[0]), 'weekly', '0.5', '', { title: `Tag: ${t.name || t.slug}` }));
     for (const a of authors) pageUrls.push(url(abs(`/author/${a.slug}/`), newest, 'monthly', '0.4', '', { title: `Author: ${a.name}` }));
@@ -1562,7 +1577,7 @@ ${listenPlayer()}
     out.set('/sitemap/', layout(
       { title: 'Sitemap', description: describe(`A complete index of every article and page on ${config.name}, grouped by type.`, 'Open a list, then choose any article.', 1), path: '/sitemap/', noindex: true, adKind: 'page', preload: image },
       {},
-      `${hero({ image, title: 'Sitemap', sub: `Every article and page on ${config.name}, grouped by type. Open a list, then choose any address.`, crumbs: [['Home', u('/')], ['Sitemap', '']] })}
+      `${hero({ image, title: 'Sitemap', sub: `Every article and page on ${config.name}, grouped by type. Open a list, then choose any address.` })}
 <section class="section"><div class="wrap">
   <ul class="sm-grid">${cards.join('')}</ul>
   <p class="sm-note">Search engines read the XML version, <a href="${u('/sitemap.xml')}">sitemap.xml</a>. About, Contact, Work with us and the policy pages are not listed.</p>
@@ -1582,7 +1597,7 @@ ${listenPlayer()}
       out.set(pathOf(pt), layout(
         { title: label, description: describe(`${g.blurb} Addresses ${start} to ${start + items.length - 1} on ${config.name}.`, 'Choose any address to open it.', 1), path: pathOf(pt), noindex: true, adKind: 'page', preload: image },
         {},
-        `${hero({ image, title: e(label), sub: `${g.blurb} Addresses ${start} to ${start + items.length - 1}. Choose any address to open it.`, crumbs: [['Home', u('/')], ['Sitemap', u('/sitemap/')], [g.name, '']] })}
+        `${hero({ image, title: e(label), sub: `${g.blurb} Addresses ${start} to ${start + items.length - 1}. Choose any address to open it.` })}
 <section class="section"><div class="wrap">
   <div class="sm-table-wrap"><table class="sm-table">
     <caption class="sr-only">${e(label)}</caption>
@@ -1610,7 +1625,7 @@ ${listenPlayer()}
     return layout(
       { title: 'Follow with RSS', description: describe(`Get new ${config.name} articles in your feed reader. Copy the feed address, paste it into a reader and read for free.`, 'No account or email needed.', 1), path: '/rss/', noindex: true, adKind: 'page', preload: image },
       {},
-      `${hero({ image, title: 'Follow with RSS', sub: 'New articles in the app you choose. No account and no email needed.', crumbs: [['Home', u('/')], ['Follow with RSS', '']] })}
+      `${hero({ image, title: 'Follow with RSS', sub: 'New articles in the app you choose. No account and no email needed.' })}
 <section class="section"><div class="wrap wrap-narrow">
   <div class="rss-box">
     <h2 class="rss-h">${icon('rss', 22)} Your feed address</h2>
@@ -1730,5 +1745,5 @@ ${items.map((p) => `  <item>
     );
   }
 
-  return { rssPage, sitemapHtml, tagTopics, tagsIndex, tagsJson, tagPage, home, category, categoriesIndex, labelsIndex, postsDirectory, popular, searchPage, staticPage, authorPage, notFound, post, aliasStub, sitemaps, feed, robots, manifest, searchIndex, helpers: { u, abs } };
+  return { authorsIndex, popularList, rssPage, sitemapHtml, tagTopics, tagsIndex, tagsJson, tagPage, home, category, categoriesIndex, labelsIndex, postsDirectory, popular, searchPage, staticPage, authorPage, notFound, post, aliasStub, sitemaps, feed, robots, manifest, searchIndex, helpers: { u, abs } };
 }

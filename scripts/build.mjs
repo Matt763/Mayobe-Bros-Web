@@ -299,7 +299,7 @@ if (errors.length) {
 
 /* ------------------------------------------------------------------ build */
 const hashFile = (f) => (fs.existsSync(path.join(ROOT, f)) ? crypto.createHash('sha1').update(fs.readFileSync(path.join(ROOT, f))).digest('hex').slice(0, 8) : '');
-const versions = { 'css/style.css': hashFile('css/style.css'), 'js/motion.js': hashFile('js/motion.js'), 'js/site.js': hashFile('js/site.js'), 'js/engage.js': hashFile('js/engage.js'), 'js/manage.js': hashFile('js/manage.js'), 'js/listen.js': hashFile('js/listen.js'), 'js/pager.js': hashFile('js/pager.js'), 'js/subscribe.js': hashFile('js/subscribe.js'), 'js/turnstile.js': hashFile('js/turnstile.js'), 'js/status-theme.js': hashFile('js/status-theme.js'), 'js/newsletter.js': hashFile('js/newsletter.js'), 'js/notfound.js': hashFile('js/notfound.js'), 'js/notfound-posts.js': hashFile('js/notfound-posts.js') };
+const versions = { 'css/style.css': hashFile('css/style.css'), 'js/motion.js': hashFile('js/motion.js'), 'js/site.js': hashFile('js/site.js'), 'js/engage.js': hashFile('js/engage.js'), 'js/manage.js': hashFile('js/manage.js'), 'js/listen.js': hashFile('js/listen.js'), 'js/pager.js': hashFile('js/pager.js'), 'js/subscribe.js': hashFile('js/subscribe.js'), 'js/turnstile.js': hashFile('js/turnstile.js'), 'js/status-theme.js': hashFile('js/status-theme.js'), 'js/newsletter.js': hashFile('js/newsletter.js'), 'js/notfound.js': hashFile('js/notfound.js'), 'js/notfound-posts.js': hashFile('js/notfound-posts.js'), 'js/reads.js': hashFile('js/reads.js') };
 // Topic photographs: assets/img/topics/<name>-<width>.webp -> { name: [1280, 2560, 3840] }
 const heroSets = {};
 const topicsDir = path.join(ROOT, 'assets/img/topics');
@@ -332,7 +332,10 @@ for (const m of email.warnings) warn('email pictures', m);
 // Questions readers asked that the team answered, saved by `node scripts/qa-sync.mjs` so search engines can read them in the page
 let qa = {};
 try { qa = JSON.parse(fs.readFileSync(path.join(ROOT, 'content/qa.json'), 'utf8')).posts || {}; } catch { /* none saved yet */ }
-const R = createRenderer({ config, categories, posts, pages, authors, versions, heroSets, shareCards: share.cards, emailImages: email.images, qa });
+// The order of the Popular page: the articles readers open most, saved by `node scripts/popular-sync.mjs` (only the order, never the numbers)
+let popularRanked = [];
+try { popularRanked = JSON.parse(fs.readFileSync(path.join(ROOT, 'content/popular.json'), 'utf8')).ranked || []; } catch { /* none saved yet: editor's picks first */ }
+const R = createRenderer({ config, categories, posts, pages, authors, versions, heroSets, shareCards: share.cards, emailImages: email.images, qa, popularRanked });
 
 const out = new Map();
 const emit = (relPath, content) => out.set(relPath, content);
@@ -354,7 +357,7 @@ emit(pageFile('/search/'), R.searchPage());
 const dirPages = chunk(posts, per);
 dirPages.forEach((list, i) => emit(pageFile(i === 0 ? '/post/' : `/post/page/${i + 1}/`), R.postsDirectory(i + 1, dirPages.length, list, posts.length)));
 
-const popularAll = [...posts.filter((p) => p.featured), ...posts.filter((p) => !p.featured)];
+const popularAll = R.popularList();
 const popularPages = chunk(popularAll, per);
 popularPages.forEach((list, i) => emit(pageFile(i === 0 ? '/popular/' : `/popular/page/${i + 1}/`), R.popular(i + 1, popularPages.length, list, popularAll.length)));
 
@@ -385,6 +388,7 @@ for (const t of R.tagTopics) {
   const tp = chunk(t.list, per);
   tp.forEach((list, i) => emit(pageFile(i === 0 ? `/tag/${t.slug}/` : `/tag/${t.slug}/page/${i + 1}/`), R.tagPage(t, list, i + 1, tp.length, t.list.length)));
 }
+emit(pageFile('/author/'), R.authorsIndex());
 for (const a of authors) {
   const mine = posts.filter((p) => p.author === a.name);
   const ap = chunk(mine, per);

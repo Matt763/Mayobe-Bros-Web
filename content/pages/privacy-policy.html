@@ -3,7 +3,7 @@ title: Privacy Policy
 description: How Mayobe Bros collects, uses and protects personal information, including cookies, browser storage, any comments or reactions, and Google AdSense advertising.
 kind: legal
 order: 10
-updated: 2026-11-08
+updated: 2026-11-09
 ---
 <p>This policy explains what personal information {{site-name}} ("we", "us") collects when you use {{site-url}}, why we collect it, who else handles it, and the choices you have. We have tried to write it in plain English. If anything is unclear, email {{email:general}}.</p>
 
@@ -39,7 +39,9 @@ updated: 2026-11-08
 <p>Videos are played by Plyr, a player we host ourselves. A video that we host ourselves does not send your data to anyone else. If an article shows a YouTube video, nothing is requested from YouTube until you press play. After that, YouTube (Google) provides the video from its privacy-enhanced address (<code>youtube-nocookie.com</code>), the player's script (<code>youtube.com</code>) and a thumbnail (<code>i.ytimg.com</code>), and may collect data under its own policy. We do not ask any other service for the video's title.</p>
 <h3>Search</h3>
 <p>Site search runs inside your browser. The words you search for are not sent to us.</p>
-<h3>Technical data</h3>
+{{#comments}}<h3>Which articles are read most</h3>
+<p>To order our Popular page, our server counts how many people really read each article. A read is counted once an article has been open on your screen for about 20 seconds and you have scrolled part of the way through it. So that one person is not counted twice in a day, the server makes a short code from the article, your network address and browser type, and a secret that changes every day. The code cannot be turned back into your address, it is not linked to anything else, and it is deleted within two days. We keep only the total number of reads of each article for each day, for up to 60 days. Nothing is stored in your browser and no cookie is set. The totals are never shown on the site and are not used to identify or follow anyone; they only decide the order of the Popular page. A browser that sends the Global Privacy Control or Do Not Track signal is not counted.</p>
+{{/comments}}<h3>Technical data</h3>
 <p>Our hosting provider (GitHub Pages){{#comments}} and our comments service (Cloudflare){{/comments}} automatically handle technical data such as your IP address, browser type and the pages requested. They use it to deliver the site, keep it secure and prevent abuse, under their own policies. {{#analytics}}We use Google Tag Manager to load measurement tools such as Google Analytics, which count visits and show us which pages are read. It loads only after you press <strong>Accept</strong> in the cookie notice; if you press <strong>Reject</strong>, it is not loaded. Google may set cookies and receive your IP address and device details. See <a href="https://policies.google.com/privacy" rel="noopener">Google's Privacy Policy</a>.{{/analytics}}{{^analytics}}{{^cfanalytics}}We do not run analytics tools at the moment. If we add one, we will update this page first.{{/cfanalytics}}{{/analytics}}{{#cfanalytics}} We also use Cloudflare Web Analytics to count visits and see which pages are read. Cloudflare states that it does not use cookies or local storage for this and does not fingerprint visitors. It runs for every visitor, whether or not you press <strong>Accept</strong>, because it stores nothing on your device. We see only totals, such as visits per day, pages, countries and browsers, not who you are. See <a href="https://www.cloudflare.com/privacypolicy/" rel="noopener">Cloudflare's Privacy Policy</a>.{{/cfanalytics}}</p>
 
 <h2>3. Advertising and Google AdSense</h2>
@@ -74,6 +76,7 @@ updated: 2026-11-08
   <li>If you delete a comment, its name, text, email, IP code, secret hash and earlier text are erased from our comments database at once. A copy saved in a published page may take a little longer to disappear. Only a short "deleted" note stays if it has replies.</li>
   <li>Comments we reject as spam are deleted from time to time.</li>
   <li>The emailed edit link works for 7 days. We store only a one-way hash of it, and we remove the hash when the comment is deleted. The choice to get reply emails stays with the comment until it is deleted or you press the stop link in a reply email.</li>
+  <li>Article read counts: the short daily codes are deleted within two days, and the total reads of each article for each day after 60 days.</li>
   <li>Rate-limit records, which stop floods of comments, reactions, edits, contact messages and emails, last from about ten minutes to about a day, depending on the kind, and are cleared out from time to time.</li>
   <li>An address that bounced or reported one of our emails as spam stays on a do-not-email list, with the reason and the date, until we remove it. Deleting a comment does not remove it from that list. Email us if you want an address taken off.</li>
   <li>We keep a count of how many emails were sent each day, with no names or addresses.</li>{{/comments}}

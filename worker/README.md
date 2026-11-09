@@ -242,3 +242,10 @@ Nothing below has been run. Order matters; the newsletter sends nothing until th
 - Sign-up limits: 3 sign-ups an hour from one IP (the 4th gets a 429 "try again later"), one confirmation email per address per UTC day, and at most 8 confirmation emails a day in total. A confirmation that hits a limit, the do-not-email list or a full news slice is not sent and not retried; the person can sign up again the next day.
 - On the Free plan each cron run can make 50 subrequests (every D1 query and every fetch counts), so a run sends about 9 emails. The six morning runs together can reach the 25. The owner `dry-run` makes one count per queued article (at most a week of articles) and also stops at the ceiling.
 - The Free plan allows 10 ms of CPU per cron run. Building up to 9 emails per run may come close; I/O waits do not count. Watch the first live runs (see Newsletter).
+
+
+## Most read (the Popular page)
+Added 2026-11-09. The browser sends `POST /v1/read { slug, p }` after an article has been on screen for 20 seconds and 40% scrolled (`js/reads.js`). The Worker (`src/reads.js`) counts one read per visitor per article per UTC day; the visitor is a salted hash of the article, the network and the kind of browser that changes daily and is deleted by the day after (`read_seen`), the daily totals (`post_reads`) after 60 days (both purged by the cron trigger). `GET /v1/admin/popular` (admin token) returns the order and the numbers; `node scripts/popular-sync.mjs` saves only the order into `content/popular.json`.
+- Apply the new tables first: `npx wrangler d1 migrations apply mayobe-engage --remote` (migration `0010_reads.sql`, safe to run twice), then `npx wrangler deploy`. On this machine add `NODE_OPTIONS=--dns-result-order=ipv4first`.
+- It writes about 3 rows per counted read (the visitor code, the daily total, the rate-limit counter), so the Free plan's 100,000 rows a day allow roughly 30,000 reads a day, shared with comments and the newsletter.
+- Tests: `scripts/tests/reads.test.mjs` (Worker), `reads-client.test.mjs` (browser), `popular.test.mjs` (order, sync command, no numbers on the site).
