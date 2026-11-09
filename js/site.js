@@ -66,6 +66,10 @@
     var onScroll = function () { header.classList.toggle('is-scrolled', window.scrollY > 8); };
     window.addEventListener('scroll', onScroll, { passive: true });
     onScroll();
+    // the header's real height, for things that stick right under it (the contents bar on phones and tablets)
+    var syncHeaderH = function () { root.style.setProperty('--header-real', Math.ceil(header.getBoundingClientRect().height) + 'px'); };
+    syncHeaderH();
+    if (window.ResizeObserver) new ResizeObserver(syncHeaderH).observe(header); else window.addEventListener('resize', syncHeaderH);
   }
   var FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
   function trapTab(container, e) {
@@ -458,8 +462,37 @@
     var railEl = $('[data-rail-progress]');
     var rail = railEl ? { ring: $('.rs-ring', railEl), pct: $('[data-rs-pct]', railEl), left: $('[data-rs-left]', railEl), min: Number(railEl.getAttribute('data-min')) || 1 } : null;
     var ticking = false;
+
+    // Contents list: the link of the section being read is marked (.is-current) and, on phones and tablets, named in the
+    // sticky bar (.toc-now). On those screens the bar sticks under the header (CSS) and leaves when the article ends.
+    var tocBox = $('.post-toc'), tocDet = $('[data-toc-details]'), tocNow = $('[data-toc-now]');
+    var tocLinks = $$('.toc a'), tocMap = {}, tocCurrent = '';
+    tocLinks.forEach(function (a) { tocMap[a.getAttribute('href').slice(1)] = a; });
+    var tocHeads = $$('h2[id], h3[id]', article).filter(function (h) { return tocMap[h.id]; });
+    var narrowToc = window.matchMedia('(max-width: 1179.98px)');
+    var tocUpdate = function () {
+      if (!tocLinks.length) return;
+      var line = Math.min(350, window.innerHeight * 0.6), id = ''; // anchor jumps land a heading about 340px down (scroll-padding + scroll-margin)
+      for (var i = 0; i < tocHeads.length; i++) { if (tocHeads[i].getBoundingClientRect().top <= line) id = tocHeads[i].id; else break; }
+      if (id !== tocCurrent) {
+        tocCurrent = id;
+        tocLinks.forEach(function (a) { a.classList.remove('is-current'); });
+        if (id) tocMap[id].classList.add('is-current');
+        if (tocNow) { tocNow.textContent = id ? tocMap[id].textContent : ''; tocNow.hidden = !id; }
+      }
+      if (!tocBox) return;
+      if (!narrowToc.matches) { tocBox.classList.remove('is-stuck', 'is-past'); return; }
+      var under = (header ? header.getBoundingClientRect().bottom : 0) + parseFloat(getComputedStyle(root).fontSize) * 0.5;
+      var rb = tocBox.getBoundingClientRect();
+      var past = article.getBoundingClientRect().bottom <= under + rb.height;
+      tocBox.classList.toggle('is-stuck', rb.top <= under + 1);
+      tocBox.classList.toggle('is-past', past);
+      if (past && tocDet && tocDet.open) tocDet.open = false;
+    };
+
     var update = function () {
       ticking = false;
+      tocUpdate();
       var r = article.getBoundingClientRect();
       var total = r.height - window.innerHeight * 0.6;
       var p = total > 0 ? Math.min(1, Math.max(0, -r.top / total)) : 0;
@@ -469,21 +502,9 @@
     };
     window.addEventListener('scroll', function () { if (!ticking) { ticking = true; requestAnimationFrame(update); } }, { passive: true });
     window.addEventListener('resize', update);
+    if (narrowToc.addEventListener) narrowToc.addEventListener('change', update);
     update();
     if (toTop) toTop.addEventListener('click', function () { window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' }); });
-
-    var tocLinks = $$('.toc a');
-    if (tocLinks.length && 'IntersectionObserver' in window) {
-      var map = {};
-      tocLinks.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
-      var heads = $$('h2[id], h3[id]', article).filter(function (h) { return map[h.id]; });
-      var tio = new IntersectionObserver(function (entries) {
-        entries.forEach(function (en) {
-          if (en.isIntersecting) { tocLinks.forEach(function (a) { a.classList.remove('is-current'); }); map[en.target.id].classList.add('is-current'); }
-        });
-      }, { rootMargin: '-15% 0px -75% 0px' });
-      heads.forEach(function (h) { tio.observe(h); });
-    }
   }
 
   /* ----------------------------------------------- video player (Plyr)
@@ -939,10 +960,33 @@
 })();
 
 
-/* On phones and tablets the contents list starts folded so the article is not pushed down the page. */
+/* The contents list. On large screens it is an open card beside the article. On phones and tablets (below 1180px) it is a
+   sticky bar (see "Phones and tablets" in css/style.css) that starts folded; opened, its list drops over the article as a
+   panel. It closes after a choice, a tap outside it or Escape (focus goes back to the bar). Crossing the 1180px line
+   (turning a tablet) switches between the two. data-ready tells the CSS that this has run (until then the panel stays hidden). */
 (() => {
   const d = document.querySelector('[data-toc-details]');
-  if (d && window.matchMedia('(max-width: 1179px)').matches) d.open = false;
+  if (!d) return;
+  const narrow = window.matchMedia('(max-width: 1179.98px)');
+  const list = d.querySelector(':scope > ol');
+  const sync = () => { d.open = !narrow.matches; d.setAttribute('data-ready', ''); };
+  sync();
+  if (narrow.addEventListener) narrow.addEventListener('change', sync);
+  d.addEventListener('click', (e) => { if (narrow.matches && e.target.closest('ol a')) d.open = false; });
+  document.addEventListener('pointerdown', (e) => { if (narrow.matches && d.open && !d.contains(e.target)) d.open = false; });
+  d.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !narrow.matches || !d.open) return;
+    d.open = false;
+    d.querySelector('summary').focus();
+  });
+  // keyboard: leaving the panel with Tab folds it
+  d.addEventListener('focusout', (e) => { if (narrow.matches && d.open && e.relatedTarget && !d.contains(e.relatedTarget)) d.open = false; });
+  // opened: the list starts with the section being read in the middle
+  d.addEventListener('toggle', () => {
+    if (!narrow.matches || !d.open || !list) return;
+    const now = list.querySelector('a.is-current');
+    list.scrollTop = now ? Math.max(0, now.offsetTop - list.clientHeight / 2 + now.offsetHeight / 2) : 0;
+  });
 })();
 
 

@@ -2,6 +2,7 @@
 import { createHash } from 'node:crypto';
 import { escapeHtml as e, addHeadingIds } from './markdown.mjs';
 import { emailAlt } from './email-images.mjs';
+import { skeletonCss, skeletonScript, skeletonHtml } from './skeleton.mjs';
 
 /* ------------------------------------------------------------------ icons */
 const ICONS = {
@@ -198,7 +199,7 @@ export function createRenderer(ctx) {
     return headHtml.replace('<meta name="viewport" content="width=device-width, initial-scale=1">', (m) => `${m}\n${tag}`);
   }
 
-  function head({ title, description, path, share = '', imageAlt = '', type = 'website', jsonLd = [], noindex = false, article = null, preload = '', noReferrer = false, bare = false }) {
+  function head({ title, description, path, share = '', imageAlt = '', type = 'website', jsonLd = [], noindex = false, article = null, preload = '', noReferrer = false, bare = false, skeleton = false }) {
     // the brand is added only when the whole title still fits in search results (about 60 characters)
     const branded = `${title} | ${config.name}`;
     const fullTitle = title === config.title || branded.length > 62 ? title : branded;
@@ -244,7 +245,7 @@ export function createRenderer(ctx) {
 <meta name="twitter:description" content="${e(description)}">
 <meta name="twitter:image" content="${img}">${si.alt ? `\n<meta name="twitter:image:alt" content="${e(si.alt)}">` : ''}${art}${preload ? `\n<link rel="preload" as="image" href="${preload}"${topicSet(preload) ? ` imagesrcset="${topicSet(preload)}" imagesizes="100vw"` : ''} fetchpriority="high">` : ''}${api ? `\n<link rel="preconnect" href="${new URL(api).origin}" crossorigin>` : ''}
 <script>(function(){var d=document.documentElement,t=null;d.classList.add('js');try{t=localStorage.getItem('theme')}catch(e){}if(t==='dark')d.classList.add('dark');else if(t==='light')d.classList.add('light');else if(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)d.classList.add('dark')})();</script>
-<link rel="stylesheet" href="${assetUrl('css/style.css')}">${jsonLd.map((j) => `\n<script type="application/ld+json">${json(j)}</script>`).join('')}`;
+${skeleton ? `<style>${skeletonCss}</style>\n<script>${skeletonScript}</script>\n<link rel="preload" as="style" href="${assetUrl('css/style.css')}">` : `<link rel="stylesheet" href="${assetUrl('css/style.css')}">`}${jsonLd.map((j) => `\n<script type="application/ld+json">${json(j)}</script>`).join('')}`;
     return withPolicy(out, bare, noReferrer);
   }
 
@@ -397,10 +398,10 @@ export function createRenderer(ctx) {
     return `<!doctype html>
 <html lang="${config.language}" data-base="${base}"${api ? ` data-api="${e(api)}"` : ''}${config.turnstileSiteKey ? ` data-turnstile="${e(config.turnstileSiteKey)}"` : ''}${adsenseId ? ` data-adsense="${e(adsenseId)}"` : ''}${gtmId ? ` data-gtm="${e(gtmId)}"` : ''}>
 <head>
-${head(meta)}
+${head({ ...meta, skeleton: !meta.notFound })}
 </head>
 <body class="${meta.bodyClass || ''}"${ads ? ' data-ads="1"' : ''}>
-${header(cur)}
+${meta.notFound ? '' : `${skeletonHtml(meta.bodyClass === 'page-home')}\n<link rel="stylesheet" href="${assetUrl('css/style.css')}">\n`}${header(cur)}
 <main id="main">
 ${body}
 </main>
@@ -1321,7 +1322,7 @@ ${withIds.html}
     if (p.label) crumbs.push([p.label.name, u(`/category/${p.category.slug}/${p.label.slug}/`)]);
     crumbs.push([p.title, '']);
     const tocItems = p.toc.filter((t) => t.level === 2 || t.level === 3);
-    const toc = p.toc.filter((t) => t.level === 2).length >= 3 ? `<nav class="toc" aria-label="Table of contents"><details open data-toc-details><summary class="aside-title">${icon('list', 16)} In this article</summary>${tocList(tocItems)}</details></nav>` : '';
+    const toc = p.toc.filter((t) => t.level === 2).length >= 3 ? `<nav class="toc" aria-label="Table of contents"><details open data-toc-details><summary class="aside-title">${icon('list', 16)} <span class="toc-text"><span class="toc-label">In this article</span><span class="toc-now" data-toc-now aria-hidden="true" hidden></span></span></summary>${tocList(tocItems)}</details></nav>` : '';
     const author = authorOf(p.author);
     const authorName = author ? `<a href="${u(`/author/${author.slug}/`)}" rel="author">${e(p.author)}</a>` : `<span>${e(p.author)}</span>`;
     const latest = posts.filter((x) => x.slug !== p.slug).slice(0, 4);

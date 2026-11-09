@@ -977,6 +977,39 @@ body.no-scroll { overflow: hidden; }
 .toc details[open] > summary { margin-bottom: 0.75rem; }
 .toc details[open] > summary::after { transform: rotate(-135deg); }
 .toc summary { font-size: 0.8125rem; letter-spacing: 0.04em; white-space: nowrap; }
+.toc-now { display: none; }
+
+/* Phones and tablets (below 1180px): the contents list has no room beside the article, so it becomes a bar that sticks
+   under the site header once you scroll to it and stays there while you read. Opened, the list drops over the article as
+   a panel (position: absolute, so opening or closing it never moves the text). Needs JavaScript (html.js): without it the
+   list stays an open card above the article. js/site.js sets --header-real (the header's real height), .is-stuck and
+   .is-past (the article has ended: the bar leaves), shows the section being read in .toc-now and closes the panel after a
+   choice, a tap outside or Escape. Headings keep their scroll-margin-top (header-h + 1rem), which clears this bar. */
+@media (max-width: 1179.98px) {
+  html.js .post-layout { display: block; }
+  html.js .post-layout > .post-rail { margin-top: 2.5rem; }
+  html.js .post-toc { position: sticky; top: calc(var(--header-real, 4.75rem) + 0.5rem); z-index: 35; transition: opacity 0.2s, transform 0.25s var(--ease), visibility 0.25s; }
+  html.js .post-toc.is-past { opacity: 0; visibility: hidden; transform: translateY(-0.5rem); pointer-events: none; }
+  html.js .post-toc .toc { position: relative; padding: 0; margin-bottom: 1rem; border-radius: 14px; transition: box-shadow 0.25s; }
+  html.js .post-toc .toc::before { content: ""; position: absolute; left: 0; right: 0; top: -0.5rem; height: 0.5rem; background: var(--bg); } /* hides the sliver of text that would show between the header and the bar (only where there is a bar) */
+  html.js .post-toc.is-stuck .toc { box-shadow: var(--shadow-lg); }
+  html.js .toc summary { display: flex; align-items: center; gap: 0.7rem; min-height: 3.5rem; padding: 0.4rem 1rem; margin: 0; }
+  html.js .toc details[open] > summary { margin-bottom: 0; }
+  html.js .toc summary:focus-visible { outline: 3px solid var(--btn-bg); outline-offset: -3px; border-radius: 14px; }
+  /* two lines: the label, and under it the section being read (the whole width is left for its name) */
+  html.js .toc .toc-text { display: flex; flex: 1 1 auto; flex-direction: column; justify-content: center; gap: 0.1rem; min-width: 0; }
+  html.js .toc .toc-label { font-size: 0.75rem; line-height: 1.25; letter-spacing: 0.06em; }
+  html.js .toc-now { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-size: 0.9375rem; font-weight: 700; line-height: 1.3; letter-spacing: 0; text-transform: none; }
+  html.js .toc-now[hidden] { display: none; }
+  /* the list never reaches under the cookie notice (js/listen.js keeps --cookie-h up to date) */
+  html.js .toc details > ol { position: absolute; left: 0; right: 0; top: calc(100% + 0.4rem); max-height: max(12rem, calc(100vh - var(--header-real, 4.75rem) - 8rem - var(--cookie-h, 0px))); max-height: max(12rem, calc(100svh - var(--header-real, 4.75rem) - 8rem - var(--cookie-h, 0px))); overflow-y: auto; overscroll-behavior: contain; padding: 0.5rem 1rem 0.9rem; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow-lg); }
+  html.js .toc details:not([data-ready]) > ol { display: none; }
+  html.js .toc a { padding-block: 0.7rem; }
+  html.js .toc ol ol a { padding-block: 0.7rem; }
+}
+@media (max-width: 1179.98px) and (prefers-reduced-motion: reduce) {
+  html.js .post-toc, html.js .post-toc .toc { transition: none; }
+}
 
 /* Large displays: the reading column grows with the screen, and the text grows a little so lines stay comfortable. */
 @media (min-width: 1440px) {

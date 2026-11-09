@@ -295,6 +295,8 @@
     if (r) { var rs = r.getClientRects(); rc = rs.length ? rs[0] : r.getBoundingClientRect(); }
     else rc = G[sen.g].el.getBoundingClientRect();
     var hh = els.header ? els.header.getBoundingClientRect().height : 0;
+    var tocBar = doc.querySelector('.post-toc.is-stuck:not(.is-past)'); // the contents bar that sticks under the header on small screens
+    if (tocBar) hh = Math.max(hh, tocBar.getBoundingClientRect().bottom);
     var pr = player.getBoundingClientRect();
     var usable = window.innerHeight - hh - Math.max(player.offsetHeight, window.innerHeight - pr.top) - 24; // the bar may sit above the cookie notice
     var anchor = hh + Math.max(40, usable * 0.3);
