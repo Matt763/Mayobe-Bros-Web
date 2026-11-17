@@ -21,8 +21,6 @@ Allow: /results/data/*/list.json$
 Allow: /results/data/*/meta.json$
 
 Sitemap: https://mayobebros.com/sitemap.xml
-Sitemap: https://mayobebros.com/results/sitemap-schools.xml
-Sitemap: https://mayobebros.com/results/sitemap-hubs.xml
 
 # Tier A: AI search and answer tools. Allowed ONLY under the AI Use Terms: show "Mayobe Bros" as the source with a working link to the
 # article, and send readers to the article for more. A robots.txt file cannot state conditions; the terms and /license.xml do.

@@ -137,7 +137,7 @@
   },
   "resultsData": {
     "base": "/results/data",
-    "pages": true,
+    "pages": false,
     "index": "all",
     "unavailable": ["acsee-2003", "acsee-2008", "psle-2003", "psle-2004", "psle-2005", "psle-2006", "psle-2007", "psle-2008", "psle-2009", "psle-2010", "psle-2011", "psle-2012"],
     "datasets": {
