@@ -4,6 +4,9 @@ date: 2026-11-04
 author: Mclean Mbaga
 category: world-histories
 excerpt: A clear timeline from German rule and the British mandate to TANU in 1954, the elections, and independence on 9 December 1961, won by talks and votes.
+image: assets/posts/how-tanganyika-won-independence.webp
+imageAlt: Drawing of a golden sun rising behind a snow-capped mountain at dawn, an acacia tree in the foreground, and a calendar page showing 9 December 1961
+imageCredit: Cover drawn by Mayobe Bros.
 tags: [tanganyika, independence, julius nyerere, tanzania history]
 ---
 

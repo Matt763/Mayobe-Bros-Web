@@ -262,11 +262,11 @@
    "thumbQuality": 2
   },
   "post:hacked-facebook-account-what-to-do": {
-   "hash": "35ec8c9849f79ff97c9ed50b3aac325d91640493",
-   "source": "assets/img/topics/technology-solutions-2560.webp",
-   "bytes": 83744,
-   "quality": 5,
-   "thumbBytes": 14408,
+   "hash": "5bd06d3f4aec30669f6c4fd2d426a313a73d2439",
+   "source": "assets/posts/hacked-facebook-account-what-to-do.webp",
+   "bytes": 55906,
+   "quality": 2,
+   "thumbBytes": 7381,
    "thumbQuality": 2
   },
   "post:healthy-gaming-habits-when-play-becomes-a-problem": {
@@ -326,12 +326,12 @@
    "thumbQuality": 2
   },
   "post:how-tanganyika-won-independence": {
-   "hash": "3aea3dd74052189604fe64b362227510a7979846",
-   "source": "assets/img/topics/world-histories-2560.webp",
-   "bytes": 78142,
-   "quality": 14,
-   "thumbBytes": 16669,
-   "thumbQuality": 3
+   "hash": "0a20c754c02b93f2bd1098b15b5fef97e01ed9cf",
+   "source": "assets/posts/how-tanganyika-won-independence.webp",
+   "bytes": 51286,
+   "quality": 2,
+   "thumbBytes": 7674,
+   "thumbQuality": 2
   },
   "post:how-to-avoid-plagiarism-university-assignments": {
    "hash": "e01693670f9ae5db74549b940977a400393176f6",
@@ -494,11 +494,11 @@
    "thumbQuality": 2
   },
   "post:keeping-children-safe-online-parents-guide": {
-   "hash": "35ec8c9849f79ff97c9ed50b3aac325d91640493",
-   "source": "assets/img/topics/technology-solutions-2560.webp",
-   "bytes": 83744,
-   "quality": 5,
-   "thumbBytes": 14408,
+   "hash": "7779901acd28a2b8abd8a072edfeb84ebe45073a",
+   "source": "assets/posts/keeping-children-safe-online-parents-guide.webp",
+   "bytes": 57501,
+   "quality": 2,
+   "thumbBytes": 7882,
    "thumbQuality": 2
   },
   "post:kilwa-kisiwani-swahili-trade-city": {
@@ -613,12 +613,868 @@
    "thumbBytes": 10188,
    "thumbQuality": 2
   },
+  "post:necta-acsee-results-2004": {
+   "hash": "52c59462bd04358976e789fadcc07cb7a2c9bbb5",
+   "source": "assets/posts/necta-acsee-results-2004.webp",
+   "bytes": 85194,
+   "quality": 3,
+   "thumbBytes": 12211,
+   "thumbQuality": 2
+  },
+  "post:necta-acsee-results-2005": {
+   "hash": "69f6b086bcab512a0d09358dfaf597ef0838206c",
+   "source": "assets/posts/necta-acsee-results-2005.webp",
+   "bytes": 84776,
+   "quality": 7,
+   "thumbBytes": 15092,
+   "thumbQuality": 2
+  },
+  "post:necta-acsee-results-2006": {
+   "hash": "84647c03a24269a4a5f1e83c42dcc45f171188db",
+   "source": "assets/posts/necta-acsee-results-2006.webp",
+   "bytes": 82805,
+   "quality": 3,
+   "thumbBytes": 11387,
+   "thumbQuality": 2
+  },
+  "post:necta-acsee-results-2007": {
+   "hash": "6efbdf495b1b98510f55fb334982c1b9f461e056",
+   "source": "assets/posts/necta-acsee-results-2007.webp",
+   "bytes": 88713,
+   "quality": 3,
+   "thumbBytes": 10112,
+   "thumbQuality": 2
+  },
+  "post:necta-acsee-results-2009": {
+   "hash": "276985cc4ba0c2e2022649e71607f398010c686f",
+   "source": "assets/posts/necta-acsee-results-2009.webp",
+   "bytes": 74336,
+   "quality": 3,
+   "thumbBytes": 9397,
+   "thumbQuality": 2
+  },
+  "post:necta-acsee-results-2010": {
+   "hash": "fb2c697ab6bbb30c66a0ae33838da7633d63b3cb",
+   "source": "assets/posts/necta-acsee-results-2010.webp",
+   "bytes": 76636,
+   "quality": 3,
+   "thumbBytes": 10556,
+   "thumbQuality": 2
+  },
+  "post:necta-acsee-results-2011": {
+   "hash": "e2edda3b89c2c8ee6e90c209d7c37088dbc32e52",
+   "source": "assets/posts/necta-acsee-results-2011.webp",
+   "bytes": 79330,
+   "quality": 4,
+   "thumbBytes": 12902,
+   "thumbQuality": 2
+  },
+  "post:necta-acsee-results-2012": {
+   "hash": "1ee074230db978cb1248264c218e1657d8acb4b3",
+   "source": "assets/posts/necta-acsee-results-2012.webp",
+   "bytes": 76389,
+   "quality": 3,
+   "thumbBytes": 11200,
+   "thumbQuality": 2
+  },
+  "post:necta-acsee-results-2013": {
+   "hash": "22aaac249b57d545d98c96412208302ee5113bed",
+   "source": "assets/posts/necta-acsee-results-2013.webp",
+   "bytes": 90674,
+   "quality": 9,
+   "thumbBytes": 16733,
+   "thumbQuality": 2
+  },
+  "post:necta-acsee-results-2014": {
+   "hash": "0266e15d44bb4bb35e52bf4a95b576c15436b48e",
+   "source": "assets/posts/necta-acsee-results-2014.webp",
+   "bytes": 81279,
+   "quality": 3,
+   "thumbBytes": 11488,
+   "thumbQuality": 2
+  },
+  "post:necta-acsee-results-2015": {
+   "hash": "dd6992b9e93c204ec66ee09a9898a13df26441ff",
+   "source": "assets/posts/necta-acsee-results-2015.webp",
+   "bytes": 84234,
+   "quality": 7,
+   "thumbBytes": 16167,
+   "thumbQuality": 2
+  },
+  "post:necta-acsee-results-2016": {
+   "hash": "63f14cf6c6d836a824edd2ca06f27fae0834a7ca",
+   "source": "assets/posts/necta-acsee-results-2016.webp",
+   "bytes": 78276,
+   "quality": 3,
+   "thumbBytes": 10577,
+   "thumbQuality": 2
+  },
+  "post:necta-acsee-results-2017": {
+   "hash": "d79b17ce017904a02d2b287fea09f8df762ddf2a",
+   "source": "assets/posts/necta-acsee-results-2017.webp",
+   "bytes": 87797,
+   "quality": 4,
+   "thumbBytes": 14222,
+   "thumbQuality": 2
+  },
+  "post:necta-acsee-results-2018": {
+   "hash": "75b3786a784cd64b8efcde95ff1a78221e214c93",
+   "source": "assets/posts/necta-acsee-results-2018.webp",
+   "bytes": 76902,
+   "quality": 3,
+   "thumbBytes": 10670,
+   "thumbQuality": 2
+  },
+  "post:necta-acsee-results-2019": {
+   "hash": "0bbe822cd8351047dcb4ccbb58c5b4bf544eb390",
+   "source": "assets/posts/necta-acsee-results-2019.webp",
+   "bytes": 89773,
+   "quality": 7,
+   "thumbBytes": 15647,
+   "thumbQuality": 2
+  },
+  "post:necta-acsee-results-2020": {
+   "hash": "b715bc2d6ca6f41a13b7f888c896479a811ab162",
+   "source": "assets/posts/necta-acsee-results-2020.webp",
+   "bytes": 72956,
+   "quality": 3,
+   "thumbBytes": 10886,
+   "thumbQuality": 2
+  },
+  "post:necta-acsee-results-2021": {
+   "hash": "9400887e47e189cafdea1a154888437457ca3c72",
+   "source": "assets/posts/necta-acsee-results-2021.webp",
+   "bytes": 89631,
+   "quality": 2,
+   "thumbBytes": 9676,
+   "thumbQuality": 2
+  },
+  "post:necta-acsee-results-2022": {
+   "hash": "62751597bb188416742ce4fb3dfd01b7350b5bba",
+   "source": "assets/posts/necta-acsee-results-2022.webp",
+   "bytes": 80158,
+   "quality": 3,
+   "thumbBytes": 11116,
+   "thumbQuality": 2
+  },
+  "post:necta-acsee-results-2023": {
+   "hash": "370069640aded6caeb7a54b1af96145571edc957",
+   "source": "assets/posts/necta-acsee-results-2023.webp",
+   "bytes": 85378,
+   "quality": 3,
+   "thumbBytes": 11388,
+   "thumbQuality": 2
+  },
+  "post:necta-acsee-results-2024": {
+   "hash": "a200df90993831d7b68e2e3ce56c6a2d980aac5f",
+   "source": "assets/posts/necta-acsee-results-2024.webp",
+   "bytes": 83166,
+   "quality": 4,
+   "thumbBytes": 13780,
+   "thumbQuality": 2
+  },
+  "post:necta-acsee-results-2025": {
+   "hash": "54ebc87847965eac56b6ac7d0affa28b87f99ce8",
+   "source": "assets/posts/necta-acsee-results-2025.webp",
+   "bytes": 86104,
+   "quality": 3,
+   "thumbBytes": 13388,
+   "thumbQuality": 2
+  },
+  "post:necta-csee-results-2003": {
+   "hash": "cec24536d9d93b5cd205a5580d8676a895ac52cb",
+   "source": "assets/posts/necta-csee-results-2003.webp",
+   "bytes": 76572,
+   "quality": 3,
+   "thumbBytes": 11490,
+   "thumbQuality": 2
+  },
+  "post:necta-csee-results-2004": {
+   "hash": "e41fb9d9b3ec75da384b1a5c21cad6a58888683f",
+   "source": "assets/posts/necta-csee-results-2004.webp",
+   "bytes": 81509,
+   "quality": 4,
+   "thumbBytes": 12440,
+   "thumbQuality": 2
+  },
+  "post:necta-csee-results-2005": {
+   "hash": "217901bcdd4f7c50d630decfa3cf4827b7594c8d",
+   "source": "assets/posts/necta-csee-results-2005.webp",
+   "bytes": 75417,
+   "quality": 3,
+   "thumbBytes": 11412,
+   "thumbQuality": 2
+  },
+  "post:necta-csee-results-2006": {
+   "hash": "12a11614b524f6b1b16d192223228c281798a64b",
+   "source": "assets/posts/necta-csee-results-2006.webp",
+   "bytes": 91828,
+   "quality": 5,
+   "thumbBytes": 15902,
+   "thumbQuality": 2
+  },
+  "post:necta-csee-results-2007": {
+   "hash": "da6ba30f319ea7e9b71b1a7de46677fd101599c3",
+   "source": "assets/posts/necta-csee-results-2007.webp",
+   "bytes": 71467,
+   "quality": 3,
+   "thumbBytes": 10688,
+   "thumbQuality": 2
+  },
+  "post:necta-csee-results-2008": {
+   "hash": "420f91185612c956af11fa4fe7af380780663231",
+   "source": "assets/posts/necta-csee-results-2008.webp",
+   "bytes": 82735,
+   "quality": 6,
+   "thumbBytes": 12764,
+   "thumbQuality": 2
+  },
+  "post:necta-csee-results-2009": {
+   "hash": "f87bcca92f6d98ef150c70029632342d4a6238f8",
+   "source": "assets/posts/necta-csee-results-2009.webp",
+   "bytes": 79866,
+   "quality": 3,
+   "thumbBytes": 11147,
+   "thumbQuality": 2
+  },
+  "post:necta-csee-results-2010": {
+   "hash": "3a9b0aee2fb83a37d86b1517e114b8f644b59adb",
+   "source": "assets/posts/necta-csee-results-2010.webp",
+   "bytes": 86832,
+   "quality": 7,
+   "thumbBytes": 16371,
+   "thumbQuality": 2
+  },
+  "post:necta-csee-results-2011": {
+   "hash": "f9f7718c2bdff5c1c0ea3ab1b2898762b545e501",
+   "source": "assets/posts/necta-csee-results-2011.webp",
+   "bytes": 92060,
+   "quality": 2,
+   "thumbBytes": 11385,
+   "thumbQuality": 2
+  },
+  "post:necta-csee-results-2012": {
+   "hash": "53311ea11d5d35214abe97180cbac320457da9ef",
+   "source": "assets/posts/necta-csee-results-2012.webp",
+   "bytes": 83689,
+   "quality": 5,
+   "thumbBytes": 13167,
+   "thumbQuality": 2
+  },
+  "post:necta-csee-results-2013": {
+   "hash": "fe9d25aeadaeea535f1c44b21e9ada9934015523",
+   "source": "assets/posts/necta-csee-results-2013.webp",
+   "bytes": 91338,
+   "quality": 3,
+   "thumbBytes": 12534,
+   "thumbQuality": 2
+  },
+  "post:necta-csee-results-2014": {
+   "hash": "9a3aa5056a125cd5275bf3180cd84083d6597e1b",
+   "source": "assets/posts/necta-csee-results-2014.webp",
+   "bytes": 85855,
+   "quality": 6,
+   "thumbBytes": 15384,
+   "thumbQuality": 2
+  },
+  "post:necta-csee-results-2015": {
+   "hash": "f7b16e4bb76b0c87f1e226aa85130bf997f3bf40",
+   "source": "assets/posts/necta-csee-results-2015.webp",
+   "bytes": 72475,
+   "quality": 3,
+   "thumbBytes": 10107,
+   "thumbQuality": 2
+  },
+  "post:necta-csee-results-2016": {
+   "hash": "02f30f319e2f50c94e8d7491cf20fa387021beaf",
+   "source": "assets/posts/necta-csee-results-2016.webp",
+   "bytes": 83394,
+   "quality": 4,
+   "thumbBytes": 13503,
+   "thumbQuality": 2
+  },
+  "post:necta-csee-results-2017": {
+   "hash": "cc28422ab68c290afabae7ff2e8767a8e9c6e4f9",
+   "source": "assets/posts/necta-csee-results-2017.webp",
+   "bytes": 71962,
+   "quality": 3,
+   "thumbBytes": 10792,
+   "thumbQuality": 2
+  },
+  "post:necta-csee-results-2018": {
+   "hash": "b600c588b3900fa38149733bef12a7ed561398be",
+   "source": "assets/posts/necta-csee-results-2018.webp",
+   "bytes": 86941,
+   "quality": 4,
+   "thumbBytes": 13573,
+   "thumbQuality": 2
+  },
+  "post:necta-csee-results-2019": {
+   "hash": "15401210e57426d81b7ae887e3db51bc5845418b",
+   "source": "assets/posts/necta-csee-results-2019.webp",
+   "bytes": 89861,
+   "quality": 2,
+   "thumbBytes": 11249,
+   "thumbQuality": 2
+  },
+  "post:necta-csee-results-2020": {
+   "hash": "aeb9156f8f22ae9c544ea59b63022b5f58b69657",
+   "source": "assets/posts/necta-csee-results-2020.webp",
+   "bytes": 86999,
+   "quality": 2,
+   "thumbBytes": 10215,
+   "thumbQuality": 2
+  },
+  "post:necta-csee-results-2021": {
+   "hash": "86b1ed1711adb62f51f57d9fdae6a6a751765fd5",
+   "source": "assets/posts/necta-csee-results-2021.webp",
+   "bytes": 73658,
+   "quality": 3,
+   "thumbBytes": 10347,
+   "thumbQuality": 2
+  },
+  "post:necta-csee-results-2022": {
+   "hash": "7c1dbbd387e2a78fc1c8388042ce408e0e0af21d",
+   "source": "assets/posts/necta-csee-results-2022.webp",
+   "bytes": 91262,
+   "quality": 3,
+   "thumbBytes": 12497,
+   "thumbQuality": 2
+  },
+  "post:necta-csee-results-2023": {
+   "hash": "bb934e44c49f2c8f87a997d30f96dcaab610a7c7",
+   "source": "assets/posts/necta-csee-results-2023.webp",
+   "bytes": 89089,
+   "quality": 4,
+   "thumbBytes": 13184,
+   "thumbQuality": 2
+  },
+  "post:necta-csee-results-2024": {
+   "hash": "52129e11a34a845ccc7205bb1eb4b10e51b55949",
+   "source": "assets/posts/necta-csee-results-2024.webp",
+   "bytes": 79669,
+   "quality": 3,
+   "thumbBytes": 13954,
+   "thumbQuality": 2
+  },
+  "post:necta-csee-results-2025": {
+   "hash": "88fa15a5e72148ce08eb724afb86b626fea35212",
+   "source": "assets/posts/necta-csee-results-2025.webp",
+   "bytes": 85450,
+   "quality": 2,
+   "thumbBytes": 10106,
+   "thumbQuality": 2
+  },
+  "post:necta-dpee-results-2026": {
+   "hash": "c88dfded731372db072d9d45d9ea06a6ae1eb768",
+   "source": "assets/posts/necta-dpee-results-2026.webp",
+   "bytes": 77726,
+   "quality": 4,
+   "thumbBytes": 12621,
+   "thumbQuality": 2
+  },
+  "post:necta-dppee-results-2026": {
+   "hash": "7ed7426ad86a613086293474c8b9c5e648151f06",
+   "source": "assets/posts/necta-dppee-results-2026.webp",
+   "bytes": 87968,
+   "quality": 3,
+   "thumbBytes": 12101,
+   "thumbQuality": 2
+  },
+  "post:necta-dsee-results-2014": {
+   "hash": "13245dc6ac1a59473602f5f2783bc4beed133898",
+   "source": "assets/posts/necta-dsee-results-2014.webp",
+   "bytes": 87072,
+   "quality": 2,
+   "thumbBytes": 10306,
+   "thumbQuality": 2
+  },
+  "post:necta-dsee-results-2015": {
+   "hash": "3f51802a31a486affe138265ad9069c492f0079c",
+   "source": "assets/posts/necta-dsee-results-2015.webp",
+   "bytes": 87534,
+   "quality": 3,
+   "thumbBytes": 12036,
+   "thumbQuality": 2
+  },
+  "post:necta-dsee-results-2016": {
+   "hash": "9809dd74ed730dc5de6d399f1ede64eff78245a7",
+   "source": "assets/posts/necta-dsee-results-2016.webp",
+   "bytes": 83054,
+   "quality": 3,
+   "thumbBytes": 12783,
+   "thumbQuality": 2
+  },
+  "post:necta-dsee-results-2017": {
+   "hash": "696e71e6caf40e9c4942cf2d47ed21b8358d8fb2",
+   "source": "assets/posts/necta-dsee-results-2017.webp",
+   "bytes": 75932,
+   "quality": 3,
+   "thumbBytes": 11137,
+   "thumbQuality": 2
+  },
+  "post:necta-dsee-results-2018": {
+   "hash": "40e355ab1086a928d541bc9921f72e2c959dc725",
+   "source": "assets/posts/necta-dsee-results-2018.webp",
+   "bytes": 74856,
+   "quality": 3,
+   "thumbBytes": 10448,
+   "thumbQuality": 2
+  },
+  "post:necta-dsee-results-2019": {
+   "hash": "f1906561bae2c062cca475a789915b6d93eb3090",
+   "source": "assets/posts/necta-dsee-results-2019.webp",
+   "bytes": 75776,
+   "quality": 3,
+   "thumbBytes": 12044,
+   "thumbQuality": 2
+  },
+  "post:necta-dsee-results-2020": {
+   "hash": "2953338ab036fb698f216ebe4da3f8803cc73d30",
+   "source": "assets/posts/necta-dsee-results-2020.webp",
+   "bytes": 91505,
+   "quality": 3,
+   "thumbBytes": 12526,
+   "thumbQuality": 2
+  },
+  "post:necta-dsee-results-2021": {
+   "hash": "5c6e6a763146043617cbf1380b9917064e9c48b8",
+   "source": "assets/posts/necta-dsee-results-2021.webp",
+   "bytes": 91392,
+   "quality": 2,
+   "thumbBytes": 10655,
+   "thumbQuality": 2
+  },
+  "post:necta-dsee-results-2022": {
+   "hash": "a1e6e58159a2351aafbf58f547eaab3f025cad7b",
+   "source": "assets/posts/necta-dsee-results-2022.webp",
+   "bytes": 79999,
+   "quality": 3,
+   "thumbBytes": 11244,
+   "thumbQuality": 2
+  },
+  "post:necta-dsee-results-2023": {
+   "hash": "33088d3f10fdaba8417f33ffc0b7df6dd4a65797",
+   "source": "assets/posts/necta-dsee-results-2023.webp",
+   "bytes": 81759,
+   "quality": 3,
+   "thumbBytes": 12773,
+   "thumbQuality": 2
+  },
+  "post:necta-dsee-results-2024": {
+   "hash": "953c10573942fc46c7b702aeb8a1130088db88b0",
+   "source": "assets/posts/necta-dsee-results-2024.webp",
+   "bytes": 77759,
+   "quality": 3,
+   "thumbBytes": 11585,
+   "thumbQuality": 2
+  },
+  "post:necta-dsee-results-2025": {
+   "hash": "0751fe7629045175ff867db3d1b3a83b0265daf1",
+   "source": "assets/posts/necta-dsee-results-2025.webp",
+   "bytes": 71479,
+   "quality": 3,
+   "thumbBytes": 10115,
+   "thumbQuality": 2
+  },
+  "post:necta-dsee-results-2026": {
+   "hash": "b14d6c0c16e21f6af0915245c6719ccae1ed14b9",
+   "source": "assets/posts/necta-dsee-results-2026.webp",
+   "bytes": 72046,
+   "quality": 3,
+   "thumbBytes": 11497,
+   "thumbQuality": 2
+  },
+  "post:necta-dspee-results-2026": {
+   "hash": "65321357ca4a1c6c5df1971977b29482f8477bbe",
+   "source": "assets/posts/necta-dspee-results-2026.webp",
+   "bytes": 88747,
+   "quality": 2,
+   "thumbBytes": 10218,
+   "thumbQuality": 2
+  },
+  "post:necta-dte-results-2019": {
+   "hash": "b9f708efdbf8ccc2a769c37476c8fc039bfdda38",
+   "source": "assets/posts/necta-dte-results-2019.webp",
+   "bytes": 78196,
+   "quality": 3,
+   "thumbBytes": 11056,
+   "thumbQuality": 2
+  },
+  "post:necta-dte-results-2020": {
+   "hash": "ec8bbe4fbdf6172b0219da72eeb60729dd0109d2",
+   "source": "assets/posts/necta-dte-results-2020.webp",
+   "bytes": 74398,
+   "quality": 3,
+   "thumbBytes": 12053,
+   "thumbQuality": 2
+  },
+  "post:necta-ftna-results-2014": {
+   "hash": "c46bbedb279d2544895f1293a8028d664b79967d",
+   "source": "assets/posts/necta-ftna-results-2014.webp",
+   "bytes": 90651,
+   "quality": 2,
+   "thumbBytes": 11107,
+   "thumbQuality": 2
+  },
+  "post:necta-ftna-results-2015": {
+   "hash": "5923ff4b287e49989125f25e3050a517f440b288",
+   "source": "assets/posts/necta-ftna-results-2015.webp",
+   "bytes": 82565,
+   "quality": 3,
+   "thumbBytes": 11702,
+   "thumbQuality": 2
+  },
+  "post:necta-ftna-results-2016": {
+   "hash": "233a94c35a93826f5882c25a683413e9f18590e7",
+   "source": "assets/posts/necta-ftna-results-2016.webp",
+   "bytes": 71997,
+   "quality": 3,
+   "thumbBytes": 10941,
+   "thumbQuality": 2
+  },
+  "post:necta-ftna-results-2017": {
+   "hash": "3cb9f94238a4269d7cb880df083814dd20156a52",
+   "source": "assets/posts/necta-ftna-results-2017.webp",
+   "bytes": 90707,
+   "quality": 3,
+   "thumbBytes": 12295,
+   "thumbQuality": 2
+  },
+  "post:necta-ftna-results-2018": {
+   "hash": "7934789132ed44cbd50424bff64fcec5a8c4e9fc",
+   "source": "assets/posts/necta-ftna-results-2018.webp",
+   "bytes": 92019,
+   "quality": 2,
+   "thumbBytes": 11417,
+   "thumbQuality": 2
+  },
+  "post:necta-ftna-results-2019": {
+   "hash": "aff95d20a1ebe21074695e56237758dda0a2d393",
+   "source": "assets/posts/necta-ftna-results-2019.webp",
+   "bytes": 79550,
+   "quality": 3,
+   "thumbBytes": 11745,
+   "thumbQuality": 2
+  },
+  "post:necta-ftna-results-2020": {
+   "hash": "c4184d76518be8a14f566f7b51fd0ae2089c262d",
+   "source": "assets/posts/necta-ftna-results-2020.webp",
+   "bytes": 79445,
+   "quality": 3,
+   "thumbBytes": 11008,
+   "thumbQuality": 2
+  },
+  "post:necta-ftna-results-2021": {
+   "hash": "cdd8b5b7414e43fc71760ddf9400f625f3e02ff2",
+   "source": "assets/posts/necta-ftna-results-2021.webp",
+   "bytes": 75426,
+   "quality": 3,
+   "thumbBytes": 12177,
+   "thumbQuality": 2
+  },
+  "post:necta-ftna-results-2022": {
+   "hash": "ff7875536ae7d8a1053dcf40ad6506e32cbb1bdd",
+   "source": "assets/posts/necta-ftna-results-2022.webp",
+   "bytes": 86561,
+   "quality": 3,
+   "thumbBytes": 11923,
+   "thumbQuality": 2
+  },
+  "post:necta-ftna-results-2023": {
+   "hash": "4b9be413c74e7b6a7905b7dc9a67c9003ce4ef30",
+   "source": "assets/posts/necta-ftna-results-2023.webp",
+   "bytes": 86389,
+   "quality": 2,
+   "thumbBytes": 10160,
+   "thumbQuality": 2
+  },
+  "post:necta-ftna-results-2024": {
+   "hash": "76f58393975445e280dbe55ff8bc3231d6dd3c03",
+   "source": "assets/posts/necta-ftna-results-2024.webp",
+   "bytes": 91174,
+   "quality": 3,
+   "thumbBytes": 12502,
+   "thumbQuality": 2
+  },
+  "post:necta-ftna-results-2025": {
+   "hash": "93912e3bddbc16007fb1d7e7ccc8a143ec98f5b8",
+   "source": "assets/posts/necta-ftna-results-2025.webp",
+   "bytes": 75324,
+   "quality": 3,
+   "thumbBytes": 11757,
+   "thumbQuality": 2
+  },
+  "post:necta-psle-results-2013": {
+   "hash": "deea2989bd05e8a3ed03e3899f8ff5f48ae41eeb",
+   "source": "assets/posts/necta-psle-results-2013.webp",
+   "bytes": 79655,
+   "quality": 3,
+   "thumbBytes": 12031,
+   "thumbQuality": 2
+  },
+  "post:necta-psle-results-2014": {
+   "hash": "54d12257a1ed23e02f036de4e054fdae71215349",
+   "source": "assets/posts/necta-psle-results-2014.webp",
+   "bytes": 89697,
+   "quality": 7,
+   "thumbBytes": 17765,
+   "thumbQuality": 2
+  },
+  "post:necta-psle-results-2015": {
+   "hash": "286b281b9e114c18024a812dab8a9dd8ba1423d0",
+   "source": "assets/posts/necta-psle-results-2015.webp",
+   "bytes": 88396,
+   "quality": 3,
+   "thumbBytes": 12903,
+   "thumbQuality": 2
+  },
+  "post:necta-psle-results-2016": {
+   "hash": "941ac9a15c0ed6b4ef5cb6a8e52238cb74654f24",
+   "source": "assets/posts/necta-psle-results-2016.webp",
+   "bytes": 85936,
+   "quality": 6,
+   "thumbBytes": 15642,
+   "thumbQuality": 2
+  },
+  "post:necta-psle-results-2017": {
+   "hash": "2111829b77b09b734bbe7ca1823ac73b1ba9a140",
+   "source": "assets/posts/necta-psle-results-2017.webp",
+   "bytes": 85297,
+   "quality": 3,
+   "thumbBytes": 12371,
+   "thumbQuality": 2
+  },
+  "post:necta-psle-results-2018": {
+   "hash": "3e01130e736ae6ea7a678272a6769349b7fc2341",
+   "source": "assets/posts/necta-psle-results-2018.webp",
+   "bytes": 89486,
+   "quality": 3,
+   "thumbBytes": 12295,
+   "thumbQuality": 2
+  },
+  "post:necta-psle-results-2019": {
+   "hash": "1d30809c4ac6ac37f361e81cdee257bbb656b481",
+   "source": "assets/posts/necta-psle-results-2019.webp",
+   "bytes": 88012,
+   "quality": 9,
+   "thumbBytes": 18722,
+   "thumbQuality": 2
+  },
+  "post:necta-psle-results-2020": {
+   "hash": "3c742de1a4aa9c0c263325f36e7734a1800728c6",
+   "source": "assets/posts/necta-psle-results-2020.webp",
+   "bytes": 73833,
+   "quality": 3,
+   "thumbBytes": 11241,
+   "thumbQuality": 2
+  },
+  "post:necta-psle-results-2021": {
+   "hash": "8f63d54d5ddfa27b4e6fc15a7e68dfca845a91bf",
+   "source": "assets/posts/necta-psle-results-2021.webp",
+   "bytes": 90530,
+   "quality": 3,
+   "thumbBytes": 12440,
+   "thumbQuality": 2
+  },
+  "post:necta-psle-results-2022": {
+   "hash": "0989f99cb7e09ef02bdfe17750f95e53b544cb04",
+   "source": "assets/posts/necta-psle-results-2022.webp",
+   "bytes": 90894,
+   "quality": 2,
+   "thumbBytes": 10194,
+   "thumbQuality": 2
+  },
+  "post:necta-psle-results-2023": {
+   "hash": "27b80ee5c37619bfa382fa8970d8a7e9e521d081",
+   "source": "assets/posts/necta-psle-results-2023.webp",
+   "bytes": 87201,
+   "quality": 4,
+   "thumbBytes": 13192,
+   "thumbQuality": 2
+  },
+  "post:necta-psle-results-2024": {
+   "hash": "d86339bbc27da2834144e7c7f46d5fdc102f40cd",
+   "source": "assets/posts/necta-psle-results-2024.webp",
+   "bytes": 74971,
+   "quality": 3,
+   "thumbBytes": 12437,
+   "thumbQuality": 2
+  },
+  "post:necta-psle-results-2025": {
+   "hash": "e5cb164a83a91a6ba8890dadfa26fc85b3924d26",
+   "source": "assets/posts/necta-psle-results-2025.webp",
+   "bytes": 80023,
+   "quality": 4,
+   "thumbBytes": 15022,
+   "thumbQuality": 2
+  },
+  "post:necta-qt-results-2015": {
+   "hash": "dbba2664238d1e924021450e94fa188288a76c85",
+   "source": "assets/posts/necta-qt-results-2015.webp",
+   "bytes": 91983,
+   "quality": 2,
+   "thumbBytes": 11550,
+   "thumbQuality": 2
+  },
+  "post:necta-qt-results-2016": {
+   "hash": "c4295e307829baebfc9957e1a83e5dc251db64e8",
+   "source": "assets/posts/necta-qt-results-2016.webp",
+   "bytes": 89814,
+   "quality": 3,
+   "thumbBytes": 12354,
+   "thumbQuality": 2
+  },
+  "post:necta-qt-results-2017": {
+   "hash": "caf077a9167bf6c0db9492018684ac5352633807",
+   "source": "assets/posts/necta-qt-results-2017.webp",
+   "bytes": 91889,
+   "quality": 2,
+   "thumbBytes": 10582,
+   "thumbQuality": 2
+  },
+  "post:necta-qt-results-2018": {
+   "hash": "c075d923c2e0b207c9611236698aabc3d5fbb289",
+   "source": "assets/posts/necta-qt-results-2018.webp",
+   "bytes": 86384,
+   "quality": 3,
+   "thumbBytes": 11889,
+   "thumbQuality": 2
+  },
+  "post:necta-qt-results-2019": {
+   "hash": "2c04cf5b97675197d9301b8758056ded4d75a29b",
+   "source": "assets/posts/necta-qt-results-2019.webp",
+   "bytes": 90781,
+   "quality": 2,
+   "thumbBytes": 11668,
+   "thumbQuality": 2
+  },
+  "post:necta-qt-results-2020": {
+   "hash": "4601de572e3144e2077be40083b8a5660e8ba1c8",
+   "source": "assets/posts/necta-qt-results-2020.webp",
+   "bytes": 84470,
+   "quality": 3,
+   "thumbBytes": 12386,
+   "thumbQuality": 2
+  },
+  "post:necta-qt-results-2021": {
+   "hash": "8045f52d0c223826e3e48a5bf5e94a8c39475b61",
+   "source": "assets/posts/necta-qt-results-2021.webp",
+   "bytes": 91368,
+   "quality": 2,
+   "thumbBytes": 10019,
+   "thumbQuality": 2
+  },
+  "post:necta-qt-results-2022": {
+   "hash": "d8bcbe25d1c92def5bd4675e7fed90507f7dab93",
+   "source": "assets/posts/necta-qt-results-2022.webp",
+   "bytes": 88630,
+   "quality": 2,
+   "thumbBytes": 11330,
+   "thumbQuality": 2
+  },
+  "post:necta-qt-results-2023": {
+   "hash": "673da87821c49ef08a1aa0a6bab7bbc4bb47cb40",
+   "source": "assets/posts/necta-qt-results-2023.webp",
+   "bytes": 82669,
+   "quality": 3,
+   "thumbBytes": 11540,
+   "thumbQuality": 2
+  },
   "post:necta-result-codes-abs-x-w-i-meaning": {
    "hash": "abe9cc521a63cae5e1ddca2ab6e97c3ec2584ada",
    "source": "assets/posts/necta-result-codes-abs-x-w-i-meaning.webp",
    "bytes": 80232,
    "quality": 3,
    "thumbBytes": 15170,
+   "thumbQuality": 2
+  },
+  "post:necta-sfna-results-2015": {
+   "hash": "17806b55ce26306eb70d69cff22f8076dbba6db5",
+   "source": "assets/posts/necta-sfna-results-2015.webp",
+   "bytes": 90024,
+   "quality": 2,
+   "thumbBytes": 10480,
+   "thumbQuality": 2
+  },
+  "post:necta-sfna-results-2016": {
+   "hash": "f1982952b239d8d4aee11a9210009b0ac3237aa4",
+   "source": "assets/posts/necta-sfna-results-2016.webp",
+   "bytes": 91706,
+   "quality": 3,
+   "thumbBytes": 12442,
+   "thumbQuality": 2
+  },
+  "post:necta-sfna-results-2017": {
+   "hash": "15ea3efc366c83d3425a9ff7a0369eaca036260e",
+   "source": "assets/posts/necta-sfna-results-2017.webp",
+   "bytes": 81055,
+   "quality": 3,
+   "thumbBytes": 12648,
+   "thumbQuality": 2
+  },
+  "post:necta-sfna-results-2018": {
+   "hash": "4d0632898230688ea98077735adb74d6d42de1f5",
+   "source": "assets/posts/necta-sfna-results-2018.webp",
+   "bytes": 84919,
+   "quality": 3,
+   "thumbBytes": 12401,
+   "thumbQuality": 2
+  },
+  "post:necta-sfna-results-2019": {
+   "hash": "c3ecf934662235af659a88a5dc3f255a4d84cbac",
+   "source": "assets/posts/necta-sfna-results-2019.webp",
+   "bytes": 91232,
+   "quality": 2,
+   "thumbBytes": 10045,
+   "thumbQuality": 2
+  },
+  "post:necta-sfna-results-2020": {
+   "hash": "bc28df642d182616a77eda7213838daa7d50de43",
+   "source": "assets/posts/necta-sfna-results-2020.webp",
+   "bytes": 79672,
+   "quality": 3,
+   "thumbBytes": 12520,
+   "thumbQuality": 2
+  },
+  "post:necta-sfna-results-2021": {
+   "hash": "7f382c9eb5d9d898ca8088f57b30a735ebc9c30c",
+   "source": "assets/posts/necta-sfna-results-2021.webp",
+   "bytes": 84125,
+   "quality": 3,
+   "thumbBytes": 11728,
+   "thumbQuality": 2
+  },
+  "post:necta-sfna-results-2022": {
+   "hash": "338c4eefdbcae714c01c2521e538b07c67cca897",
+   "source": "assets/posts/necta-sfna-results-2022.webp",
+   "bytes": 88340,
+   "quality": 2,
+   "thumbBytes": 10378,
+   "thumbQuality": 2
+  },
+  "post:necta-sfna-results-2023": {
+   "hash": "ee268d14560512d6badd55c0ee02868fec60397a",
+   "source": "assets/posts/necta-sfna-results-2023.webp",
+   "bytes": 83487,
+   "quality": 3,
+   "thumbBytes": 11554,
+   "thumbQuality": 2
+  },
+  "post:necta-sfna-results-2024": {
+   "hash": "96ed1b2c1909a6bebf360a691b8660f0e7456561",
+   "source": "assets/posts/necta-sfna-results-2024.webp",
+   "bytes": 75849,
+   "quality": 3,
+   "thumbBytes": 12146,
+   "thumbQuality": 2
+  },
+  "post:necta-sfna-results-2025": {
+   "hash": "497db8ee4bda1c130c191e97327ff7a364ca78e5",
+   "source": "assets/posts/necta-sfna-results-2025.webp",
+   "bytes": 85523,
+   "quality": 3,
+   "thumbBytes": 12617,
    "thumbQuality": 2
   },
   "post:next-generation-online-learning-platform": {
@@ -774,19 +1630,19 @@
    "thumbQuality": 2
   },
   "post:sell-on-jiji-tanzania-rules-safe-deals-ad-limits": {
-   "hash": "6c80bb6236a30f04fa35dd7b8cf0e0374d2ffeba",
-   "source": "assets/img/topics/business-ideas-2560.webp",
-   "bytes": 87472,
-   "quality": 14,
-   "thumbBytes": 19568,
-   "thumbQuality": 3
+   "hash": "652acd60e3a9cb94ae8d25a7030441c191b51dae",
+   "source": "assets/posts/sell-on-jiji-tanzania-rules-safe-deals-ad-limits.webp",
+   "bytes": 58924,
+   "quality": 2,
+   "thumbBytes": 8665,
+   "thumbQuality": 2
   },
   "post:sim-swap-fraud-what-to-do": {
-   "hash": "35ec8c9849f79ff97c9ed50b3aac325d91640493",
-   "source": "assets/img/topics/technology-solutions-2560.webp",
-   "bytes": 83744,
-   "quality": 5,
-   "thumbBytes": 14408,
+   "hash": "631640dfef8d14e705447073ef08e54a6aa11cbc",
+   "source": "assets/posts/sim-swap-fraud-what-to-do.webp",
+   "bytes": 59644,
+   "quality": 2,
+   "thumbBytes": 7870,
    "thumbQuality": 2
   },
   "post:simple-business-records-small-traders-cash-book-tanzania": {

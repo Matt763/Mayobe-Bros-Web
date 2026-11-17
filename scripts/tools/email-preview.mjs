@@ -64,6 +64,10 @@ function article(slug) {
 const VIDEO_POST = article('how-to-find-an-internship-in-tanzania-real-or-fake');
 const LATEST = [article('ajira-portal-how-to-apply-public-service-jobs'), VIDEO_POST, article('back-up-your-phone-and-move-to-a-new-phone')];
 
+// A launch-sized batch of results pages (one per exam and year), as the cron would list them.
+const DIGEST_YEARS = { csee: [2003, 2025], acsee: [2004, 2025], psle: [2013, 2025], ftna: [2014, 2025], sfna: [2015, 2021], dsee: [2014, 2026], qt: [2015, 2023], dte: [2019, 2020], dpee: [2026, 2026], dppee: [2026, 2026], dspee: [2026, 2026] };
+const DIGEST_POSTS = Object.entries(DIGEST_YEARS).flatMap(([exam, [a, b]]) => Array.from({ length: b - a + 1 }, (_, i) => ({ exam, year: a + i, url: `https://mayobebros.com/post/educational/results/necta-${exam}-results-${a + i}/` })));
+
 const SAMPLES = [
   ['manage-link', 'manageLinkEmail', { name: 'Amani', commentExcerpt: 'Thanks', postTitle: AJIRA.title, postUrl: AJIRA.url, manageUrl: 'https://mayobebros.com/manage/#l=3f9a2c71b0d84e56', notifyWanted: true }],
   ['manage-link-long-title', 'manageLinkEmail', { postTitle: 'Application Letter for a Job in Tanzania: How to Write One That Gets Read, With a Full Example and a Checklist', postUrl: P('application-letter-for-a-job-tanzania-how-to-write'), manageUrl: 'https://mayobebros.com/manage/#l=3f9a2c71b0d84e56', notifyWanted: false }],
@@ -81,6 +85,7 @@ const SAMPLES = [
   ['new-post', 'newPostEmail', { post: LATEST[0], unsubscribeUrl: 'https://mayobebros.com/v1/newsletter/unsubscribe?t=91aa' }],
   ['new-post-video', 'newPostEmail', { post: VIDEO_POST, unsubscribeUrl: 'https://mayobebros.com/v1/newsletter/unsubscribe?t=91aa' }],
   ['new-post-long', 'newPostEmail', { post: { title: 'Application Letter for a Job in Tanzania: How to Write One That Gets Read, With a Full Example and a Checklist', url: P('application-letter-for-a-job-tanzania-how-to-write'), excerpt: LONG_EXCERPT, category: 'Jobs and internships' }, unsubscribeUrl: 'https://mayobebros.com/v1/newsletter/unsubscribe?t=91aa' }],
+  ['results-digest', 'resultsDigestEmail', { posts: DIGEST_POSTS, unsubscribeUrl: 'https://mayobebros.com/v1/newsletter/unsubscribe?t=91aa' }],
   ['farewell', 'farewellEmail', { resubscribeUrl: 'https://mayobebros.com/newsletter/' }],
 ].filter(([name]) => !only.length || only.includes(name));
 

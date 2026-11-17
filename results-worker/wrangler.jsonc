@@ -1,0 +1,22 @@
+{
+  // The Worker that renders the indexable results pages (mayobebros.com/results/*). Steps: README.md
+  "name": "mayobe-results",
+  "main": "src/index.js",
+  "compatibility_date": "2026-11-01",
+  "routes": [
+    { "pattern": "mayobebros.com/results/*", "zone_name": "mayobebros.com" },
+    { "pattern": "mayobebros.com/results", "zone_name": "mayobebros.com" }
+  ],
+  "r2_buckets": [
+    { "binding": "RESULTS", "bucket_name": "mayobe-results-data" }
+  ],
+  "vars": {
+    // off | hubs | all. Keep "off" until the owner decides to let search engines see these pages (README, "Turning indexing on").
+    "RESULTS_INDEX": "all",
+    // The first exam year that may be indexed ("" = every year). A roll-out knob for "hubs" and "all": start with the newest years (for example "2023"),
+    // deploy, watch Search Console, then lower it. Older years stay noindex and out of the sitemaps. Works with the cache key: nothing to purge.
+    "RESULTS_INDEX_FROM": "",
+    "ORIGIN": "https://mayobebros.com"
+  },
+  "observability": { "enabled": true }
+}

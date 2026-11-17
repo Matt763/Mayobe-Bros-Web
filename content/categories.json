@@ -27,7 +27,93 @@
         "name": "Results",
         "slug": "results",
         "description": "Exam results: what they mean and how to check them.",
-        "image": "assets/img/topics/results-2560.webp"
+        "image": "assets/img/topics/results-2560.webp",
+        "sections": [
+          {
+            "name": "NECTA CSEE Results",
+            "short": "CSEE",
+            "slug": "csee",
+            "description": "Form Four (CSEE) results from the National Examinations Council of Tanzania (NECTA) for 2025 back to 2003.",
+            "image": "assets/img/heroes/results-csee.webp"
+          },
+          {
+            "name": "NECTA ACSEE Results",
+            "short": "ACSEE",
+            "slug": "acsee",
+            "description": "Form Six (ACSEE) results from the National Examinations Council of Tanzania (NECTA) for 2025 back to 2004, except 2008.",
+            "image": "assets/img/heroes/results-acsee.webp"
+          },
+          {
+            "name": "NECTA PSLE Results",
+            "short": "PSLE",
+            "slug": "psle",
+            "description": "Standard Seven (PSLE) results from the National Examinations Council of Tanzania (NECTA) for 2025 back to 2013.",
+            "image": "assets/img/heroes/results-psle.webp"
+          },
+          {
+            "name": "NECTA FTNA Results",
+            "short": "FTNA",
+            "slug": "ftna",
+            "description": "Form Two (FTNA) national assessment results from the National Examinations Council of Tanzania (NECTA) for every year published online.",
+            "image": "assets/img/heroes/results-ftna.webp"
+          },
+          {
+            "name": "NECTA SFNA Results",
+            "short": "SFNA",
+            "slug": "sfna",
+            "description": "Standard Four (SFNA) national assessment results from the National Examinations Council of Tanzania (NECTA) for every year published online.",
+            "image": "assets/img/heroes/results-sfna.webp"
+          },
+          {
+            "name": "NECTA DSEE Results",
+            "short": "DSEE",
+            "slug": "dsee",
+            "description": "Diploma in Secondary Education (DSEE) results from the National Examinations Council of Tanzania (NECTA) for every year published online.",
+            "image": "assets/img/heroes/results-dsee.webp"
+          },
+          {
+            "name": "NECTA DPEE Results",
+            "short": "DPEE",
+            "slug": "dpee",
+            "description": "DPEE teachers' college diploma results from the National Examinations Council of Tanzania (NECTA) for every year published online.",
+            "image": "assets/img/heroes/results-dpee.webp"
+          },
+          {
+            "name": "NECTA DPPEE Results",
+            "short": "DPPEE",
+            "slug": "dppee",
+            "description": "DPPEE teachers' college diploma results from the National Examinations Council of Tanzania (NECTA) for every year published online.",
+            "image": "assets/img/heroes/results-dppee.webp"
+          },
+          {
+            "name": "NECTA DSPEE Results",
+            "short": "DSPEE",
+            "slug": "dspee",
+            "description": "DSPEE teachers' college diploma results from the National Examinations Council of Tanzania (NECTA) for every year published online.",
+            "image": "assets/img/heroes/results-dspee.webp"
+          },
+          {
+            "name": "NECTA DTE Results",
+            "short": "DTE",
+            "slug": "dte",
+            "description": "Diploma in Technical Education (DTE) results from the National Examinations Council of Tanzania (NECTA) for every year published online.",
+            "image": "assets/img/heroes/results-dte.webp"
+          },
+          {
+            "name": "NECTA QT Results",
+            "short": "QT",
+            "slug": "qt",
+            "description": "Qualifying Test (QT) results from the National Examinations Council of Tanzania (NECTA) for every year published online.",
+            "image": "assets/img/heroes/results-qt.webp"
+          },
+          {
+            "name": "Results Guides",
+            "short": "Guides",
+            "slug": "guides",
+            "description": "Plain-English guides on reading exam results, result codes, certificates, university admission and student loan results.",
+            "image": "assets/img/heroes/results-guides.webp"
+          }
+        ]
       }
     ]
   },

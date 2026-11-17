@@ -52,6 +52,7 @@ const TEMPLATES = {
   'welcome': ['welcomeEmail', { unsubscribeUrl: `${ORIGIN}/newsletter/#u=sample`, latestPosts: LATEST }, 'news', true],
   'new-post': ['newPostEmail', { post: POST, unsubscribeUrl: `${ORIGIN}/newsletter/#u=sample` }, 'news', true],
   'new-post-video': ['newPostEmail', { post: VIDEO_POST, unsubscribeUrl: `${ORIGIN}/newsletter/#u=sample` }, 'news', true],
+  'results-digest': ['resultsDigestEmail', { posts: ['csee', 'acsee', 'psle'].flatMap((exam) => [2025, 2024, 2023].map((year) => ({ exam, year, url: `${ORIGIN}/post/educational/results/necta-${exam}-results-${year}/` }))), unsubscribeUrl: `${ORIGIN}/newsletter/#u=sample` }, 'news', true],
   'farewell': ['farewellEmail', { resubscribeUrl: `${ORIGIN}/newsletter/` }, 'news', true],
 };
 

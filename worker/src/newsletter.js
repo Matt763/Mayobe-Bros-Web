@@ -9,7 +9,7 @@
 //   runNewsletter(env, ctx, opts)  the Cron Trigger job (six runs each morning): seed guard, one email per new article per subscriber, clean-up
 
 import { sendMail, validEmail, CAPS } from './mail.js';
-import { confirmSubscriptionEmail, welcomeEmail, farewellEmail, newPostEmail, oneLine } from './mail-templates.js';
+import { confirmSubscriptionEmail, welcomeEmail, farewellEmail, newPostEmail, resultsDigestEmail, oneLine } from './mail-templates.js';
 import { SLUG_RE, TOKEN_RE, now, reply, fail, sha, ipHash, newToken, hit, readJson, siteOrigin, siteOf, canonicalEmail, utcDay, DAY_TTL, later, humanCheck } from './util.js';
 
 // One neutral wording for every link problem (wrong, expired, already used, removed) and one for every limit, so an answer never says
@@ -219,6 +219,16 @@ const dayStr = (ms) => new Date(ms).toISOString().slice(0, 10);
 const POST_PATH_RE = /^\/post\/[a-z0-9/-]*$/; // the same rule as postMeta in index.js
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+// NECTA results pages (necta-<exam>-results-<year>) come in batches of a hundred or more, so they are never emailed one by one.
+// A new one waits in newsletter_sent like any post, and ONE email lists the whole batch (resultsDigestEmail): a single send per reader,
+// kept in newsletter_deliveries under results-digest-<queued_at of the first page of the batch>, so it goes out once to each reader
+// whatever happens to the daily budget. A page added while the batch is still going out joins it for the readers not yet served; a page
+// added after it is finished starts the next batch. A page older than RESULTS_FRESH_DAYS when first seen is recorded and not announced.
+export const RESULTS_SLUG_RE = /^necta-([a-z]{2,6})-results-(\d{4})$/;
+const RESULTS_GLOB = 'necta-*-results-[0-9][0-9][0-9][0-9]';
+const RESULTS_FRESH_DAYS = 60;
+const WRITE_CHUNK = 40; // statements per D1 batch (a batch counts as one subrequest)
+
 // The site's own list of published posts, cleaned: null when it cannot be read or has no usable entry.
 async function publishedPosts(env, today) {
   try {
@@ -240,6 +250,11 @@ async function publishedPosts(env, today) {
 
 const str = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
 function postMail(env, p, unsubscribeUrl) {
+  if (p.digest) {
+    const { origin } = siteOf(env);
+    const posts = p.digest.map((x) => { const m = RESULTS_SLUG_RE.exec(x.s); return { exam: m[1], year: Number(m[2]), url: `${origin}${x.u}` }; });
+    return resultsDigestEmail({ posts, unsubscribeUrl }, siteOf(env));
+  }
   return newPostEmail({ post: emailPost(env, p), unsubscribeUrl }, siteOf(env));
 }
 
@@ -343,13 +358,15 @@ async function sendRun(env, ctx, report, list, { t, dry, mode, sleep, meter }) {
     return;
   }
   const freshFrom = dayStr(t - FRESH_DAYS * D);
+  const resultsFrom = dayStr(t - RESULTS_FRESH_DAYS * D);
+  const isResults = (p) => RESULTS_SLUG_RE.test(p.s);
   const unknown = list.filter((p) => !known.has(p.s));
   // (3) an unknown post older than 7 days (a renamed slug, or a list that was down) is recorded and never emailed. A post renamed within
   // 7 days of its date is NOT caught (search.json carries no aliases): it would be sent again under the new slug. Do not rename a post in
   // its first week.
-  const old = unknown.filter((p) => p.d < freshFrom);
+  const old = unknown.filter((p) => p.d < (isResults(p) ? resultsFrom : freshFrom));
   report.tooOld = old.map((p) => p.s);
-  const fresh = unknown.filter((p) => p.d >= freshFrom);
+  const fresh = unknown.filter((p) => p.d >= (isResults(p) ? resultsFrom : freshFrom));
   const bySlug = new Map(list.map((p) => [p.s, p]));
   const writes = old.map((p) => insertSent(DB, p, t, true));
   // seed (the owner, right before switching sending on): every listed post not yet recorded counts as handled, also last week's
@@ -367,14 +384,29 @@ async function sendRun(env, ctx, report, list, { t, dry, mode, sleep, meter }) {
   if (queueing) {
     // (5) queue new posts. A queued post that has left the list (unpublished) is not sent; after 7 days it is closed so it cannot come back.
     for (const p of fresh) writes.push(insertSent(DB, p, t, false));
-    for (const r of known.values()) if (r.sent_at === null && !bySlug.has(r.slug) && r.queued_at < t - FRESH_DAYS * D) writes.push(DB.prepare('UPDATE newsletter_sent SET sent_at = ? WHERE slug = ? AND sent_at IS NULL').bind(t, r.slug));
+    for (const r of known.values()) if (r.sent_at === null && !bySlug.has(r.slug) && r.queued_at < t - (RESULTS_SLUG_RE.test(r.slug) ? RESULTS_FRESH_DAYS : FRESH_DAYS) * D) writes.push(DB.prepare('UPDATE newsletter_sent SET sent_at = ? WHERE slug = ? AND sent_at IS NULL').bind(t, r.slug));
   }
-  if (writes.length && !dry) await DB.batch(writes);
+  if (!dry) for (let i = 0; i < writes.length; i += WRITE_CHUNK) await DB.batch(writes.slice(i, i + WRITE_CHUNK));
   if (report.stopped) { console.error(`newsletter: ${report.stopped === 'no-key' ? 'RESEND_API_KEY is not set' : 'API_ORIGIN is missing or not https'}; nothing sent`); return; }
   if (!queueing) return;
 
   // From the snapshot (no second read). A run started at the same moment may have queued the same slug a few ms apart; harmless.
-  const queue = [...[...known.values()].filter((r) => r.sent_at === null && !r.seeded), ...fresh.map((p) => ({ slug: p.s, queued_at: t }))];
+  const open = [...known.values()].filter((r) => r.sent_at === null && !r.seeded);
+  const queue = [...open.filter((r) => !RESULTS_SLUG_RE.test(r.slug)), ...fresh.filter((p) => !isResults(p)).map((p) => ({ slug: p.s, queued_at: t }))];
+  // The results pages still waiting (queued earlier or just now, and still on the list) go out as ONE email, under one key.
+  const batch = [...open.filter((r) => RESULTS_SLUG_RE.test(r.slug)), ...fresh.filter(isResults).map((p) => ({ slug: p.s, queued_at: t }))].filter((r) => bySlug.has(r.slug));
+  if (batch.length) {
+    let from = Math.min(...batch.map((r) => r.queued_at));
+    const upTo = Math.max(...batch.map((r) => r.queued_at));
+    // The key is the earliest open results row IN THE DATABASE (read after the writes), so two runs that overlap, or a later run on
+    // another day, name the same email and each reader is claimed for it once.
+    if (!dry) { const q = (await DB.prepare(`SELECT MIN(queued_at) AS q FROM newsletter_sent WHERE sent_at IS NULL AND seeded = 0 AND slug GLOB '${RESULTS_GLOB}'`).first())?.q; if (Number.isFinite(q)) from = q; }
+    const posts = batch.map((r) => bySlug.get(r.slug)).sort((a, b) => (a.s < b.s ? -1 : 1));
+    const digest = { s: `results-digest-${from}`, t: 'New NECTA results', d: dayStr(from), digest: posts, upTo };
+    bySlug.set(digest.s, digest);
+    queue.push({ slug: digest.s, queued_at: from });
+    report.digest = { slug: digest.s, posts: posts.length };
+  }
   const todo = queue.filter((r) => bySlug.has(r.slug)).sort((a, b) => {
     const x = bySlug.get(a.slug), y = bySlug.get(b.slug);
     return x.d < y.d ? -1 : x.d > y.d ? 1 : a.slug < b.slug ? -1 : 1;
@@ -386,6 +418,7 @@ async function sendRun(env, ctx, report, list, { t, dry, mode, sleep, meter }) {
   for (const row of todo) {
     const p = bySlug.get(row.slug);
     const stat = { slug: p.s, recipients: 0, sent: 0, skipped: 0, failed: 0 };
+    if (p.digest) stat.posts = p.digest.length;
     report.posts.push(stat);
     if (dry) {
       if (!room(1)) { report.posts.pop(); report.stopped = 'subrequests'; return; } // a week of posts at most, but keep the run under the limit
@@ -442,8 +475,9 @@ async function sendRun(env, ctx, report, list, { t, dry, mode, sleep, meter }) {
         stat.failed++; await mark('failed'); // 5xx, thrown, timed out: Resend may have taken it, so never retried
       }
     }
-    // (7) nobody left for this post
-    await DB.prepare('UPDATE newsletter_sent SET sent_at = ? WHERE slug = ? AND sent_at IS NULL').bind(now(), p.s).run();
+    // (7) nobody left for this post (for the results email: for every results page that was in it)
+    if (p.digest) await DB.prepare(`UPDATE newsletter_sent SET sent_at = ? WHERE sent_at IS NULL AND seeded = 0 AND queued_at <= ? AND slug GLOB '${RESULTS_GLOB}'`).bind(now(), p.upTo).run();
+    else await DB.prepare('UPDATE newsletter_sent SET sent_at = ? WHERE slug = ? AND sent_at IS NULL').bind(now(), p.s).run();
   }
 }
 
@@ -465,19 +499,28 @@ export async function newsletterAdmin(request, env, ctx, path, url, cors) {
     return reply({ subscribers: rows.results || [] }, 200, cors);
   }
   if (method === 'GET' && path === '/v1/admin/newsletter/count') {
-    const [byStatus, budget, queue] = await DB.batch([
+    const [byStatus, budget, queue, results] = await DB.batch([
       DB.prepare('SELECT status, COUNT(*) AS n FROM newsletter_subscribers GROUP BY status'),
       DB.prepare("SELECT n FROM mail_budget WHERE day = ? AND kind = 'news'").bind(utcDay()),
       DB.prepare(`SELECT n.slug AS slug,
         (SELECT COUNT(*) FROM newsletter_deliveries d WHERE d.slug = n.slug AND d.status IN ('claimed','sent')) AS sent,
         (SELECT COUNT(*) FROM newsletter_subscribers s WHERE s.status = 'active' AND s.confirmed <= n.queued_at AND NOT EXISTS (SELECT 1 FROM newsletter_deliveries d WHERE d.slug = n.slug AND d.subscriber_id = s.id)) AS left
-        FROM newsletter_sent n WHERE n.sent_at IS NULL AND n.seeded = 0 ORDER BY n.queued_at LIMIT 50`),
+        FROM newsletter_sent n WHERE n.sent_at IS NULL AND n.seeded = 0 AND n.slug NOT GLOB '${RESULTS_GLOB}' ORDER BY n.queued_at LIMIT 50`),
+      DB.prepare(`SELECT COUNT(*) AS posts, MIN(queued_at) AS q FROM newsletter_sent WHERE sent_at IS NULL AND seeded = 0 AND slug GLOB '${RESULTS_GLOB}'`),
     ]);
     const c = Object.fromEntries((byStatus.results || []).map((r) => [r.status, r.n]));
+    const list = (queue.results || []).map((r) => ({ slug: r.slug, sent: r.sent, left: r.left }));
+    // the results pages still waiting are one email: shown as one line, with the number of pages in it
+    const waiting = results.results?.[0];
+    if (waiting && waiting.posts > 0 && Number.isFinite(waiting.q)) {
+      const key = `results-digest-${waiting.q}`;
+      const x = await DB.prepare("SELECT (SELECT COUNT(*) FROM newsletter_deliveries d WHERE d.slug = ?1 AND d.status IN ('claimed','sent')) AS sent, (SELECT COUNT(*) FROM newsletter_subscribers s WHERE s.status = 'active' AND s.confirmed <= ?2 AND NOT EXISTS (SELECT 1 FROM newsletter_deliveries d WHERE d.slug = ?1 AND d.subscriber_id = s.id)) AS left").bind(key, waiting.q).first();
+      list.push({ slug: key, posts: waiting.posts, sent: x?.sent || 0, left: x?.left || 0 });
+    }
     return reply({
       pending: c.pending || 0, active: c.active || 0, unsubscribed: c.unsubscribed || 0,
       newsToday: budget.results?.[0]?.n || 0, newsCap: CAPS.news, articleCap: ARTICLE_CAP, paused: env.NEWSLETTER_SEND !== 'true',
-      queue: (queue.results || []).map((r) => ({ slug: r.slug, sent: r.sent, left: r.left })),
+      queue: list,
     }, 200, cors);
   }
   if (method === 'POST' && path === '/v1/admin/newsletter/remove') {

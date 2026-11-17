@@ -5,6 +5,9 @@ author: Mclean Mbaga
 category: business-ideas
 label: e-commerce
 excerpt: How selling on Jiji Tanzania works, how to write an ad that gets approved, what the free ad limit means, and how to make safe deals with buyers.
+image: assets/posts/sell-on-jiji-tanzania-rules-safe-deals-ad-limits.webp
+imageAlt: Drawing of an online listing card with a picture, a button and a chat button, beside a yellow price tag, a stack of gold coins, a map pin and a green shield with a tick
+imageCredit: Cover drawn by Mayobe Bros.
 tags: [online selling, small business, tanzania, scams]
 ---
 

@@ -217,7 +217,7 @@ function renderTable(lines, start) {
   const al = (n) => (aligns[n] ? ` style="text-align:${aligns[n]}"` : '');
   const th = head.map((c, n) => `<th${al(n)}>${inline(c)}</th>`).join('');
   const body = rows.map((r) => `<tr>${head.map((_c, n) => `<td${al(n)}>${inline(r[n] ?? '')}</td>`).join('')}</tr>`).join('\n');
-  return { html: `<div class="table-wrapper"><table class="editor-table">\n<thead><tr>${th}</tr></thead>\n<tbody>\n${body}\n</tbody>\n</table></div>`, next: i };
+  return { html: `<div class="table-wrapper" role="region" aria-label="Table" tabindex="0"><table class="editor-table">\n<thead><tr>${th}</tr></thead>\n<tbody>\n${body}\n</tbody>\n</table></div>`, next: i };
 }
 
 export function blocks(lines) {

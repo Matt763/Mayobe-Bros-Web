@@ -21,8 +21,13 @@ import { parseFrontMatter } from './lib/frontmatter.mjs';
 import { markdown, addHeadingIds, plainText, slugify } from './lib/markdown.mjs';
 import { createRenderer, newsletterOn, newsletterSetting } from './lib/render.mjs';
 import { lintPost } from './lib/lint.mjs';
+import { decodeList } from '../js/results-codec.js';
+import { letterOf } from '../js/results-app.js';
+import { buildIndex as buildPapersIndex } from '../js/papers-core.js';
+import { EXAMS as PAPER_EXAMS, GROUPS as PAPER_GROUPS, SEARCH_ORDER as PAPER_ORDER } from './lib/papers-app.mjs';
 import { makeShareCards } from './lib/share.mjs';
 import { makeEmailImages, emailSpec } from './lib/email-images.mjs';
+import { licenseXml } from './lib/ai-policy.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
@@ -32,7 +37,7 @@ const NO_SAMPLES = args.has('--no-samples');
 const API_OVERRIDE = argv.includes('--api') ? argv[argv.indexOf('--api') + 1] : null;
 const NEWSLETTER_FLAG = args.has('--newsletter');
 
-const RESERVED_TOP = new Set(['post', 'category', 'label', 'popular', 'search', 'data', 'assets', 'css', 'js', 'content', 'scripts', 'worker', 'vendor', 'tag', 'author', '404', 'index', 'feed', 'sitemap']);
+const RESERVED_TOP = new Set(['post', 'category', 'label', 'popular', 'search', 'data', 'assets', 'css', 'js', 'content', 'scripts', 'worker', 'vendor', 'tag', 'results-data', 'results', 'author', '404', 'index', 'feed', 'sitemap']);
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 const errors = [];
@@ -93,11 +98,16 @@ const DEFAULTS = {
   commentsApi: '',
   turnstileSiteKey: '',
   blockAiCrawlers: true,
+  aiAnswers: 'allow',
+  copyGuard: { mode: 'attribute', minChars: 160 },
+  resultsData: { base: '/results-data', pages: false, index: 'off', datasets: {} },
 };
 const userConfig = readJson('site.config.json');
-const config = { ...DEFAULTS, ...userConfig, contact: { ...DEFAULTS.contact, ...userConfig.contact }, adsense: { ...DEFAULTS.adsense, ...userConfig.adsense } };
+const config = { ...DEFAULTS, ...userConfig, contact: { ...DEFAULTS.contact, ...userConfig.contact }, adsense: { ...DEFAULTS.adsense, ...userConfig.adsense }, copyGuard: { ...DEFAULTS.copyGuard, ...userConfig.copyGuard }, resultsData: { ...DEFAULTS.resultsData, ...userConfig.resultsData } };
 if (API_OVERRIDE !== null) config.commentsApi = API_OVERRIDE;
 if (!config.siteUrl || !/^https?:\/\//.test(config.siteUrl)) fail('site.config.json', '"siteUrl" must be a full URL such as https://mayobebros.com');
+if (!['allow', 'block'].includes(config.aiAnswers)) fail('site.config.json', '"aiAnswers" must be "allow" (AI search and answer tools may read the site under the AI Use Terms) or "block" (they are refused too)');
+if (!['attribute', 'limit', 'off'].includes(config.copyGuard.mode) || !Number.isInteger(config.copyGuard.minChars) || config.copyGuard.minChars < 40 || config.copyGuard.minChars > 2000) fail('site.config.json', '"copyGuard" must be {"mode": "attribute" | "limit" | "off", "minChars": a whole number from 40 to 2000}');
 if (config.basePath && !/^\/[^/].*[^/]$|^\/[^/]$/.test(config.basePath)) fail('site.config.json', '"basePath" must be empty or look like "/repo-name" (leading slash, no trailing slash)');
 if (config.commentsApi && !/^https?:\/\//.test(config.commentsApi)) fail('site.config.json', '"commentsApi" must be a full URL or empty');
 {
@@ -108,6 +118,57 @@ if (config.commentsApi && !/^https?:\/\//.test(config.commentsApi)) fail('site.c
 }
 const NEWSLETTER_ON = !errors.length && newsletterOn(config);
 if (config.adsense.sidebarSlot && !/^\d{6,20}$/.test(String(config.adsense.sidebarSlot).trim())) warn('site.config.json', '"adsense.sidebarSlot" should be only the numbers of the ad unit (data-ad-slot), for example "1234567890"; the sidebar ad is left out until it is');
+/* ------------------------------------------------- results search pages (front matter `app: results`)
+   The nine NECTA results posts show a search app instead of an article (docs/superpowers/specs/2026-11-10-results-app-design.md). The data is
+   not in git: config.resultsData.base says where it is fetched from, and config.resultsData.datasets lists the exams that have data, each with
+   the official NECTA page. Counts and the "last verified" date come from results-data/<exam>/meta.json when it is present on this computer, and are
+   kept in content/results-manifest.json so a build without the data folder prints the same numbers. */
+{
+  const rd = config.resultsData;
+  const b = String(rd.base || '');
+  if (!/^\/[a-z0-9/_-]*[a-z0-9_-]$|^https:\/\/[^\s/]+(\/[^\s]*[^\s/])?$/i.test(b)) fail('site.config.json', '"resultsData.base" must be a path such as "/results-data" or an https address without a trailing slash');
+  if (typeof rd.pages !== 'boolean') fail('site.config.json', '"resultsData.pages" must be true or false (true = the results Worker\'s pages exist and the exam pages link to them)');
+  if (!['off', 'hubs', 'all'].includes(rd.index)) fail('site.config.json', '"resultsData.index" must be "off", "hubs" or "all" (it is also the Worker variable RESULTS_INDEX; see results-worker/README.md)');
+  for (const id of rd.unavailable || []) if (!/^(csee|acsee|psle|ftna|sfna|dsee|dpee|dppee|dspee|dte|qt)-\d{4}$/.test(String(id))) fail('site.config.json', `"resultsData.unavailable" entry "${id}" must look like csee-2004`);
+  for (const [id, d] of Object.entries(rd.datasets || {})) {
+    if (!/^(csee|acsee|psle|ftna|sfna|dsee|dpee|dppee|dspee|dte|qt)-\d{4}$/.test(id)) fail('site.config.json', `"resultsData.datasets" key "${id}" must look like csee-2024`);
+    // a year NECTA no longer serves (ACSEE 2004) links the Internet Archive's saved copy of the NECTA page: https://web.archive.org/web/<timestamp>/http://www.necta.go.tz/...
+    if (!d || !/^https:\/\/([a-z0-9-]+\.)?necta\.go\.tz\/|^https:\/\/web\.archive\.org\/web\/\d{4,14}\/https?:\/\/([a-z0-9-]+\.)?necta\.go\.tz[:\d]*\//.test(d.official || '')) fail('site.config.json', `"resultsData.datasets.${id}.official" must be a NECTA results page (https://...necta.go.tz/...) or the Internet Archive copy of one`);
+  }
+}
+const manifestFile = path.join(ROOT, 'content/results-manifest.json');
+let resultsManifest = {};
+try { resultsManifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8')); } catch { resultsManifest = {}; }
+let manifestChanged = false;
+function resultsDataset(id) {
+  const d = config.resultsData.datasets?.[id];
+  if (!d) return null;
+  let live = null;
+  try {
+    const j = JSON.parse(fs.readFileSync(path.join(ROOT, 'results-data', id, 'meta.json'), 'utf8'));
+    if (Number.isInteger(j.total) && Number.isInteger(j.online) && /^\d{4}-\d{2}-\d{2}$/.test(j.verified || '')) {
+      live = { total: j.total, online: j.online, verified: j.verified, ...(/maktaba\.tetea\.org/.test(j.ut || '') ? { mirror: true } : {}), ...(/web\.archive\.org/.test(j.ut || '') ? { archive: true } : {}), ...(/^[0-9a-f]{6,16}$/.test(j.key || '') ? { key: j.key } : {}) };
+      // centres with results here, per first letter (the "Browse A to Z" links); the same rule as the Worker's lists
+      const letters = {};
+      for (const r of decodeList(JSON.parse(fs.readFileSync(path.join(ROOT, 'results-data', id, 'list.json'), 'utf8')), j.kind)) if (r[2]) { const L = letterOf(r[1]); letters[L] = (letters[L] || 0) + 1; }
+      live.letters = letters;
+    }
+  } catch { /* the data folder is not on this computer: use the saved numbers */ }
+  if (live && JSON.stringify(resultsManifest[id]) !== JSON.stringify(live)) { resultsManifest[id] = live; manifestChanged = true; }
+  const info = live || resultsManifest[id];
+  if (!info) return null;
+  return { ...info, official: d.official };
+}
+/* ------------------------------------------------- past papers pages (front matter `app: papers`)
+   One post per exam + year under Education > Examination Past Papers. The page is made at build time from content/papers-manifest.json
+   (titles, page counts and file ids, written by scripts/papers-manifest.mjs from the owner's separate papers project). The PDFs are NOT in this
+   repository: config.pastPapers.pdfBase says where the reader fetches them from. */
+let papersManifest = {};
+try { papersManifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'content/papers-manifest.json'), 'utf8')); } catch { papersManifest = {}; }
+{
+  const pp = config.pastPapers || {};
+  if (pp.pdfBase !== undefined && !/^\/[a-z0-9/_-]*[a-z0-9_-]$|^https:\/\/[^\s/]+(\/[^\s]*[^\s/])?$/i.test(String(pp.pdfBase))) fail('site.config.json', '"pastPapers.pdfBase" must be a path such as "/pdf" or an https address without a trailing slash');
+}
 const authors = (config.authors || []).map((a) => ({ ...a, slug: a.slug || slugify(a.name) }));
 
 /* ------------------------------------------------------------- categories */
@@ -126,7 +187,38 @@ for (const c of allCategories) {
     if (l.slug === 'page') fail('content/categories.json', 'label slug "page" is reserved');
     if (ls.has(l.slug)) fail('content/categories.json', `duplicate label "${l.slug}" in "${c.slug}"`);
     ls.add(l.slug);
+    if (l.search != null && l.search !== 'papers') fail('content/categories.json', `label "${c.slug}/${l.slug}": "search" can only be "papers"`);
+    // sections: a second level under a label (the sub-menu under the hero, e.g. Results > CSEE, ACSEE, PSLE, Guides)
+    l.sections = l.sections || [];
+    const ss = new Set();
+    for (const s of l.sections) {
+      const at = `section in "${c.slug}/${l.slug}"`;
+      if (!s.name || !s.slug || !SLUG_RE.test(s.slug)) fail('content/categories.json', `${at} needs a name and a valid slug (${s.slug})`);
+      if (s.slug === 'page') fail('content/categories.json', 'section slug "page" is reserved');
+      if (ss.has(s.slug)) fail('content/categories.json', `duplicate ${at}: "${s.slug}"`);
+      ss.add(s.slug);
+      if (!s.description) fail('content/categories.json', `${at} "${s.slug}" needs a description`);
+      if (!s.image) fail('content/categories.json', `${at} "${s.slug}" needs its own hero "image"`);
+      else if (!fs.existsSync(path.join(ROOT, String(s.image).replace(/^\//, '')))) fail('content/categories.json', `${at} "${s.slug}": image file not found: ${s.image}`);
+    }
   }
+}
+
+/* Results portals (content/portals.json): the "check your results" card on a section page, keyed "<label>/<section>".
+   Official links, steps and the clarifications FAQ. Every link must be https, every question needs an answer. */
+const portals = fs.existsSync(path.join(ROOT, 'content/portals.json')) ? readJson('content/portals.json') : {};
+for (const [key, p] of Object.entries(portals)) {
+  const at = `content/portals.json "${key}"`;
+  const [lSlug, sSlug] = key.split('/');
+  const lab = allCategories.flatMap((c) => c.labels).find((l) => l.slug === lSlug);
+  if (!lab || !(lab.sections || []).some((s) => s.slug === sSlug)) fail('content/portals.json', `"${key}" does not match a label/section in content/categories.json`);
+  if (!p.title || !p.intro) fail('content/portals.json', `${at} needs "title" and "intro"`);
+  if (!p.checked || !/^\d{4}-\d{2}-\d{2}$/.test(String(p.checked))) fail('content/portals.json', `${at} needs "checked": "YYYY-MM-DD" (the day the links were last opened)`);
+  const https = (u) => /^https:\/\/[^\s"<>]+$/.test(String(u || ''));
+  if (!p.button || !p.button.label || !https(p.button.url)) fail('content/portals.json', `${at} needs a "button" with a label and an https url`);
+  if (!Array.isArray(p.steps) || p.steps.length < 2) fail('content/portals.json', `${at} needs at least 2 "steps"`);
+  for (const q of p.faq || []) if (!q.q || !q.a) fail('content/portals.json', `${at}: every faq item needs "q" and "a"`);
+  for (const n of p.next || []) if (!n.label || !https(n.url)) fail('content/portals.json', `${at}: every "next" link needs a label and an https url`);
 }
 
 /* ------------------------------------------------------------------ posts */
@@ -186,6 +278,12 @@ for (const file of postFiles) {
     label = cat?.labels.find((l) => l.slug === data.label) || null;
     if (cat && !label) fail(where, `unknown label "${data.label}" in category "${cat.slug}". Known: ${cat.labels.map((l) => l.slug).join(', ') || '(none)'}`);
   }
+  // section: one or more sub-sections of the label (a list, or words separated by commas); see "sections" in content/categories.json
+  const sectionSlugs = Array.isArray(data.section) ? data.section.map(String) : data.section ? String(data.section).split(',').map((t) => t.trim()).filter(Boolean) : [];
+  if (sectionSlugs.length) {
+    if (!label) fail(where, '"section" needs a "label" (sections sit under a label)');
+    else for (const s of sectionSlugs) if (!(label.sections || []).some((x) => x.slug === s)) fail(where, `unknown section "${s}" in label "${label.slug}". Known: ${(label.sections || []).map((x) => x.slug).join(', ') || '(none)'}`);
+  }
   const date = parseDate(data.date, where);
   const updated = parseDate(data.updated, where, 'updated');
   if (date && date.getTime() > now + 86400000) warn(where, `date ${data.date} is in the future; it is still published by this build`);
@@ -221,10 +319,34 @@ for (const file of postFiles) {
       imageFocus = undefined;
     }
   }
+  // app: results turns the post into the results search page (see resultsDataset above); it must be one of the nine NECTA results posts
+  let app = null;
+  if (String(data.app) === 'papers') {
+    const pm = /^necta-(csee|acsee|psle|ftna|qt|gatce|dsee|dtee)-past-papers-(\d{4})$/.exec(slug);
+    if (!pm || data.label !== 'examination-past-papers') fail(where, '"app: papers" is only for necta-<csee|acsee|psle|ftna|qt|gatce|dsee|dtee>-past-papers-<year> posts with label: examination-past-papers');
+    else {
+      const entry = papersManifest[`${pm[1]}-${pm[2]}`];
+      if (!entry) fail(where, `no papers for ${pm[1]}-${pm[2]} in content/papers-manifest.json (run scripts/papers-manifest.mjs)`);
+      else {
+        const flat = entry.subjects.flatMap((s) => s[1]);
+        app = { type: 'papers', cat: pm[1], year: Number(pm[2]), exam: `${pm[1]}-${pm[2]}`, dataset: { subjects: entry.subjects, nSubjects: entry.subjects.length, papers: flat.filter((x) => x[1]).length, solutions: flat.filter((x) => x[3]).length } };
+      }
+      if (body.trim()) fail(where, 'a past papers post has no body text: the page is made from the papers list');
+    }
+  } else if (data.app !== undefined) {
+    const m = /^necta-(csee|acsee|psle|ftna|sfna|dsee|dpee|dppee|dspee|dte|qt)-results-(\d{4})$/.exec(slug);
+    if (String(data.app) !== 'results') fail(where, `unknown "app: ${data.app}" (only "results" and "papers" exist)`);
+    else if (!m || data.label !== 'results' || !sectionSlugs.includes(m[1])) fail(where, '"app: results" is only for necta-<exam>-results-<year> posts with label: results and the matching section');
+    else {
+      const ds = resultsDataset(`${m[1]}-${m[2]}`);
+      app = { type: 'results', cat: m[1], year: Number(m[2]), exam: `${m[1]}-${m[2]}`, kind: m[1] === 'psle' || m[1] === 'sfna' ? 'primary' : 'secondary', dataset: ds ? { total: ds.total, online: ds.online, verified: ds.verified, key: ds.key || '', mirror: !!ds.mirror, archive: !!ds.archive, letters: ds.letters || null } : null, pending: !ds && !(config.resultsData.unavailable || []).includes(`${m[1]}-${m[2]}`), official: ds?.official || config.resultsData.datasets?.[`${m[1]}-${m[2]}`]?.official || '' };
+      if (body.trim()) fail(where, 'a results search post has no body text: the page is made by the app');
+    }
+  }
   const post = {
-    slug, file,
+    slug, file, app,
     title: String(data.title || ''),
-    date, updated, category: cat, label, excerpt,
+    date, updated, category: cat, label, sections: sectionSlugs, excerpt,
     image: data.image ? String(data.image) : '',
     imageAlt: data.imageAlt ? String(data.imageAlt) : '',
     emailImage: data.emailImage ? String(data.emailImage) : '',
@@ -244,7 +366,7 @@ for (const file of postFiles) {
     readingMinutes: Math.max(1, Math.round(words / 200)),
     path: `/post/${cat.slug}/${label ? `${label.slug}/` : ''}${slug}/`,
   };
-  for (const m of lintPost(post)) warn(where, m);
+  if (!post.app) for (const m of lintPost(post)) warn(where, m);
   posts.push(post);
 }
 posts.sort((a, b) => b.date - a.date || a.title.localeCompare(b.title));
@@ -256,7 +378,23 @@ const SHOW_EMPTY = config.showEmptyTopics !== false; // false = hide categories 
 const categories = allCategories.map((c) => {
   const has = posts.some((p) => p.category.slug === c.slug);
   // every label is kept; `empty` marks the ones that have no post yet (their page says so, is noindex and stays out of the sitemap)
-  return { ...c, empty: !has, labels: c.labels.map((l) => ({ ...l, empty: !posts.some((p) => p.category.slug === c.slug && p.label?.slug === l.slug) })).filter((l) => SHOW_EMPTY || !l.empty) };
+  return {
+    ...c,
+    empty: !has,
+    labels: c.labels
+      .map((l) => ({
+        ...l,
+        empty: !posts.some((p) => p.category.slug === c.slug && p.label?.slug === l.slug),
+        // a section is real when it has an article or its own results portal; the portal is original, checked content, so a section with one is never "empty"
+        sections: (l.sections || [])
+          .map((s) => {
+            const portal = portals[`${l.slug}/${s.slug}`] || null;
+            return { ...s, portal, empty: !portal && !posts.some((p) => p.category.slug === c.slug && p.label?.slug === l.slug && p.sections.includes(s.slug)) };
+          })
+          .filter((s) => SHOW_EMPTY || !s.empty),
+      }))
+      .filter((l) => SHOW_EMPTY || !l.empty),
+  };
 }).filter((c) => SHOW_EMPTY || !c.empty);
 
 /* ------------------------------------------------------------------ pages */
@@ -299,7 +437,8 @@ if (errors.length) {
 
 /* ------------------------------------------------------------------ build */
 const hashFile = (f) => (fs.existsSync(path.join(ROOT, f)) ? crypto.createHash('sha1').update(fs.readFileSync(path.join(ROOT, f))).digest('hex').slice(0, 8) : '');
-const versions = { 'css/style.css': hashFile('css/style.css'), 'js/motion.js': hashFile('js/motion.js'), 'js/site.js': hashFile('js/site.js'), 'js/engage.js': hashFile('js/engage.js'), 'js/manage.js': hashFile('js/manage.js'), 'js/listen.js': hashFile('js/listen.js'), 'js/pager.js': hashFile('js/pager.js'), 'js/subscribe.js': hashFile('js/subscribe.js'), 'js/turnstile.js': hashFile('js/turnstile.js'), 'js/status-theme.js': hashFile('js/status-theme.js'), 'js/newsletter.js': hashFile('js/newsletter.js'), 'js/notfound.js': hashFile('js/notfound.js'), 'js/notfound-posts.js': hashFile('js/notfound-posts.js'), 'js/reads.js': hashFile('js/reads.js') };
+const versions = { 'css/style.css': hashFile('css/style.css'), 'css/results.css': hashFile('css/results.css'), 'js/results-app.js': hashFile('js/results-app.js'), 'js/results-codec.js': hashFile('js/results-codec.js'), 'js/motion.js': hashFile('js/motion.js'), 'js/site.js': hashFile('js/site.js'), 'js/engage.js': hashFile('js/engage.js'), 'js/manage.js': hashFile('js/manage.js'), 'js/listen.js': hashFile('js/listen.js'), 'js/pager.js': hashFile('js/pager.js'), 'js/subscribe.js': hashFile('js/subscribe.js'), 'js/turnstile.js': hashFile('js/turnstile.js'), 'js/status-theme.js': hashFile('js/status-theme.js'), 'js/newsletter.js': hashFile('js/newsletter.js'), 'js/notfound.js': hashFile('js/notfound.js'), 'js/notfound-posts.js': hashFile('js/notfound-posts.js'), 'js/reads.js': hashFile('js/reads.js') };
+if (manifestChanged && !CHECK_ONLY) fs.writeFileSync(manifestFile, `${JSON.stringify(resultsManifest, null, 2)}\n`);
 // Topic photographs: assets/img/topics/<name>-<width>.webp -> { name: [1280, 2560, 3840] }
 const heroSets = {};
 const topicsDir = path.join(ROOT, 'assets/img/topics');
@@ -316,7 +455,10 @@ const localCover = (...c) => (c.find((x) => x && !/^(https?:)?\/\//i.test(x) && 
 const shareSpecs = [{ id: 'site', source: localCover(config.heroImage, config.logo), chip: config.heroBadge || '', focus: Number.isFinite(Number(config.shareFocus)) ? Number(config.shareFocus) : 22 }];
 for (const c of categories) {
   shareSpecs.push({ id: `category-${c.slug}`, source: localCover(c.image, config.heroImage), chip: c.name });
-  for (const l of c.labels) shareSpecs.push({ id: `label-${c.slug}-${l.slug}`, source: localCover(l.image, c.image, config.heroImage), chip: l.name });
+  for (const l of c.labels) {
+    shareSpecs.push({ id: `label-${c.slug}-${l.slug}`, source: localCover(l.image, c.image, config.heroImage), chip: l.name });
+    for (const s of l.sections) shareSpecs.push({ id: `label-${c.slug}-${l.slug}-${s.slug}`, source: localCover(s.image, l.image, c.image, config.heroImage), chip: s.short || s.name });
+  }
 }
 for (const p of posts) shareSpecs.push({ id: `post-${p.slug}`, source: localCover(p.image, p.category.image, config.heroImage), chip: p.category.name, focus: p.imageFocus });
 const share = makeShareCards(shareSpecs.filter((s) => s.source), { root: ROOT, host: new URL(config.siteUrl).host, dryRun: CHECK_ONLY });
@@ -335,7 +477,8 @@ try { qa = JSON.parse(fs.readFileSync(path.join(ROOT, 'content/qa.json'), 'utf8'
 // The order of the Popular page: the articles readers open most, saved by `node scripts/popular-sync.mjs` (only the order, never the numbers)
 let popularRanked = [];
 try { popularRanked = JSON.parse(fs.readFileSync(path.join(ROOT, 'content/popular.json'), 'utf8')).ranked || []; } catch { /* none saved yet: editor's picks first */ }
-const R = createRenderer({ config, categories, posts, pages, authors, versions, heroSets, shareCards: share.cards, emailImages: email.images, qa, popularRanked });
+const resultsLastmod = Object.values(resultsManifest).map((x) => x.verified).filter(Boolean).sort().pop() || '';
+const R = createRenderer({ papersSearch: Object.keys(papersManifest).length > 0, resultsLastmod, config, categories, posts, pages, authors, versions, heroSets, shareCards: share.cards, emailImages: email.images, qa, popularRanked });
 
 const out = new Map();
 const emit = (relPath, content) => out.set(relPath, content);
@@ -349,6 +492,7 @@ const per = Number(config.postsPerPage) || 15;
 
 emit('index.html', R.home());
 emit('404.html', R.notFound());
+emit('results-shell.html', R.resultsShell());
 emit(pageFile('/category/'), R.categoriesIndex());
 emit(pageFile('/label/'), R.labelsIndex());
 emit(pageFile('/tag/'), R.tagsIndex());
@@ -370,6 +514,12 @@ for (const c of categories) {
     const inLabel = inCat.filter((p) => p.label?.slug === l.slug);
     const lp = chunk(inLabel, per);
     lp.forEach((list, i) => emit(pageFile(i === 0 ? `/category/${c.slug}/${l.slug}/` : `/category/${c.slug}/${l.slug}/page/${i + 1}/`), R.category(c, l, i + 1, lp.length, list, inLabel.length)));
+    // the sections under a label (sub-menu under the hero): /category/<cat>/<label>/<section>/ and its page 2, 3...
+    for (const s of l.sections) {
+      const inSection = inLabel.filter((p) => p.sections.includes(s.slug));
+      const sp = chunk(inSection, per);
+      sp.forEach((list, i) => emit(pageFile(i === 0 ? `/category/${c.slug}/${l.slug}/${s.slug}/` : `/category/${c.slug}/${l.slug}/${s.slug}/page/${i + 1}/`), R.category(c, l, i + 1, sp.length, list, inSection.length, s)));
+    }
   }
 }
 posts.forEach((p, i) => {
@@ -402,9 +552,11 @@ emit('feed.xml', R.feed());
 emit('feed.css', fs.readFileSync(path.join(ROOT, 'scripts/tools/feed.css'), 'utf8').replace(/\{\{name\}\}/g, config.name).replace(/\{\{rss-page\}\}/g, R.helpers.abs('/rss/')));
 emit(pageFile('/rss/'), R.rssPage());
 emit('robots.txt', R.robots());
+if (config.blockAiCrawlers) emit('license.xml', licenseXml({ abs: R.helpers.abs, answers: config.aiAnswers }));
 emit('manifest.json', R.manifest());
 emit('data/search.json', R.searchIndex());
 emit('data/tags.json', JSON.stringify(R.tagsJson()));
+if (Object.keys(papersManifest).length) emit('data/papers-index.json', JSON.stringify(buildPapersIndex(papersManifest, PAPER_ORDER, Object.fromEntries(Object.entries(PAPER_EXAMS).map(([id, x]) => [id, x.who])), Object.fromEntries(Object.entries(PAPER_EXAMS).filter(([, x]) => x.group).map(([id, x]) => [id, x.group])), PAPER_GROUPS)));
 
 if (CHECK_ONLY) {
   report(0, 0);

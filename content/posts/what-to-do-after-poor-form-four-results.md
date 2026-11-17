@@ -4,6 +4,7 @@ date: 2026-11-04
 author: Mclean Mbaga
 category: educational
 label: results
+section: [guides]
 excerpt: Disappointed with Division IV or 0? See your real options: retaking the exam, a technical certificate at NTA level 4, and the steps up to a diploma and degree.
 image: assets/posts/what-to-do-after-poor-form-four-results.webp
 imageAlt: A worker's gloved hand holds a gas torch that is welding a seam on a metal vehicle body in an open workshop

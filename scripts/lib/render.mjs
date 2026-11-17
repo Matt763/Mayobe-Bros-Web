@@ -4,6 +4,10 @@ import { escapeHtml as e, addHeadingIds } from './markdown.mjs';
 import { emailAlt } from './email-images.mjs';
 import { skeletonCss, skeletonScript, skeletonHtml } from './skeleton.mjs';
 import { popularOrder } from './popular.mjs';
+import { resultsAppHtml, resultsPostDescription, resultsPostTitle } from './results-app.mjs';
+import { papersAppHtml, EXAMS as PAPER_EXAMS, GROUPS as PAPER_GROUPS, SEARCH_ORDER as PAPER_ORDER } from './papers-app.mjs';
+import { papersSearchHtml } from './papers-search.mjs';
+import { aiRobotsGroups, AI_TERMS_DATE } from './ai-policy.mjs';
 
 /* ------------------------------------------------------------------ icons */
 const ICONS = {
@@ -22,6 +26,7 @@ const ICONS = {
   arrowLeft: '<path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>',
   arrowUp: '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',
   chevronDown: '<path d="m6 9 6 6 6-6"/>',
+  chevronRight: '<path d="m9 6 6 6-6 6"/>',
   link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
   share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/>',
   facebook: '<path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>',
@@ -53,6 +58,28 @@ const ICONS = {
   shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
   image: '<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21"/>',
   mapPin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+  external: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+  landmark: '<line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/>',
+  /* Lucide icons (ISC licence) used by the phone menu and the candidate pop-up */
+  gamepad: '<line x1="6" x2="10" y1="11" y2="11"/><line x1="8" x2="8" y1="9" y2="13"/><line x1="15" x2="15.01" y1="12" y2="12"/><line x1="18" x2="18.01" y1="10" y2="10"/><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"/>',
+  cpu: '<rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/>',
+  graduationCap: '<path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/>',
+  lightbulb: '<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/>',
+  briefcase: '<path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><rect width="20" height="14" x="2" y="6" rx="2"/>',
+  globe: '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+  newspaper: '<path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/>',
+  bookOpen: '<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>',
+  rocket: '<path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>',
+  cart: '<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>',
+  megaphone: '<path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>',
+  smartphone: '<rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/>',
+  code: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
+  sparkles: '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/>',
+  fileText: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
+  award: '<path d="m15.477 12.89 1.515 8.526a.5.5 0 0 1-.81.47l-3.58-2.687a1 1 0 0 0-1.197 0l-3.586 2.686a.5.5 0 0 1-.81-.469l1.514-8.526"/><circle cx="12" cy="8" r="6"/>',
+  monitorPlay: '<path d="m10 7 5 3-5 3Z"/><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M12 17v4"/><path d="M8 21h8"/>',
+  maximize: '<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>',
+  alert: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
 };
 
 const BRANDS = {
@@ -85,7 +112,9 @@ const LABEL_HEADINGS = (label, cat) => [
   { heading: `${label} in Focus`, sub: `Essential reads for everyone following ${cat}` },
 ];
 
-const BOT_RULES = ['GPTBot', 'CCBot', 'anthropic-ai', 'ClaudeBot', 'Google-Extended', 'Applebot-Extended', 'Bytespider', 'meta-externalagent', 'cohere-ai', 'Diffbot', 'omgilibot', 'ImagesiftBot'];
+/** True when the results Worker's pages exist and may be indexed (its sitemap is then named in robots.txt). */
+export const resultsPagesIndexed = (config) => !!(config.resultsData?.pages && ['hubs', 'all'].includes(config.resultsData.index));
+
 const NO_AD_PAGES = new Set(['legal', 'search', 'notfound']);
 
 // The newsletter switch. "newsletterAction" in site.config.json is "" (off: the footer shows the RSS button) or "api" (the footer form
@@ -99,9 +128,11 @@ export function newsletterSetting(action, flag = false) {
 export const newsletterOn = (config) => !!(config.commentsApi || '').trim() && config.newsletterAction === 'api';
 
 export function createRenderer(ctx) {
-  const { config, categories, posts, pages, authors, versions, heroSets = {}, shareCards = new Map(), emailImages = new Map(), qa = {}, popularRanked = [] } = ctx;
+  const { config, categories, posts, pages, authors, versions, heroSets = {}, shareCards = new Map(), emailImages = new Map(), qa = {}, popularRanked = [], resultsLastmod = '', papersSearch = false } = ctx;
   const base = (config.basePath || '').replace(/\/$/, '');
   const siteUrl = config.siteUrl.replace(/\/$/, '');
+  // js/copy-note.js: what a long copy from an article does (site.config.json "copyGuard"; mode 'attribute', 'limit' or 'off')
+  const copyGuard = { mode: 'attribute', minChars: 160, ...config.copyGuard };
   const api = (config.commentsApi || '').replace(/\/$/, '');
   const newsletter = newsletterOn(config);
   const adsenseId = (config.adsense?.client || '').trim();
@@ -109,6 +140,8 @@ export function createRenderer(ctx) {
   const gtmId = /^GTM-[A-Z0-9]{4,12}$/.test(config.analytics?.gtmId || '') ? config.analytics.gtmId : '';
 
   const u = (p) => `${base}${p}`;
+  // a results search page has no reading time: cards say what it is instead
+  const readTime = (x, short = false) => (x.app ? (x.app.type === 'papers' ? (short ? 'Papers' : 'Past papers') : (short ? 'Results' : 'Search results')) : `${x.readingMinutes} min${short ? '' : ' read'}`);
   const abs = (p) => `${siteUrl}${base}${p}`;
   const assetUrl = (p) => `${u('/' + p)}${versions[p] ? `?v=${versions[p]}` : ''}`;
   const resolveImage = (src) => {
@@ -164,13 +197,14 @@ export function createRenderer(ctx) {
      protection without a real header), and a policy cannot be checked by a test alone: after changing a host, load a post, press play on a video
      and press Accept with the browser console open. When ads are switched on (adsense.autoAds), re-test ads: Google's host list changes. */
   const adsOn = !!(adsenseId && config.adsense?.autoAds);
-  function contentSecurityPolicy(inlineScripts, bare) {
+  function contentSecurityPolicy(inlineScripts, bare, extraConnect = [], pdfjs = false) {
     let apiOrigin = '';
     try { apiOrigin = api ? new URL(api).origin : ''; } catch { apiOrigin = ''; }
     const hashes = inlineScripts.map((t) => `'sha256-${createHash('sha256').update(t, 'utf8').digest('base64')}'`);
     const google = ['https://*.google-analytics.com', 'https://*.analytics.google.com', 'https://*.googletagmanager.com', 'https://*.g.doubleclick.net', 'https://www.google.com'];
     const script = ["'self'", ...hashes];
-    const connect = ["'self'", apiOrigin];
+    if (pdfjs) script.push("'wasm-unsafe-eval'"); // pdf.js decodes some scanned images with WebAssembly (past-papers pages only)
+    const connect = ["'self'", apiOrigin, ...extraConnect];
     const img = ["'self'", 'data:'];
     const frame = [];
     if (!bare) {
@@ -194,16 +228,19 @@ export function createRenderer(ctx) {
     ].join('; ');
   }
   // Puts the policy first in <head> (right after the viewport tag, before any script) and a referrer policy on pages that do not set their own.
-  function withPolicy(headHtml, bare, noReferrer) {
+  function withPolicy(headHtml, bare, noReferrer, extraConnect = [], pdfjs = false) {
     const inline = [...headHtml.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
-    const tag = `<meta http-equiv="Content-Security-Policy" content="${e(contentSecurityPolicy(inline, bare))}">${noReferrer ? '' : '\n<meta name="referrer" content="strict-origin-when-cross-origin">'}`;
+    const tag = `<meta http-equiv="Content-Security-Policy" content="${e(contentSecurityPolicy(inline, bare, extraConnect, pdfjs))}">${noReferrer ? '' : '\n<meta name="referrer" content="strict-origin-when-cross-origin">'}`;
     return headHtml.replace('<meta name="viewport" content="width=device-width, initial-scale=1">', (m) => `${m}\n${tag}`);
   }
 
-  function head({ title, description, path, share = '', imageAlt = '', type = 'website', jsonLd = [], noindex = false, article = null, preload = '', noReferrer = false, bare = false, skeleton = false }) {
+  function head({ title, description, path, share = '', imageAlt = '', type = 'website', jsonLd = [], noindex = false, article = null, preload = '', noReferrer = false, bare = false, skeleton = false, connect = [], pdfjs = false }) {
     // the brand is added only when the whole title still fits in search results (about 60 characters)
+    // a title that already ends with the brand ("NECTA CSEE RESULTS 2025 | MAYOBE BROS") is not branded twice, and og:title / twitter:title drop it
+    const brandTail = new RegExp(`\\s*\\|\\s*${config.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'i');
+    const hasBrand = brandTail.test(title), shareTitle = title.replace(brandTail, '');
     const branded = `${title} | ${config.name}`;
-    const fullTitle = title === config.title || branded.length > 62 ? title : branded;
+    const fullTitle = title === config.title || hasBrand || branded.length > 62 ? title : branded;
     const url = abs(path);
     const si = shareImage(share, imageAlt);
     const img = si.url;
@@ -222,7 +259,7 @@ export function createRenderer(ctx) {
 <title>${e(fullTitle)}</title>
 <meta name="description" content="${e(description)}">
 <link rel="canonical" href="${url}">
-<meta name="robots" content="${robots}">${noReferrer ? '\n<meta name="referrer" content="no-referrer">' : ''}
+<meta name="robots" content="${robots}">${config.blockAiCrawlers ? `\n<link rel="license" type="application/rsl+xml" href="${u('/license.xml')}">` : ''}${noReferrer ? '\n<meta name="referrer" content="no-referrer">' : ''}
 <meta name="author" content="${e(config.author)}">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
@@ -237,17 +274,17 @@ export function createRenderer(ctx) {
 <meta property="og:site_name" content="${e(config.name)}">
 <meta property="og:locale" content="en_US">
 <meta property="og:type" content="${type}">
-<meta property="og:title" content="${e(title)}">
+<meta property="og:title" content="${e(shareTitle)}">
 <meta property="og:description" content="${e(description)}">
 <meta property="og:url" content="${url}">
 <meta property="og:image" content="${img}">${ogSize}
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="${e(title)}">
+<meta name="twitter:title" content="${e(shareTitle)}">
 <meta name="twitter:description" content="${e(description)}">
 <meta name="twitter:image" content="${img}">${si.alt ? `\n<meta name="twitter:image:alt" content="${e(si.alt)}">` : ''}${art}${preload ? `\n<link rel="preload" as="image" href="${preload}"${topicSet(preload) ? ` imagesrcset="${topicSet(preload)}" imagesizes="100vw"` : ''} fetchpriority="high">` : ''}${api ? `\n<link rel="preconnect" href="${new URL(api).origin}" crossorigin>` : ''}
 <script>(function(){var d=document.documentElement,t=null;d.classList.add('js');try{t=localStorage.getItem('theme')}catch(e){}if(t==='dark')d.classList.add('dark');else if(t==='light')d.classList.add('light');else if(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)d.classList.add('dark')})();</script>
 ${skeleton ? `<style>${skeletonCss}</style>\n<script>${skeletonScript(assetUrl('css/style.css'))}</script>\n<link rel="preload" as="style" href="${assetUrl('css/style.css')}">` : `<link rel="stylesheet" href="${assetUrl('css/style.css')}">`}${jsonLd.map((j) => `\n<script type="application/ld+json">${json(j)}</script>`).join('')}`;
-    return withPolicy(out, bare, noReferrer);
+    return withPolicy(out, bare, noReferrer, connect, pdfjs);
   }
 
   /* ------------------------------------------------------------- header */
@@ -258,7 +295,16 @@ ${skeleton ? `<style>${skeletonCss}</style>\n<script>${skeletonScript(assetUrl('
       const isCat = cur.cat === c.slug;
       const link = `<a class="nav-link${active(isCat)}" href="${u(`/category/${c.slug}/`)}"${isCat ? ' aria-current="page"' : ''}>${e(c.name)}${c.labels.length ? icon('chevronDown', 13, 'nav-caret') : ''}</a>`;
       if (!c.labels.length) return `<div class="nav-item">${link}</div>`;
-      return `<div class="nav-item has-sub">${link}<div class="submenu">${c.labels.map((l) => `<a href="${u(`/category/${c.slug}/${l.slug}/`)}">${e(l.name)}</a>`).join('')}</div></div>`;
+      // a label with sections (Results) opens a second panel beside it, with every section; the arrow button is for touch screens and keyboards
+      const labelItem = (l) => {
+        const href = u(`/category/${c.slug}/${l.slug}/`);
+        // a label's optional "short" name (content/categories.json) is what the menus and hero pills print; its page heading keeps "name"
+        const ln = l.short || l.name;
+        if (!(l.sections || []).length) return `<a href="${href}">${e(ln)}</a>`;
+        const id = `fly-${c.slug}-${l.slug}`;
+        return `<div class="sub-fly"><a class="sub-fly-link" href="${href}">${e(ln)}</a><button class="sub-fly-btn" type="button" aria-expanded="false" aria-controls="${id}" aria-label="Show the ${e(ln)} sections">${icon('chevronRight', 15, 'sub-fly-caret')}</button><div class="flyout" id="${id}"><a href="${href}">All ${e(ln)}</a>${l.sections.map((x) => `<a href="${u(`/category/${c.slug}/${l.slug}/${x.slug}/`)}">${e(x.name)}</a>`).join('')}</div></div>`;
+      };
+      return `<div class="nav-item has-sub">${link}<div class="submenu">${c.labels.map(labelItem).join('')}</div></div>`;
     };
     // Categories that have no post yet sit under "More". On very wide screens there is room, so they show inline instead.
     const emptyCats = categories.filter((c) => c.empty);
@@ -267,13 +313,31 @@ ${skeleton ? `<style>${skeletonCss}</style>\n<script>${skeletonScript(assetUrl('
       ? `<div class="nav-item has-sub nav-more"><button class="nav-link${active(moreOn)}" type="button" aria-haspopup="true">More${icon('chevronDown', 13, 'nav-caret')}</button><div class="submenu">${emptyCats.map((c) => `<a href="${u(`/category/${c.slug}/`)}">${e(c.name)}</a>`).join('')}</div></div>`
       : '';
     const dropdown = categories.map((c) => (c.empty ? catItem(c).replace('class="nav-item', 'class="nav-item nav-empty') : catItem(c))).join('') + more;
+    // phones and tablets: a label with sections (Results) is a nested accordion: its own link first, then every section
+    // every row of the phone menu has an icon that says what it is about (a new category or label needs an entry here; a tag is the fallback)
+    const CAT_ICON = { educational: 'graduationCap', 'business-ideas': 'lightbulb', 'world-histories': 'globe', 'video-games-updates': 'gamepad', 'technology-solutions': 'cpu', 'jobs-and-internships': 'briefcase', 'tanzania-news': 'newspaper' };
+    const LABEL_ICON = { 'online-learning': 'monitorPlay', 'study-tips': 'bookOpen', 'career-development': 'briefcase', results: 'award', 'examination-past-papers': 'fileText', startups: 'rocket', 'e-commerce': 'cart', marketing: 'megaphone', smartphones: 'smartphone', software: 'code', 'ai-tools': 'sparkles', 'cyber-security': 'shield' };
+    const subIcon = (name) => `<span class="drawer-subico" aria-hidden="true">${icon(name, 17)}</span>`;
+    const drawerLabelFor = (c) => (l) => {
+      const href = u(`/category/${c.slug}/${l.slug}/`);
+      const ic = subIcon(LABEL_ICON[l.slug] || 'tag');
+      const ln = l.short || l.name;
+      if (!(l.sections || []).length) return `<a href="${href}">${ic}<span>${e(ln)}</span></a>`;
+      return `<details class="drawer-subgroup"><summary>${ic}<span class="drawer-label">${e(ln)}</span>${icon('chevronDown', 14, 'drawer-caret')}</summary><div class="drawer-sub2"><a href="${href}">All ${e(ln)}</a>${l.sections.map((x) => `<a href="${u(`/category/${c.slug}/${l.slug}/${x.slug}/`)}">${e(x.name)}</a>`).join('')}</div></details>`;
+    };
+    // the phone menu (redesigned 2026-11-11): a search bar, a shortcut card to the exam results, one row per category with its own icon tile,
+    // groups that open smoothly (js/site.js), and a footer with the theme switch and the main pages
+    const rowIcon = (c) => `<span class="drawer-ico" aria-hidden="true">${icon(CAT_ICON[c.slug] || 'tag', 18)}</span>`;
     const drawerCats = categories
       .map((c) => {
-        const link = `<a class="drawer-link${active(cur.cat === c.slug)}" href="${u(`/category/${c.slug}/`)}">${e(c.name)}</a>`;
-        if (!c.labels.length) return `<div>${link}</div>`;
-        return `<details class="drawer-group"${cur.cat === c.slug ? ' open' : ''}><summary>${e(c.name)}${icon('chevronDown', 15, 'drawer-caret')}</summary><div class="drawer-sub"><a href="${u(`/category/${c.slug}/`)}">All ${e(c.name)}</a>${c.labels.map((l) => `<a href="${u(`/category/${c.slug}/${l.slug}/`)}">${e(l.name)}</a>`).join('')}</div></details>`;
+        if (!c.labels.length) return `<a class="drawer-row drawer-link${active(cur.cat === c.slug)}" href="${u(`/category/${c.slug}/`)}">${rowIcon(c)}<span class="drawer-label">${e(c.name)}</span>${icon('chevronRight', 16, 'drawer-go')}</a>`;
+        return `<details class="drawer-group"${cur.cat === c.slug ? ' open' : ''}><summary class="drawer-row">${rowIcon(c)}<span class="drawer-label">${e(c.name)}</span>${icon('chevronDown', 16, 'drawer-caret')}</summary><div class="drawer-sub"><a href="${u(`/category/${c.slug}/`)}">${subIcon('list')}<span>All ${e(c.name)}</span></a>${c.labels.map(drawerLabelFor(c)).join('')}</div></details>`;
       })
       .join('');
+    const resultsHub = categories.flatMap((c) => c.labels.map((l) => ({ c, l }))).find((x) => (x.l.sections || []).length);
+    const drawerResults = resultsHub
+      ? `<section class="drawer-results" aria-labelledby="drawer-res-h"><p class="drawer-res-h" id="drawer-res-h">${icon('award', 16)} Exam results</p><div class="drawer-res-chips">${resultsHub.l.sections.slice(0, 6).map((x) => `<a href="${u(`/category/${resultsHub.c.slug}/${resultsHub.l.slug}/${x.slug}/`)}">${e(x.short || x.name)}</a>`).join('')}<a class="drawer-res-all" href="${u(`/category/${resultsHub.c.slug}/${resultsHub.l.slug}/`)}">All ${icon('arrowRight', 14)}</a></div></section>`
+      : '';
     const brand = `<img src="${resolveImage(config.logoSmall || config.logo)}" alt="${e(config.name)}" width="246" height="48">`;
     return `<a class="skip-link" href="#main">Skip to content</a>
 <div class="read-progress" aria-hidden="true"><span></span></div>
@@ -300,10 +364,16 @@ ${skeleton ? `<style>${skeletonCss}</style>\n<script>${skeletonScript(assetUrl('
     <button class="icon-btn" type="button" data-drawer-close aria-label="Close menu">${icon('x')}</button>
   </div>
   <nav class="drawer-nav" aria-label="Mobile">
-    <a class="drawer-link${active(cur.type === 'home')}" href="${u('/')}">${icon('home', 18)} Home</a>
+    <button class="drawer-search" type="button" data-search-open aria-haspopup="dialog">${icon('search', 20)}<span>Search articles</span></button>
+    ${drawerResults}
+    <a class="drawer-row drawer-link${active(cur.type === 'home')}" href="${u('/')}"><span class="drawer-ico" aria-hidden="true">${icon('home', 18)}</span><span class="drawer-label">Home</span>${icon('chevronRight', 16, 'drawer-go')}</a>
     <p class="drawer-title">Categories</p>
     ${drawerCats}
   </nav>
+  <div class="drawer-foot">
+    <button class="drawer-theme theme-btn" type="button" data-theme-toggle aria-label="Switch to dark mode" title="Dark mode"><span class="drawer-ico" aria-hidden="true">${icon('monitor', 18, 'i-auto')}${icon('sun', 18, 'i-sun')}${icon('moon', 18, 'i-moon')}</span><span class="drawer-label">Appearance</span><span class="drawer-theme-state" data-theme-state>Light</span></button>
+    <p class="drawer-quick"><a href="${u('/about/')}">About</a><a href="${u('/contact/')}">Contact</a><a href="${u('/privacy-policy/')}">Privacy</a></p>
+  </div>
 </aside>`;
   }
 
@@ -402,14 +472,14 @@ ${skeleton ? `<style>${skeletonCss}</style>\n<script>${skeletonScript(assetUrl('
 ${head({ ...meta, skeleton: !meta.notFound })}
 </head>
 <body class="${meta.bodyClass || ''}"${ads ? ' data-ads="1"' : ''}>
-${meta.notFound ? '' : `${skeletonHtml(meta.bodyClass === 'page-post')}\n<link rel="stylesheet" href="${assetUrl('css/style.css')}">\n`}${header(cur)}
+${meta.notFound ? '' : `${skeletonHtml(meta.bodyClass === 'page-post' || !!meta.skeletonLeft)}\n<link rel="stylesheet" href="${assetUrl('css/style.css')}">\n${(meta.extraCss || []).map((f) => `<link rel="stylesheet" href="${assetUrl(f)}" data-extra>\n`).join('')}`}${header(cur)}
 <main id="main">
 ${body}
 </main>
-${footer()}
+${meta.footer === false ? '' : footer()}
 ${SEARCH_MODAL()}
 <script src="${assetUrl('js/motion.js')}" defer></script>
-${config.turnstileSiteKey ? `<script src="${assetUrl('js/turnstile.js')}" defer></script>\n` : ''}${meta.notFound ? `<script src="${assetUrl('js/notfound.js')}" defer></script>\n<script src="${assetUrl('js/notfound-posts.js')}" defer></script>\n` : ''}<script src="${assetUrl('js/site.js')}" defer></script>${meta.listen ? `\n<script src="${assetUrl('js/listen.js')}" defer></script>` : ''}${body.includes('class="pagination"') || body.includes('hero-listing') ? `\n<script src="${assetUrl('js/pager.js')}" defer></script>` : ''}${api ? `\n<script src="${assetUrl('js/engage.js')}" defer></script>` : ''}${api && meta.listen ? `\n<script src="${assetUrl('js/reads.js')}" defer></script>` : ''}${api && meta.contact ? `\n<script src="${assetUrl('js/contact.js')}" defer></script>` : ''}${api && meta.manage ? `\n<script src="${assetUrl('js/manage.js')}" defer></script>` : ''}${newsletter ? `\n<script src="${assetUrl('js/subscribe.js')}" defer></script>` : ''}${newsletter && meta.newsletterPage ? `\n<script src="${assetUrl('js/newsletter.js')}" defer></script>` : ''}${cfToken && !meta.manage && !meta.newsletterPage ?`\n<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${cfToken}"}'></script>` : ''}
+${config.turnstileSiteKey && !meta.app ? `<script src="${assetUrl('js/turnstile.js')}" defer></script>\n` : ''}${meta.notFound ? `<script src="${assetUrl('js/notfound.js')}" defer></script>\n<script src="${assetUrl('js/notfound-posts.js')}" defer></script>\n` : ''}<script src="${assetUrl('js/site.js')}" defer></script>${meta.listen ? `\n<script src="${assetUrl('js/listen.js')}" defer></script>` : ''}${meta.listen && copyGuard.mode !== 'off' ? `\n<script src="${assetUrl('js/copy-note.js')}" defer data-copy-mode="${copyGuard.mode}" data-copy-min="${copyGuard.minChars}"></script>` : ''}${!meta.app && (body.includes('class="pagination"') || body.includes('hero-listing')) ? `\n<script src="${assetUrl('js/pager.js')}" defer></script>` : ''}${api && !meta.app ? `\n<script src="${assetUrl('js/engage.js')}" defer></script>` : ''}${api && meta.listen ? `\n<script src="${assetUrl('js/reads.js')}" defer></script>` : ''}${api && meta.contact ? `\n<script src="${assetUrl('js/contact.js')}" defer></script>` : ''}${api && meta.manage ? `\n<script src="${assetUrl('js/manage.js')}" defer></script>` : ''}${newsletter ? `\n<script src="${assetUrl('js/subscribe.js')}" defer></script>` : ''}${(meta.moduleScripts || []).map((f) => `\n<script type="module" src="${assetUrl(f)}"></script>`).join('')}${newsletter && meta.newsletterPage ? `\n<script src="${assetUrl('js/newsletter.js')}" defer></script>` : ''}${cfToken && !meta.manage && !meta.newsletterPage ?`\n<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${cfToken}"}'></script>` : ''}
 </body>
 </html>
 `;
@@ -476,7 +546,7 @@ ${config.turnstileSiteKey ? `<script src="${assetUrl('js/turnstile.js')}" defer>
   <div class="card-body">
     <${h} class="card-title"><a class="card-link" href="${href}">${e(p.title)}</a></${h}>
     ${small ? '' : `<p class="card-excerpt">${e(p.excerpt)}</p>`}
-    <div class="card-meta">${timeTag(p.date)}<span class="meta-item">${icon('clock', 15)} ${p.readingMinutes} min read</span>${stats(p)}</div>
+    <div class="card-meta">${timeTag(p.date)}<span class="meta-item">${icon('clock', 15)} ${readTime(p)}</span>${stats(p)}</div>
   </div>
 </article>`;
   }
@@ -573,11 +643,11 @@ ${config.turnstileSiteKey ? `<script src="${assetUrl('js/turnstile.js')}" defer>
       if (labelled.length) labelled.forEach(({ l, n }) => topics.push({ name: l.name, parent: c.name, n, href: u(`/category/${c.slug}/${l.slug}/`), image: l.image || c.image }));
       else topics.push({ name: c.name, parent: 'Category', n: inCat.length, href: u(`/category/${c.slug}/`), image: c.image });
     }
-    const quick = [...posts].sort((a, b) => a.readingMinutes - b.readingMinutes || b.date - a.date).slice(0, 3);
+    const quick = posts.filter((x) => !x.app).sort((a, b) => a.readingMinutes - b.readingMinutes || b.date - a.date).slice(0, 3);
     const tagCount = new Map();
     posts.forEach((x) => x.tags.forEach((t) => tagCount.set(t, (tagCount.get(t) || 0) + 1)));
     const tags = [...tagCount.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 7).map((x) => x[0]);
-    const newest = posts[0];
+    const newest = posts.find((x) => !x.app) || posts[0];
     if (!paths.length && topics.length < 3) return '';
     const thumb = (src) => smallTopic(resolveImage(src)) || resolveImage(config.heroImage);
 
@@ -587,7 +657,7 @@ ${config.turnstileSiteKey ? `<script src="${assetUrl('js/turnstile.js')}" defer>
         <p class="dsc-path-kicker"><span class="dsc-num" aria-hidden="true">${i + 1}</span> ${e(hp.kicker || 'Reading path')}</p>
         <h3>${e(hp.title)}</h3>
         ${hp.sub ? `<p class="dsc-path-sub">${e(hp.sub)}</p>` : ''}
-        <ol class="dsc-steps">${hp.list.map((x) => `<li><a href="${u(x.path)}"><span class="dsc-step-title">${e(x.title)}</span><span class="dsc-step-meta">${x.readingMinutes} min read</span></a></li>`).join('')}</ol>
+        <ol class="dsc-steps">${hp.list.map((x) => `<li><a href="${u(x.path)}"><span class="dsc-step-title">${e(x.title)}</span><span class="dsc-step-meta">${readTime(x)}</span></a></li>`).join('')}</ol>
       </div>
     </article>`;
     const topicCard = (t) => `<li class="dsc-topic"><a href="${t.href}">
@@ -614,7 +684,7 @@ ${config.turnstileSiteKey ? `<script src="${assetUrl('js/turnstile.js')}" defer>
     <div class="dsc-tools" data-reveal-stagger>
       <div class="dsc-tool">
         <h3>${icon('clock', 18)} Short on time?</h3>
-        <ul class="dsc-quick">${quick.map((x) => `<li><a href="${u(x.path)}"><span>${e(x.title)}</span><em>${x.readingMinutes} min</em></a></li>`).join('')}</ul>
+        <ul class="dsc-quick">${quick.map((x) => `<li><a href="${u(x.path)}"><span>${e(x.title)}</span><em>${readTime(x, true)}</em></a></li>`).join('')}</ul>
       </div>
       <div class="dsc-tool dsc-listen">
         <h3>${icon('headphones', 18)} Prefer to listen?</h3>
@@ -761,23 +831,102 @@ ${discover()}`;
     return layout({ ...meta, preload: heroOpts.image }, cur, `${hero(heroOpts)}<section class="section"><div class="wrap">${inner}</div></section>`);
   }
 
-  function category(c, label, pageNo, pageCount, list, total) {
-    const root = label ? `/category/${c.slug}/${label.slug}/` : `/category/${c.slug}/`;
+  /* The sub-menu under the hero of a label that has sections (Results: All | CSEE | ACSEE | PSLE | Guides). Every item is a real
+     page with its own address, so it works without JavaScript; js/pager.js swaps the content in place when it can. Centred.
+     On phones the long names turn into the short ones (CSEE, ACSEE...) so five items fit in two rows with nothing hidden. */
+  function subnav(c, label, section) {
+    const secs = label.sections || [];
+    if (!secs.length) return '';
+    // The exam's own letters (CSEE, ACSEE, PSLE...) are the part a reader looks for: they get their own strong style (.sn-key) and the words
+    // around them ("NECTA", "Results") a quiet one (.sn-aux). The spaces stay real text, so a screen reader still says "NECTA CSEE Results".
+    const keyed = (full, short) => {
+      const i = full.indexOf(short);
+      if (i < 0) return e(full);
+      const pre = full.slice(0, i).trim(), post = full.slice(i + short.length).trim();
+      return `${pre ? `<span class="sn-aux">${e(pre)}</span> ` : ''}<span class="sn-key">${e(short)}</span>${post ? ` <span class="sn-aux">${e(post)}</span>` : ''}`;
+    };
+    const item = (href, full, short, on) =>
+      `<li><a class="subnav-link${on ? ' is-active' : ''}" href="${href}"${on ? ' aria-current="page"' : ''}>${short && short !== full ? `<span class="sn-full">${keyed(full, short)}</span><span class="sn-short"><span class="sn-key">${e(short)}</span></span>` : `<span>${e(full)}</span>`}</a></li>`;
+    return `<nav class="subnav" aria-label="${e(label.name)} sections"><ul class="subnav-list">${item(u(`/category/${c.slug}/${label.slug}/`), 'All', '', !section)}${secs
+      .map((s) => item(u(`/category/${c.slug}/${label.slug}/${s.slug}/`), s.name, s.short, section?.slug === s.slug))
+      .join('')}</ul></nav>`;
+  }
+
+  /* The "check your results" card of a section (content/portals.json): the official results page, steps, what to have ready and the
+     clarifications. Plain, checked content: no result is shown here (we cannot see anyone's result), and every link is the exam board's own. */
+  function portalCard(label, section, portal) {
+    const id = `portal-${section.slug}`;
+    const ext = (url, text, cls = '') => `<a${cls ? ` class="${cls}"` : ''} href="${e(url)}" target="_blank" rel="noopener noreferrer">${text}<span class="sr-only"> (opens in a new tab)</span></a>`;
+    const checked = fmtDate(new Date(`${portal.checked}T00:00:00Z`), true);
+    const guides = (portal.guides || []).map((slug) => posts.find((x) => x.slug === slug)).filter(Boolean);
+    const faq = (portal.faq || [])
+      .map((q) => `<details class="portal-q"><summary><span>${e(q.q)}</span>${icon('chevronDown', 18, 'portal-q-caret')}</summary><div class="portal-a"><p>${e(q.a)}</p>${q.source && /^https:\/\//.test(q.source.url || '') ? `<p class="portal-src">Source: ${ext(q.source.url, e(q.source.label || 'official page'))}</p>` : ''}</div></details>`)
+      .join('');
+    const next = (portal.next || []).map((n) => `<li>${ext(n.url, `${e(n.label)} ${icon('external', 14)}`)}${n.note ? `<span>${e(n.note)}</span>` : ''}</li>`).join('');
+    return `<section class="portal" aria-labelledby="${id}-h" data-portal="${e(section.slug)}">
+  <div class="portal-head">
+    <p class="portal-kicker">${icon('landmark', 16)} Official results portal</p>
+    <h2 class="portal-title" id="${id}-h">${e(portal.title)}</h2>
+    <p class="portal-intro">${e(portal.intro)}</p>
+    <div class="portal-actions">${ext(portal.button.url, `${e(portal.button.label)} ${icon('external', 18)}`, 'btn btn-primary btn-lg portal-btn')}</div>
+    <p class="portal-note">${icon('shield', 16)} <span>${e(config.name)} is not the exam board and cannot see anyone's result. Links last checked on ${checked}.</span></p>
+  </div>
+  <div class="portal-cols">
+    <div class="portal-col">
+      <h3>How to check</h3>
+      <ol class="portal-steps">${portal.steps.map((t) => `<li>${e(t)}</li>`).join('')}</ol>
+    </div>
+    <div class="portal-col">
+      ${portal.before && portal.before.length ? `<h3>Before you start</h3><ul class="portal-list">${portal.before.map((t) => `<li>${icon('check', 16)}<span>${e(t)}</span></li>`).join('')}</ul>` : ''}
+      ${portal.warning ? `<p class="portal-warn">${icon('alert', 18)} <span>${e(portal.warning)}</span></p>` : ''}
+    </div>
+  </div>
+  ${faq ? `<div class="portal-faq"><h3>Questions and clarifications</h3><div class="portal-qs">${faq}</div></div>` : ''}
+  <div class="portal-foot">
+    ${next ? `<div class="portal-next"><h3>What comes next</h3><ul>${next}</ul></div>` : ''}
+    <div class="portal-help">
+      <h3>Still unsure?</h3>
+      <p>Send us your question and we will answer it in plain words. Never send your candidate number or any password in a comment or message.</p>
+      <p class="portal-help-links"><a class="btn btn-outline btn-sm" href="${u('/contact/')}">Ask us a question</a>${guides.map((g) => `<a class="portal-guide" href="${u(g.path)}">${icon('arrowRight', 14)} ${e(g.title)}</a>`).join('')}</p>
+    </div>
+  </div>
+</section>`;
+  }
+
+  function category(c, label, pageNo, pageCount, list, total, section = null) {
+    const root = section ? `/category/${c.slug}/${label.slug}/${section.slug}/` : label ? `/category/${c.slug}/${label.slug}/` : `/category/${c.slug}/`;
     const hrefFor = (n) => u(n === 1 ? root : `${root}page/${n}/`);
     const chips = c.labels.length
-      ? `<div class="chips hero-chips" role="list"><a role="listitem" class="chip${label ? '' : ' is-active'}" href="${u(`/category/${c.slug}/`)}">All</a>${c.labels.map((l) => `<a role="listitem" class="chip${label?.slug === l.slug ? ' is-active' : ''}" href="${u(`/category/${c.slug}/${l.slug}/`)}">${e(l.name)}</a>`).join('')}</div>`
+      ? `<div class="chips hero-chips" role="list"><a role="listitem" class="chip${label ? '' : ' is-active'}" href="${u(`/category/${c.slug}/`)}">All</a>${c.labels.map((l) => `<a role="listitem" class="chip${label?.slug === l.slug ? ' is-active' : ''}" href="${u(`/category/${c.slug}/${l.slug}/`)}">${e(l.short || l.name)}</a>`).join('')}</div>`
       : '';
-    const title = label ? `${label.name} in ${c.name}` : c.name;
-    const desc = (label ? label.description : c.description) || c.description || `Browse ${title} articles on ${config.name}.`;
-    const img = heroFor(label ? `${c.slug}/${label.slug}` : c.slug, (label && label.image) || c.image);
-    const countLine = `<p class="hero-count">${total ? `${total} ${total === 1 ? 'article' : 'articles'}` : 'No articles yet'}</p>`;
+    const title = section ? section.name : label ? `${label.name} in ${c.name}` : c.name;
+    const desc = (section ? section.description : label ? label.description : c.description) || c.description || `Browse ${title} articles on ${config.name}.`;
+    const img = heroFor(section ? `${c.slug}/${label.slug}/${section.slug}` : label ? `${c.slug}/${label.slug}` : c.slug, (section && section.image) || (label && label.image) || c.image);
+    // a section that has its own portal always has something to show; the others say so when they have no article yet
+    const countLine = `<p class="hero-count">${total ? `${total} ${total === 1 ? 'article' : 'articles'}` : section && section.portal ? 'Results portal' : 'No articles yet'}</p>`;
+    const papersOn = !!(label && label.search === 'papers' && papersSearch);
+    const src = papersOn ? pdfSource() : null;
+    const search = papersOn
+      ? papersSearchHtml({ u, e, indexUrl: u('/data/papers-index.json'), pdfBase: src.base, trust: src.origin ? [src.origin] : [], postPath: u(`/post/${c.slug}/${label.slug}/necta-{exam}-past-papers-{year}/`), levels: PAPER_ORDER.map((id) => ({ id, name: PAPER_EXAMS[id].abbr, group: PAPER_EXAMS[id].group || '' })), groups: PAPER_GROUPS })
+      : '';
+    const menu = (label ? subnav(c, label, section) : '');
+    const lead = `${search}${menu}`; // the search bar (when the label has one) comes first, right under the hero, then the sub-menu
+    // thin pages stay out of search engines: fewer than 3 articles, unless the page carries its own results portal
+    const noindex = section ? !section.portal && total < 3 : !total || (!!label && total < 3);
+    let inner;
+    if (section && section.portal) {
+      const head = list.length ? sectionHead(`Articles on ${section.short || section.name}`, '', '') : '';
+      inner = `${lead}${portalCard(label, section, section.portal)}${head}${list.length ? `${grid(list, 'normal', '', 'h3')}${pagination(pageNo, pageCount, hrefFor, { count: total, perPage })}` : `<p class="portal-none">No ${e(section.short || section.name)} articles yet. Our <a href="${u(`/category/${c.slug}/${label.slug}/guides/`)}">Results guides</a> explain results for every exam.</p>`}`;
+    } else if (list.length) {
+      inner = `${lead}${grid(list, 'normal', '', 'h2')}${pagination(pageNo, pageCount, hrefFor, { count: total, perPage })}`;
+    } else {
+      inner = `${lead}<div class="empty-cat"><h2>No articles in ${e(title)} yet</h2><p>We only publish a topic when an article has been researched and checked. Until the first one is ready, here are our latest articles.</p></div>${sectionHead('Latest articles', 'All posts', u('/post/'))}${grid(posts.slice(0, 6))}`;
+    }
     return listingShell(
-      { title: pageNo > 1 ? `${title}, page ${pageNo}` : title, description: describe(desc, `Browse ${title} articles on ${config.name}: plain-English guides for readers in Tanzania.`, pageNo), noindex: !total || (!!label && total < 3), path: pageNo === 1 ? root : `${root}page/${pageNo}/`, adKind: 'category', share: label ? `label-${c.slug}-${label.slug}` : `category-${c.slug}`, jsonLd: [{ '@context': 'https://schema.org', '@type': 'CollectionPage', name: title, description: desc, url: abs(root) }] },
+      { ...(papersOn ? { extraCss: ['css/papers-search.css'], moduleScripts: ['js/papers-search.js'], pdfjs: true, connect: src.origin ? [src.origin] : [] } : {}), title: pageNo > 1 ? `${title}, page ${pageNo}` : title, description: describe(desc, `Browse ${title} articles on ${config.name}: plain-English guides for readers in Tanzania.`, pageNo), noindex, path: pageNo === 1 ? root : `${root}page/${pageNo}/`, adKind: 'category', share: section ? `label-${c.slug}-${label.slug}-${section.slug}` : label ? `label-${c.slug}-${label.slug}` : `category-${c.slug}`, jsonLd: [{ '@context': 'https://schema.org', '@type': 'CollectionPage', name: title, description: desc, url: abs(root), ...(section ? { isPartOf: { '@type': 'CollectionPage', name: `${label.name} in ${c.name}`, url: abs(`/category/${c.slug}/${label.slug}/`) } } : {}) }] },
       { type: 'category', cat: c.slug },
-      { image: img, kind: 'listing', title: e(label ? label.name : c.name), sub: desc, extra: `<div class="hero-foot">${countLine}${chips}</div>` },
-      list.length
-        ? `${grid(list, 'normal', '', 'h2')}${pagination(pageNo, pageCount, hrefFor, { count: total, perPage })}`
-        : `<div class="empty-cat"><h2>No articles in ${e(title)} yet</h2><p>We only publish a topic when an article has been researched and checked. Until the first one is ready, here are our latest articles.</p></div>${sectionHead('Latest articles', 'All posts', u('/post/'))}${grid(posts.slice(0, 6))}`,
+      { image: img, kind: 'listing', title: e(section ? section.name : label ? label.name : c.name), sub: desc, extra: `<div class="hero-foot">${countLine}${chips}</div>` },
+      inner,
     );
   }
 
@@ -1167,7 +1316,7 @@ ${withIds.html}
       return `<a class="pn pn-${dir}" href="${u(x.path)}" rel="${dir}">
   <img class="pn-img" src="${fallbackImage(x)}" alt="" width="${x.imageW || 1400}" height="${x.imageH || 800}" loading="lazy" decoding="async">
   <span class="pn-shade" aria-hidden="true"></span>
-  <span class="pn-body"><span class="pn-dir">${label}</span><strong class="pn-title">${e(x.title)}</strong><span class="pn-meta">${e(x.category.name)} · ${x.readingMinutes} min read</span></span>
+  <span class="pn-body"><span class="pn-dir">${label}</span><strong class="pn-title">${e(x.title)}</strong><span class="pn-meta">${e(x.category.name)} · ${readTime(x)}</span></span>
 </a>`;
     };
     return `<nav class="post-nav" aria-label="Previous and next articles">${card(older, 'prev')}${card(newer, 'next')}</nav>`;
@@ -1275,7 +1424,7 @@ ${withIds.html}
       mods.push(`<section class="rail-mod rail-next" aria-labelledby="rn-h"><a href="${u(upNext.path)}">
         <img src="${fallbackImage(upNext)}" alt="" width="${upNext.imageW || 1400}" height="${upNext.imageH || 800}" loading="lazy" decoding="async">
         <span class="rn-shade" aria-hidden="true"></span>
-        <span class="rn-body"><span class="rn-kicker" id="rn-h">${icon('arrowRight', 14)} Read next</span><strong>${e(upNext.title)}</strong><span class="rn-meta">${e(upNext.category.name)} · ${upNext.readingMinutes} min read</span></span>
+        <span class="rn-body"><span class="rn-kicker" id="rn-h">${icon('arrowRight', 14)} Read next</span><strong>${e(upNext.title)}</strong><span class="rn-meta">${e(upNext.category.name)} · ${readTime(upNext)}</span></span>
       </a></section>`);
     }
     // the reading path (set in site.config.json, homePaths) that contains this article
@@ -1286,7 +1435,7 @@ ${withIds.html}
       mods.push(`<section class="rail-mod rail-path" aria-labelledby="rp-h">
         <p class="rail-eyebrow">${icon('list', 14)} Reading path · step ${at} of ${steps.length}</p>
         <h2 class="rail-title" id="rp-h">${e(hp.title)}</h2>
-        <ol>${steps.map((x, i) => (x.slug === p.slug ? `<li class="is-here" aria-current="step"><span class="rp-n">${i + 1}</span><span class="rp-t">${e(x.title)}<em>You are here</em></span></li>` : `<li><a href="${u(x.path)}"><span class="rp-n">${i + 1}</span><span class="rp-t">${e(x.title)}<em>${x.readingMinutes} min read</em></span></a></li>`)).join('')}</ol>
+        <ol>${steps.map((x, i) => (x.slug === p.slug ? `<li class="is-here" aria-current="step"><span class="rp-n">${i + 1}</span><span class="rp-t">${e(x.title)}<em>You are here</em></span></li>` : `<li><a href="${u(x.path)}"><span class="rp-n">${i + 1}</span><span class="rp-t">${e(x.title)}<em>${readTime(x)}</em></span></a></li>`)).join('')}</ol>
       </section>`);
     }
     // the mini sign-up (same script and states as the footer form); only when the newsletter is on
@@ -1298,7 +1447,7 @@ ${withIds.html}
       </section>`);
     }
     if (latest.length) {
-      mods.push(`<section class="rail-mod rail-latest" aria-labelledby="rl-h"><h2 class="rail-title" id="rl-h">More like this</h2><ul class="rail-list">${latest.map((x) => `<li><a href="${u(x.path)}"><img src="${fallbackImage(x)}" alt="" width="96" height="64" loading="lazy" decoding="async"><span class="rl-body"><span class="rl-t">${e(x.title)}</span><em>${x.readingMinutes} min read</em></span></a></li>`).join('')}</ul></section>`);
+      mods.push(`<section class="rail-mod rail-latest" aria-labelledby="rl-h"><h2 class="rail-title" id="rl-h">More like this</h2><ul class="rail-list">${latest.map((x) => `<li><a href="${u(x.path)}"><img src="${fallbackImage(x)}" alt="" width="96" height="64" loading="lazy" decoding="async"><span class="rl-body"><span class="rl-t">${e(x.title)}</span><em>${readTime(x)}</em></span></a></li>`).join('')}</ul></section>`);
     }
     const ad = sidebarAd();
     if (ad) mods.push(ad);
@@ -1318,13 +1467,139 @@ ${withIds.html}
     </section>`);
     mods.push(`<section class="rail-mod rail-stick" aria-label="Your reading progress" data-rail-progress data-min="${p.readingMinutes}">
       <div class="rs-ring" style="--p:0" aria-hidden="true"><span data-rs-pct>0%</span></div>
-      <div class="rs-text"><p class="rs-title">Your progress</p><p class="rs-sub" data-rs-left role="status" aria-live="off">${p.readingMinutes} min read</p></div>
+      <div class="rs-text"><p class="rs-title">Your progress</p><p class="rs-sub" data-rs-left role="status" aria-live="off">${readTime(p)}</p></div>
       <button class="rs-listen" type="button" data-listen-proxy hidden>${icon('headphones', 17)} <span>Listen</span></button>
     </section>`);
     return `<aside class="post-rail" aria-label="More from ${e(config.name)}">\n      ${mods.join('\n      ')}\n    </aside>`;
   }
 
+  /* The results search page (front matter `app: results`): the site navbar and nothing else of the blog. The body is the app in
+     scripts/lib/results-app.mjs, js/results-app.js and css/results.css; data is fetched from config.resultsData.base at run time. Spec:
+     docs/superpowers/specs/2026-11-10-results-app-design.md. A post without a dataset says so plainly and stays out of search engines. */
+  function resultsAppPage(p) {
+    const a = p.app;
+    const rd = config.resultsData || {};
+    const rdBase = String(rd.base || '/results-data').replace(/\/$/, '');
+    const dataBase = /^https?:\/\//.test(rdBase) ? rdBase : u(rdBase);
+    let dataOrigin = '';
+    try { dataOrigin = /^https?:\/\//.test(rdBase) ? new URL(rdBase).origin : ''; } catch { dataOrigin = ''; }
+    const section = p.label?.sections?.find((s) => s.slug === a.cat);
+    const crumbs = [
+      { name: 'Home', href: u('/') },
+      { name: 'Results', href: u(`/category/${p.category.slug}/${p.label.slug}/`) },
+      { name: a.cat.toUpperCase(), href: u(`/category/${p.category.slug}/${p.label.slug}/${a.cat}/`) },
+      { name: String(a.year), href: '' },
+    ];
+    const siblings = posts.filter((x) => x.app && x.app.type === 'results' && x.app.cat === a.cat).sort((x, y) => y.app.year - x.app.year)
+      .map((x) => ({ label: String(x.app.year), href: u(x.path), current: x.slug === p.slug, hasData: !!x.app.dataset }));
+    const html = resultsAppHtml(p, { u, e, icon, config, dataset: a.dataset || null, pending: !!a.pending, imageCredit: p.imageCredit || '', siblings, crumbs, official: a.official || null, verified: a.dataset?.verified || '', dataBase, sectionName: section?.name || '', pagesBase: rd.pages ? u('/results') : '', browse: rd.pages && rd.index !== 'off' ? (a.dataset?.letters || null) : null, cacheKey: a.dataset?.key || versions['js/results-app.js'] || '' });
+    // the description says what the page does and how many schools it covers (from the dataset), so every exam-year has its own
+    const seoDescription = p.metaDescription || resultsPostDescription(p, a.dataset) || p.excerpt;
+    const seoTitle = p.metaTitle || resultsPostTitle(p, a.dataset) || p.title;
+    return layout(
+      {
+        title: seoTitle,
+        description: seoDescription,
+        path: p.path,
+        share: `post-${p.slug}`,
+        imageAlt: p.imageAlt,
+        type: 'website',
+        noindex: !a.dataset,
+        adKind: 'results-app',
+        bodyClass: 'page-results',
+        skeletonLeft: true,
+        app: 'results',
+        extraCss: ['css/results.css'],
+        moduleScripts: ['js/results-app.js'],
+        connect: dataOrigin ? [dataOrigin] : [],
+        jsonLd: [
+          { '@context': 'https://schema.org', '@type': 'WebPage', name: seoTitle.replace(/\s*\|\s*MAYOBE BROS\s*$/i, ''), description: seoDescription, url: abs(p.path), inLanguage: config.language, ...(a.dataset ? { datePublished: p.date.toISOString(), dateModified: a.dataset.verified } : {}), isPartOf: { '@type': 'WebSite', name: config.name, url: abs('/') } },
+          { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: crumbs.map((c, i) => ({ '@type': 'ListItem', position: i + 1, name: c.name, item: c.href ? `${siteUrl}${c.href}` : abs(p.path) })) },
+        ],
+      },
+      { type: 'post', cat: p.category.slug },
+      html,
+    );
+  }
+
+  /* results-shell.html: the page frame the results Worker (results-worker/) fills in. Same header, footer, styles and scripts as
+     every page, with tokens where the Worker writes its own text. noindex; not in sitemaps or the search index. See "Results search pages" in CLAUDE.md. */
+  function resultsShell() {
+    const html = layout(
+      { title: '%%TITLE%%', description: '%%DESC%%', path: '%%PATH%%', noindex: true, adKind: 'results-app', bodyClass: 'page-results', skeletonLeft: true, app: 'results', extraCss: ['css/results.css'], moduleScripts: ['js/results-app.js'], jsonLd: ['__JSONLD__'] },
+      { type: 'post', cat: 'educational' },
+      '%%MAIN%%',
+    );
+    const moduleTag = (/\n?(<script type="module" src="[^"]*js\/results-app\.js[^"]*"><\/script>)/.exec(html) || [])[1];
+    if (!moduleTag) throw new Error('results shell: the app script tag was not found');
+    let out = html
+      .replace(/<title>[^<]*<\/title>/, '<title>%%TITLEFULL%%</title>')
+      .replace(/<meta name="robots" content="[^"]*">/, '%%ROBOTS%%')
+      .replace(/<script type="application\/ld\+json">[^<]*<\/script>/, '%%JSONLD%%')
+      .replace(moduleTag, '%%APPJS%%');
+    // the link-preview picture: the Worker puts the exam-year's own cover card here (its default is the site card, kept in a comment)
+    const ogImage = (/<meta property="og:image" content="([^"]+)">/.exec(out) || [])[1];
+    if (!ogImage) throw new Error('results shell: og:image was not found');
+    out = out.split(ogImage).join('%%OGIMG%%');
+    // the picture's description (search engines and screen readers use it): the Worker writes the exam-year's own words here
+    out = out
+      .replace(/(<meta property="og:image:height" content="\d+">)/, '$1\n<meta property="og:image:alt" content="%%OGALT%%">')
+      .replace(/(<meta name="twitter:image" content="%%OGIMG%%">)/, '$1\n<meta name="twitter:image:alt" content="%%OGALT%%">');
+    for (const t of ['%%TITLEFULL%%', '%%ROBOTS%%', '%%JSONLD%%', '%%APPJS%%', '%%MAIN%%', '%%OGIMG%%', '%%OGALT%%']) if (!out.includes(t)) throw new Error(`results shell: token ${t} is missing`);
+    return `${out.replace(/\n+$/, '')}\n<!--app-js:${moduleTag}-->\n<!--og-image:${ogImage}-->\n`;
+  }
+
+  // Where the past-paper PDFs are read from (config.pastPapers.pdfBase: a path on this site, or the https address of the file host)
+  function pdfSource() {
+    const raw = String((config.pastPapers || {}).pdfBase || '/pdf').replace(/\/$/, '');
+    const isAbs = /^https?:\/\//.test(raw);
+    let origin = '';
+    try { origin = isAbs ? new URL(raw).origin : ''; } catch { origin = ''; }
+    return { base: isAbs ? raw : u(raw), origin };
+  }
+
+  /* The past papers page (front matter `app: papers`): hero with the year's cover, filter, one card per subject and the in-site reader.
+     Built from content/papers-manifest.json (see scripts/lib/papers-app.mjs); the PDFs are read from config.pastPapers.pdfBase. */
+  function papersAppPage(p) {
+    const a = p.app;
+    const { base: pdfBase, origin: pdfOrigin } = pdfSource();
+    const ex = PAPER_EXAMS[a.cat];
+    const siblings = posts.filter((x) => x.app && x.app.type === 'papers' && x.app.cat === a.cat).map((x) => ({ year: x.app.year, href: u(x.path) }));
+    const html = papersAppHtml(p, { u, e, image: resolveImage(p.image), imageAlt: p.imageAlt, siblings, labelHref: u(`/category/${p.category.slug}/${p.label.slug}/`), pdfBase, trust: pdfOrigin ? [pdfOrigin] : [] });
+    const crumbs = [
+      { name: 'Home', href: u('/') },
+      { name: p.category.name, href: u(`/category/${p.category.slug}/`) },
+      { name: p.label.name, href: u(`/category/${p.category.slug}/${p.label.slug}/`) },
+      { name: `${ex.abbr} ${a.year}`, href: '' },
+    ];
+    return layout(
+      {
+        title: p.metaTitle || p.title,
+        description: p.metaDescription || p.excerpt,
+        path: p.path,
+        share: `post-${p.slug}`,
+        imageAlt: p.imageAlt,
+        type: 'website',
+        adKind: 'results-app',
+        bodyClass: 'page-papers',
+        skeletonLeft: true,
+        app: 'papers',
+        pdfjs: true,
+        extraCss: ['css/papers.css'],
+        moduleScripts: ['js/papers-app.js'],
+        connect: pdfOrigin ? [pdfOrigin] : [],
+        jsonLd: [
+          { '@context': 'https://schema.org', '@type': 'CollectionPage', name: p.title.replace(/\s*\|\s*MAYOBE BROS\s*$/i, ''), description: p.excerpt, url: abs(p.path), inLanguage: config.language, isPartOf: { '@type': 'WebSite', name: config.name, url: abs('/') }, about: `${ex.name} ${a.year}` },
+          { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: crumbs.map((c, i) => ({ '@type': 'ListItem', position: i + 1, name: c.name, item: c.href ? `${siteUrl}${c.href}` : abs(p.path) })) },
+        ],
+      },
+      { type: 'post', cat: p.category.slug },
+      html,
+    );
+  }
+
   function post(p, idx) {
+    if (p.app) return p.app.type === 'papers' ? papersAppPage(p) : resultsAppPage(p);
     const related = posts
       .filter((x) => x.slug !== p.slug)
       .map((x) => ({ x, s: (x.category.slug === p.category.slug ? 3 : 0) + (x.label && x.label.slug === p.label?.slug ? 2 : 0) + x.tags.filter((t) => p.tags.includes(t)).length }))
@@ -1466,7 +1741,12 @@ ${listenPlayer()}
     const perFile = Math.max(1, Number(config.sitemapUrlsPerFile) || 200);
     const day = (d) => (d instanceof Date ? d : new Date(d)).toISOString().slice(0, 10);
     const newest = posts[0]?.updated || posts[0]?.date || new Date();
-    const when = (p) => p.updated || p.date;
+    // a results post changes when its data is checked again (the date shown on the page), not when the post file was written
+    const when = (p) => {
+      const base = p.updated || p.date;
+      const v = p.app && p.app.dataset && p.app.dataset.verified ? new Date(`${p.app.dataset.verified}T00:00:00Z`) : null;
+      return v && !Number.isNaN(v.getTime()) && v > base ? v : base;
+    };
     const url = (loc, lastmod, changefreq, priority, extra = '', info = {}) =>
       ({ loc, lastmod, info, xml: `  <url><loc>${xml(loc)}</loc><lastmod>${day(lastmod)}</lastmod>${changefreq ? `<changefreq>${changefreq}</changefreq><priority>${priority}</priority>` : ''}${extra}</url>` });
 
@@ -1476,7 +1756,8 @@ ${listenPlayer()}
     for (const t of tagTopics) if (t.list.length >= 3) pageUrls.push(url(abs(`/tag/${t.slug}/`), when(t.list[0]), 'weekly', '0.5', '', { title: `Tag: ${t.name || t.slug}` }));
     for (const a of authors) pageUrls.push(url(abs(`/author/${a.slug}/`), newest, 'monthly', '0.4', '', { title: `Author: ${a.name}` }));
 
-    const postUrls = posts.map((p) => url(abs(p.path), when(p), 'monthly', '0.9', '', { title: p.title, note: p.category.name }));
+    const indexable = posts.filter((p) => !p.app || p.app.type === 'papers' || p.app.dataset);
+    const postUrls = indexable.map((p) => url(abs(p.path), when(p), 'monthly', '0.9', '', { title: p.title, note: p.category.name }));
 
     const categoryUrls = [];
     const labelUrls = [];
@@ -1486,12 +1767,17 @@ ${listenPlayer()}
       for (const l of c.labels) {
         const mine = posts.filter((x) => x.category.slug === c.slug && x.label?.slug === l.slug);
         if (mine.length >= 3) labelUrls.push(url(abs(`/category/${c.slug}/${l.slug}/`), when(mine[0]), 'weekly', '0.6', '', { title: `${l.name} in ${c.name}` }));
+        // sections under a label (the sub-menu): listed when they carry their own results portal or have at least three articles (same rule as the page's noindex)
+        for (const s of l.sections || []) {
+          const inSection = mine.filter((x) => x.sections.includes(s.slug));
+          if (s.portal || inSection.length >= 3) labelUrls.push(url(abs(`/category/${c.slug}/${l.slug}/${s.slug}/`), inSection[0] ? when(inSection[0]) : newest, 'weekly', '0.6', '', { title: s.name }));
+        }
       }
     }
 
     // pictures: the cover and every picture inside the article, on the article's address
     const imageUrls = [];
-    for (const p of posts) {
+    for (const p of indexable) {
       const srcs = new Map();
       if (p.image) srcs.set(absImage(p.image), p.imageAlt || p.title);
       for (const m of p.html.matchAll(/<img\b[^>]*?\ssrc="([^"]+)"[^>]*>/gi)) {
@@ -1524,7 +1810,7 @@ ${listenPlayer()}
       { type: 'pages', stem: 'pages-sitemap', name: 'Pages', title: 'Home, lists, topics and authors', blurb: 'The home page, article lists, tag pages and author pages.', list: pageUrls },
       { type: 'posts', stem: 'posts-sitemap', name: 'Posts', title: 'All published articles', blurb: 'Every article, with the date it was last changed.', list: postUrls },
       { type: 'category', stem: 'category-sitemap', name: 'Categories', title: 'Category pages', blurb: 'One page for each topic area.', list: categoryUrls },
-      { type: 'label', stem: 'label-sitemap', name: 'Labels', title: 'Topic label pages', blurb: 'Label pages that have at least three articles.', list: labelUrls },
+      { type: 'label', stem: 'label-sitemap', name: 'Labels', title: 'Topic label pages', blurb: 'Label pages that have at least three articles, and the sections under a label.', list: labelUrls },
       { type: 'image', stem: 'image-sitemap', name: 'Images', title: 'Pictures in the articles', blurb: 'Each article with its cover and body pictures.', list: imageUrls },
       { type: 'video', stem: 'video-sitemap', name: 'Videos', title: 'Videos in the articles', blurb: 'Each article that has a video.', list: videoUrls },
     ].filter((g) => g.list.length);
@@ -1550,6 +1836,8 @@ ${listenPlayer()}
       const last = items.reduce((a, x) => (x.lastmod > a ? x.lastmod : a), items[0].lastmod);
       index.push(`  <sitemap><loc>${xml(abs(`/${name}`))}</loc><lastmod>${day(last)}</lastmod></sitemap>`);
     }
+    // The results Worker's sitemap (/results/sitemap.xml) is an index itself, and the protocol does not allow an index inside an index, so it is NOT
+    // listed here: robots.txt names it as its own "Sitemap:" line (see robots()), and it is submitted on its own in Search Console and Bing.
     files.set('sitemap.xml', `${head}<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${index.join('\n')}\n</sitemapindex>\n`);
     return files;
   }
@@ -1620,7 +1908,7 @@ ${listenPlayer()}
       ['Does it cost anything, and do I need an account?', 'No. The feed is free and you do not need to sign up with us. Some reader apps ask you to make an account with them, which is their rule, not ours.'],
       ['Do you know who follows the feed?', `No. Your reader asks our site for the feed file, in the same way a browser asks for a web page. We do not collect names or email addresses through the feed. Our hosting provider handles technical data as described in the <a href="${u('/privacy-policy/')}">Privacy Policy</a>.`],
       ['How do I stop following?', 'Remove the feed from your reader app. Nothing else is needed.'],
-      ['Does the feed have the whole article?', `Yes. Each item carries the full article text, so you can read it in your reader. The articles on the website have the pictures, the videos and the "Listen to this article" button.`],
+      ['Does the feed have the whole article?', `No. Each item has the title, a short summary and a link, so your reader tells you what is new and takes you to the article. The full article, with its pictures, videos and the "Listen to this article" button, is on the website.`],
     ];
     return layout(
       { title: 'Follow with RSS', description: describe(`Get new ${config.name} articles in your feed reader. Copy the feed address, paste it into a reader and read for free.`, 'No account or email needed.', 1), path: '/rss/', noindex: true, adKind: 'page', preload: image },
@@ -1657,7 +1945,6 @@ ${listenPlayer()}
 
   function feed() {
     const items = posts.slice(0, 30);
-    const absolutize = (h) => h.replace(/(href|src)="(\/(?!\/)[^"]*)"/g, (_m, a, p) => `${a}="${siteUrl}${p}"`);
     return `<?xml version="1.0" encoding="UTF-8"?>
 <?xml-stylesheet type="text/css" href="${u('/feed.css')}"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:dc="http://purl.org/dc/elements/1.1/">
@@ -1676,7 +1963,7 @@ ${items.map((p) => `  <item>
     <dc:creator>${xml(p.author)}</dc:creator>
     <category>${xml(p.category.name)}</category>
     <description>${xml(p.excerpt)}</description>
-    <content:encoded><![CDATA[${absolutize(p.html).replace(/\]\]>/g, ']]]]><![CDATA[>')}]]></content:encoded>
+    <content:encoded><![CDATA[${`<p>${e(p.excerpt)}</p><p><a href="${abs(p.path)}">Read the full article on ${e(config.name)}</a></p>`.replace(/\]\]>/g, ']]]]><![CDATA[>')}]]></content:encoded>
   </item>`).join('\n')}
 </channel>
 </rss>
@@ -1684,9 +1971,9 @@ ${items.map((p) => `  <item>
   }
 
   function robots() {
-    const lines = [
-      'User-agent: *',
-      'Allow: /',
+    // Every group repeats these rules: a bot with its own group ignores the "*" group (RFC 9309), so a tier A AI bot would otherwise be allowed into
+    // the source folders and the candidate files.
+    const closed = [
       '# Site sources and notes are not for search results',
       'Disallow: /content/',
       'Disallow: /scripts/',
@@ -1696,15 +1983,36 @@ ${items.map((p) => `  <item>
       'Disallow: /DEPLOY.md',
       'Disallow: /README.md',
       'Disallow: /site.config.json',
-      '',
-      '# Googlebot, Bingbot (also feeds Yahoo and DuckDuckGo), YandexBot and Mediapartners-Google (AdSense) follow the rules above.',
-      `Sitemap: ${abs('/sitemap.xml')}`,
+      'Disallow: /results-shell.html',
+      'Disallow: /results/data/',
+      // The lists and the small meta files hold centre names and numbers only (no candidate); the pages that search need them to draw, and so does a crawler
+      // that renders those pages. The centre files (with the candidates) and everything else under /results/data/ stay closed. The longer rule wins.
+      'Allow: /results/data/*/list.json$',
+      'Allow: /results/data/*/meta.json$',
     ];
-    if (config.blockAiCrawlers) {
-      lines.push('', '# AI training crawlers (set "blockAiCrawlers": false in site.config.json to allow). Search crawlers are not affected.');
-      for (const b of BOT_RULES) lines.push(`User-agent: ${b}`, 'Disallow: /', '');
-      lines.push('# Generic "do not use for AI training" signal announced by Microsoft and Google', 'User-agent: __usage_ai-training', 'Disallow: /', '');
-    }
+    const ai = config.blockAiCrawlers;
+    const lines = [
+      ...(ai
+        ? [
+            `# AI use terms (effective ${AI_TERMS_DATE}): ${abs('/ai-use-terms/')}`,
+            '# AI search and answer tools may read this site only with visible credit to Mayobe Bros and a link to the article. AI training and copying',
+            '# need written permission: contact the Mayobe Bros Team at ' + abs('/contact/'),
+            `License: ${abs('/license.xml')}`,
+            '',
+          ]
+        : []),
+      // Googlebot, Bingbot (also feeds Yahoo and DuckDuckGo), YandexBot, Applebot and the link-preview bots are not named anywhere in this file on
+      // purpose: they use this group. Google's AdSense crawlers (Mediapartners-Google, AdsBot-Google) ignore this group and are never refused.
+      'User-agent: *',
+      ...(ai ? ['Content-Signal: search=yes, ai-train=no'] : []),
+      'Allow: /',
+      ...closed,
+      '',
+      `Sitemap: ${abs('/sitemap.xml')}`,
+      // every single school page has its own sitemap index; the year, A to Z and region lists have another (/results/sitemap.xml holds both and is not named: it would repeat them)
+      ...(resultsPagesIndexed(config) ? [`Sitemap: ${abs('/results/sitemap-schools.xml')}`, `Sitemap: ${abs('/results/sitemap-hubs.xml')}`] : []),
+    ];
+    if (ai) lines.push('', ...aiRobotsGroups({ closed, answers: config.aiAnswers }));
     return lines.join('\n').replace(/\n+$/, '\n');
   }
 
@@ -1715,6 +2023,7 @@ ${items.map((p) => `  <item>
           name: config.name,
           short_name: config.name.replace(/\s+/g, ''),
           description: config.slogan,
+          id: u('/'),
           start_url: u('/'),
           scope: u('/'),
           display: 'standalone',
@@ -1725,6 +2034,11 @@ ${items.map((p) => `  <item>
             { src: u('/assets/img/icon-512.png'), sizes: '512x512', type: 'image/png', purpose: 'any' },
           ],
           categories: ['news', 'education', 'lifestyle'],
+          // long-press the installed icon: straight to the two tools people come for (only pages that exist on this build)
+          shortcuts: [
+            { name: 'Past papers', short_name: 'Past papers', url: u('/category/educational/examination-past-papers/') },
+            { name: 'Exam results', short_name: 'Results', url: u('/category/educational/results/') },
+          ],
         },
         null,
         2,
@@ -1745,5 +2059,5 @@ ${items.map((p) => `  <item>
     );
   }
 
-  return { authorsIndex, popularList, rssPage, sitemapHtml, tagTopics, tagsIndex, tagsJson, tagPage, home, category, categoriesIndex, labelsIndex, postsDirectory, popular, searchPage, staticPage, authorPage, notFound, post, aliasStub, sitemaps, feed, robots, manifest, searchIndex, helpers: { u, abs } };
+  return { resultsShell, authorsIndex, popularList, rssPage, sitemapHtml, tagTopics, tagsIndex, tagsJson, tagPage, home, category, categoriesIndex, labelsIndex, postsDirectory, popular, searchPage, staticPage, authorPage, notFound, post, aliasStub, sitemaps, feed, robots, manifest, searchIndex, helpers: { u, abs } };
 }

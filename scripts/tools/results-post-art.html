@@ -1,0 +1,597 @@
+<!doctype html>
+<!-- Draws the nine cover pictures of the NECTA results posts (assets/posts/necta-<exam>-results-<year>.webp).
+     Open it through a small local server (a browser blocks the logo file on file://), for example
+       python3 -m http.server 8011 --bind 127.0.0.1 --directory scripts/tools
+     then http://127.0.0.1:8011/results-post-art.html?scene=csee-2025   (?scene=list shows every name, ?scene=sheet shows all nine small).
+     Photo covers: ?scene=csee-2010&photo=file.jpg&layout=split-left|split-right|arch|frame|top-band|diagonal|circle|bottom-band|centre-band&tone=navy|emerald|burgundy|charcoal|plum|forest&fx=50&fy=50 (see the photo block below).
+     Nine scenes, each with its own style: csee-2025 / 2024 / 2023, acsee-2025 / 2024 / 2023, psle-2025 / 2024 / 2023.
+     Every scene has the same three ingredients and nothing else is a photograph or a copy:
+       - the NECTA logo (scripts/tools/necta-logo.png, NECTA's own file from necta.go.tz, enlarged), shown only to say whose results the post is about,
+       - the flag of Tanzania, drawn here from its published geometry (72 x 48, green and blue triangles, black band with yellow edges) and
+         made to wave: the flag is cut into thin strips and every strip is moved and shaded along a travelling wave,
+       - the exam name, the level and the year, written in text.
+     Render each scene at 1400 x 788 (viewport screenshot) and convert with cwebp (see docs/image-sources.md). Nothing is requested from the network. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Results post art</title>
+<style>html,body{margin:0;background:#111}svg{display:block;width:1400px;height:788px}#sheet svg{width:466px;height:262px;display:inline-block;margin:0}#sheet{width:1400px;line-height:0}</style>
+</head>
+<body>
+<div id="stage"></div>
+<script>
+/* ---------- helpers ---------- */
+var W = 1400, H = 788, LOGO = 'necta-logo.png';
+var EXAMS = {
+  csee:  { abbr: 'CSEE',  level: 'FORM FOUR',      full: 'CERTIFICATE OF SECONDARY EDUCATION EXAMINATION' },
+  acsee: { abbr: 'ACSEE', level: 'FORM SIX',       full: 'ADVANCED CERTIFICATE OF SECONDARY EDUCATION EXAMINATION' },
+  psle:  { abbr: 'PSLE',  level: 'STANDARD SEVEN', full: 'PRIMARY SCHOOL LEAVING EXAMINATION' },
+  ftna: { abbr: 'FTNA', level: 'FORM TWO', full: 'FORM TWO NATIONAL ASSESSMENT' },
+  sfna: { abbr: 'SFNA', level: 'STANDARD FOUR', full: 'STANDARD FOUR NATIONAL ASSESSMENT' },
+  dsee: { abbr: 'DSEE', level: 'DIPLOMA', full: 'DIPLOMA IN SECONDARY EDUCATION EXAMINATION' },
+  dpee: { abbr: 'DPEE', level: 'DIPLOMA', full: 'TEACHERS COLLEGE DIPLOMA EXAMINATION' },
+  dppee: { abbr: 'DPPEE', level: 'DIPLOMA', full: 'TEACHERS COLLEGE DIPLOMA EXAMINATION' },
+  dspee: { abbr: 'DSPEE', level: 'DIPLOMA', full: 'TEACHERS COLLEGE DIPLOMA EXAMINATION' },
+  dte: { abbr: 'DTE', level: 'DIPLOMA', full: 'DIPLOMA IN TECHNICAL EDUCATION EXAMINATION' },
+  qt: { abbr: 'QT', level: 'QUALIFYING TEST', full: 'QUALIFYING TEST' }
+};
+var NAMES = ['csee-2025', 'csee-2024', 'csee-2023', 'acsee-2025', 'acsee-2024', 'acsee-2023', 'psle-2025', 'psle-2024', 'psle-2023'];
+var ORG = 'NATIONAL EXAMINATIONS COUNCIL OF TANZANIA';
+var FOOT = 'mayobebros.com  ·  An independent guide, not run by NECTA';
+var E, Y;
+function f(n) { return Math.round(n * 10) / 10; }
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+var ctx = document.createElement('canvas').getContext('2d');
+function measure(str, fam, wt, style) { ctx.font = (style || 'normal') + ' ' + wt + ' 100px ' + fam; return ctx.measureText(str).width / 100; }
+/* the font size that makes `str` exactly `width` wide (sp = letter spacing in em) */
+function fit(str, fam, wt, width, sp, style) { return width / (measure(str, fam, wt, style) + str.length * (sp || 0)); }
+function T(x, y, str, o) {
+  return '<text x="' + f(x) + '" y="' + f(y) + '" font-family="' + o.fam + '" font-weight="' + (o.wt || 700) + '" font-size="' + f(o.size) + '" fill="' + (o.fill || '#fff') + '"' +
+    (o.anchor ? ' text-anchor="' + o.anchor + '"' : '') + (o.sp ? ' letter-spacing="' + f(o.sp * o.size) + '"' : '') + (o.style ? ' font-style="' + o.style + '"' : '') + (o.extra ? ' ' + o.extra : '') + '>' + esc(str) + '</text>';
+}
+function foot(x, y, fill, anchor, fam, size) { return T(x, y, FOOT, { fam: fam || 'Lato, sans-serif', wt: 600, size: size || 15, fill: fill, anchor: anchor || 'start', sp: 0.03 }); }
+function rnd(seed) { var s = seed; return function () { s = (s * 1664525 + 1013904223) % 4294967296; return s / 4294967296; }; }
+/* the NECTA logo on a white disc */
+function badge(cx, cy, r, ring, ringW, extra) {
+  return '<g ' + (extra || '') + '><circle cx="' + f(cx) + '" cy="' + f(cy) + '" r="' + f(r) + '" fill="#fff"' + (ring ? ' stroke="' + ring + '" stroke-width="' + ringW + '"' : '') + '/>' +
+    '<image href="' + LOGO + '" x="' + f(cx - r * 0.9) + '" y="' + f(cy - r * 0.9) + '" width="' + f(r * 1.8) + '" height="' + f(r * 1.8) + '"/></g>';
+}
+/* the flag of Tanzania, flying. It is drawn flat (72 x 48 units, the published geometry), cut into thin strips, and every strip is placed on a
+   travelling wave: moved along the curve, sheared to follow its slope, and shaded (darker where the cloth turns away, lighter where it turns to the
+   light). It is painted on a canvas (one bitmap per strip, so no seams show between strips) and placed in the picture as an <image>. */
+function flatFlag(fw, fh, k) {
+  var c = document.createElement('canvas'), g;
+  c.width = Math.ceil(fw * k); c.height = Math.ceil(fh * k);
+  g = c.getContext('2d'); g.scale(c.width / 72, c.height / 48);
+  g.fillStyle = '#1EB53A'; g.beginPath(); g.moveTo(0, 48); g.lineTo(0, 0); g.lineTo(72, 0); g.closePath(); g.fill();
+  g.fillStyle = '#00A3DD'; g.beginPath(); g.moveTo(72, 0); g.lineTo(72, 48); g.lineTo(0, 48); g.closePath(); g.fill();
+  g.beginPath(); g.rect(0, 0, 72, 48); g.clip();
+  g.lineCap = 'butt'; g.strokeStyle = '#FCD116'; g.lineWidth = 19; g.beginPath(); g.moveTo(0, 48); g.lineTo(72, 0); g.stroke();
+  g.strokeStyle = '#000'; g.lineWidth = 13; g.beginPath(); g.moveTo(0, 48); g.lineTo(72, 0); g.stroke();
+  return c;
+}
+function waveFlag(o) {
+  var id = o.id || 'wf', fw = o.w, fh = fw * 2 / 3, k = 2, i;
+  var amp = o.amp == null ? 0.42 : o.amp, waves = o.waves || 1.6, ph = o.phase || 0, flat = flatFlag(fw, fh, k);
+  var SP = 4, n = Math.floor(flat.width / SP), sw = flat.width / n / k, ov = 1 / k; // every strip is SP whole source pixels wide (+1 pixel of overlap)
+  var st = [], px = 0, py = 0, minY = 0, maxY = fh, maxX = 0;
+  for (i = 0; i < n; i++) {
+    var t = (i + 0.5) / n, th = amp * (0.12 + 0.88 * t) * Math.cos(2 * Math.PI * waves * t + ph), c = Math.cos(th), sn = Math.sin(th);
+    st.push({ px: px, py: py, c: c, s: sn });
+    px += sw * c; py += sw * sn; minY = Math.min(minY, py, st[i].py); maxY = Math.max(maxY, py + fh, st[i].py + fh); maxX = Math.max(maxX, px);
+  }
+  var pad = 14, cw = Math.ceil((maxX + 2 * pad) * k), ch = Math.ceil((maxY - minY + 2 * pad) * k), cv = document.createElement('canvas'), g;
+  cv.width = cw; cv.height = ch; g = cv.getContext('2d'); g.imageSmoothingQuality = 'high';
+  g.scale(k, k); g.translate(pad, pad - minY);
+  for (i = 0; i < n; i++) {
+    var q = st[i];
+    g.save(); g.transform(q.c, q.s, 0, 1, q.px, q.py);
+    var sx = i * SP, sWd = Math.min(SP + 1, flat.width - sx);
+    g.drawImage(flat, sx, 0, sWd, flat.height, 0, 0, sWd / k, fh);
+    g.fillStyle = q.s > 0 ? 'rgba(0,0,0,' + Math.min(0.34, q.s * 0.75).toFixed(3) + ')' : 'rgba(255,255,255,' + Math.min(0.17, -q.s * 0.4).toFixed(3) + ')';
+    g.fillRect(0, 0, sWd / k, fh);
+    g.restore();
+  }
+  var ix = o.x - pad, iy = o.y - (pad - minY) ;
+  var defs = '<defs><filter id="' + id + 'sh" x="-20%" y="-30%" width="150%" height="170%"><feDropShadow dx="' + f(fh * 0.03) + '" dy="' + f(fh * 0.07) + '" stdDeviation="' + f(fh * 0.05) + '" flood-color="' + (o.shadowColor || '#000') + '" flood-opacity="' + (o.shadow == null ? 0.4 : o.shadow) + '"/></filter>' +
+    '<linearGradient id="' + id + 'pole" x1="0" x2="1"><stop offset="0" stop-color="#7d8590"/><stop offset=".4" stop-color="#f4f6f8"/><stop offset="1" stop-color="#6b727c"/></linearGradient>' +
+    '<radialGradient id="' + id + 'ball" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#fff3b0"/><stop offset=".5" stop-color="#f2b705"/><stop offset="1" stop-color="#9a6a00"/></radialGradient></defs>';
+  var poleX = o.x - 9, pt = o.poleTop == null ? o.y - 40 : o.poleTop, pb = o.poleBottom == null ? o.y + fh + 120 : o.poleBottom;
+  var pole = '<rect x="' + f(poleX) + '" y="' + f(pt) + '" width="11" height="' + f(pb - pt) + '" rx="5" fill="url(#' + id + 'pole)"/>' +
+    '<circle cx="' + f(poleX + 5.5) + '" cy="' + f(pt - 3) + '" r="12" fill="url(#' + id + 'ball)"/>';
+  var flag = '<image href="' + cv.toDataURL('image/png') + '" x="' + f(ix) + '" y="' + f(iy) + '" width="' + f(cw / k) + '" height="' + f(ch / k) + '" filter="url(#' + id + 'sh)"' + (o.rot ? ' transform="rotate(' + o.rot + ' ' + o.x + ' ' + o.y + ')"' : '') + '/>';
+  return defs + flag + pole;
+}
+function svg(inner) { return '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1400 788" width="1400" height="788">' + inner + '</svg>'; }
+function hill(base, amp, freq, ph, fill, extra) {
+  var d = 'M0 788V' + f(base), x;
+  for (x = 0; x <= 1400; x += 14) d += 'L' + x + ' ' + f(base - amp * (0.55 * Math.sin(x * freq + ph) + 0.45 * Math.sin(x * freq * 2.3 + ph * 1.7)));
+  return '<path d="' + d + 'V788Z" fill="' + fill + '"' + (extra ? ' ' + extra : '') + '/>';
+}
+
+var SCENES = {};
+
+/* ================= CSEE 2025: aurora glass (navy and teal, glass panel left, flag right) ================= */
+SCENES['csee-2025'] = function () {
+  var F = 'Noto Sans, Lato, sans-serif', s = Math.min(fit('NECTA CSEE', F, 800, 590, 0), fit('RESULTS', F, 800, 590, 0));
+  var o = '<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#050f2b"/><stop offset=".55" stop-color="#093350"/><stop offset="1" stop-color="#0c6a6c"/></linearGradient>' +
+    '<radialGradient id="g1"><stop offset="0" stop-color="#2dd4bf" stop-opacity=".6"/><stop offset="1" stop-color="#2dd4bf" stop-opacity="0"/></radialGradient>' +
+    '<radialGradient id="g2"><stop offset="0" stop-color="#3b82f6" stop-opacity=".55"/><stop offset="1" stop-color="#3b82f6" stop-opacity="0"/></radialGradient>' +
+    '<linearGradient id="yr" x1="0" x2="1"><stop offset="0" stop-color="#5eead4"/><stop offset="1" stop-color="#7dd3fc"/></linearGradient>' +
+    '<linearGradient id="glass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".16"/><stop offset="1" stop-color="#fff" stop-opacity=".04"/></linearGradient>' +
+    '<pattern id="grid" width="56" height="56" patternUnits="userSpaceOnUse"><path d="M56 0H0V56" fill="none" stroke="#fff" stroke-opacity=".05"/></pattern></defs>' +
+    '<rect width="1400" height="788" fill="url(#bg)"/><rect width="1400" height="788" fill="url(#grid)"/>' +
+    '<circle cx="1110" cy="300" r="480" fill="url(#g1)"/><circle cx="220" cy="720" r="430" fill="url(#g2)"/>' +
+    '<circle cx="1110" cy="330" r="260" fill="none" stroke="#fff" stroke-opacity=".08" stroke-width="2"/><circle cx="1110" cy="330" r="360" fill="none" stroke="#fff" stroke-opacity=".06" stroke-width="2"/><circle cx="1110" cy="330" r="470" fill="none" stroke="#fff" stroke-opacity=".05" stroke-width="2"/>';
+  o += waveFlag({ id: 'a', x: 925, y: 150, w: 420, amp: 0.4, waves: 1.5, phase: 0.2, poleTop: 96, poleBottom: 700 });
+  // floating grade chips
+  [['A', 1010, 590, 62], ['B', 1130, 640, 50], ['C', 1235, 585, 44]].forEach(function (c, i) {
+    o += '<g><rect x="' + (c[1] - c[3] / 2 * 1.0) + '" y="' + (c[2] - c[3] / 2) + '" width="' + c[3] + '" height="' + c[3] + '" rx="' + c[3] * 0.28 + '" fill="url(#glass)" stroke="#fff" stroke-opacity=".28"/>' +
+      T(c[1] + c[3] / 2 - c[3] / 2, c[2] + c[3] * 0.18, c[0], { fam: F, wt: 800, size: c[3] * 0.56, fill: '#a7f3d0', anchor: 'middle' }) + '</g>';
+  });
+  o += '<rect x="64" y="96" width="700" height="590" rx="38" fill="url(#glass)" stroke="#fff" stroke-opacity=".22" stroke-width="1.5"/>' +
+    '<path d="M100 97.5H728" stroke="#fff" stroke-opacity=".55" stroke-width="1.5" stroke-linecap="round"/>';
+  o += badge(172, 196, 48, '#5eead4', 3) +
+    T(238, 190, 'NATIONAL EXAMINATIONS', { fam: F, wt: 700, size: 18, fill: '#a7f3d0', sp: 0.12 }) + T(238, 216, 'COUNCIL OF TANZANIA', { fam: F, wt: 700, size: 18, fill: '#a7f3d0', sp: 0.12 });
+  o += '<rect x="112" y="272" width="212" height="40" rx="20" fill="#2dd4bf"/>' + T(218, 299, E.level + '  ·  ' + E.abbr, { fam: F, wt: 800, size: 17, fill: '#042f2e', anchor: 'middle', sp: 0.08 });
+  o += T(112, 410, 'NECTA CSEE', { fam: F, wt: 800, size: s, fill: '#fff' }) + T(112, 410 + s * 1.02, 'RESULTS', { fam: F, wt: 800, size: s, fill: '#fff' });
+  o += T(108, 650, Y, { fam: F, wt: 800, size: 150, fill: 'url(#yr)' });
+  o += foot(64, 738, '#9fd8d3', 'start', F);
+  return o;
+};
+
+/* ================= CSEE 2024: editorial poster (cream paper, black rule, serif, coral panel) ================= */
+SCENES['csee-2024'] = function () {
+  var F = "'DejaVu Serif', Georgia, serif", C = '#e4572e', s1 = fit('NECTA CSEE', F, 700, 790), s2 = fit('RESULTS', F, 700, 790);
+  var o = '<defs><filter id="paper"><feTurbulence type="fractalNoise" baseFrequency=".8" numOctaves="2" seed="4"/><feColorMatrix values="0 0 0 0 .3  0 0 0 0 .25  0 0 0 0 .15  0 0 0 .07 0"/></filter>' +
+    '<linearGradient id="cor" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f0643a"/><stop offset="1" stop-color="#c9391a"/></linearGradient></defs>' +
+    '<rect width="1400" height="788" fill="#f4eee1"/><rect width="1400" height="788" filter="url(#paper)"/>' +
+    '<path d="M985 0H1400V788H905Z" fill="url(#cor)"/>' +
+    '<path d="M985 0L905 788" stroke="#111" stroke-width="8"/>';
+  o += waveFlag({ id: 'b', x: 1030, y: 138, w: 300, amp: 0.36, waves: 1.3, phase: 1.0, poleTop: 90, poleBottom: 520, shadow: 0.45 });
+  o += badge(1170, 640, 70, '#111', 6) + T(1170, 746, 'RESULTS ' + Y, { fam: 'Liberation Sans Narrow, sans-serif', wt: 700, size: 20, fill: '#fff', anchor: 'middle', sp: 0.14 });
+  o += '<rect x="70" y="86" width="790" height="12" fill="#111"/>' +
+    T(70, 66, ORG, { fam: 'Liberation Sans Narrow, sans-serif', wt: 700, size: 19, fill: '#111', sp: 0.16 });
+  o += T(66, 98 + s1 * 0.8, 'NECTA CSEE', { fam: F, wt: 700, size: s1, fill: '#111' }) + T(66, 98 + s1 * 0.8 + s2 * 0.95, 'RESULTS', { fam: F, wt: 700, size: s2, fill: C });
+  var yb = 98 + s1 * 0.8 + s2 * 0.95;
+  o += '<rect x="70" y="' + f(yb + 34) + '" width="790" height="4" fill="#111"/>' +
+    T(70, yb + 84, E.level + ' EXAMINATION', { fam: 'Liberation Sans Narrow, sans-serif', wt: 700, size: 26, fill: '#111', sp: 0.2 }) +
+    T(60, 712, Y, { fam: F, wt: 700, size: fit(Y, F, 700, 800), fill: '#111' });
+  o += foot(70, 758, '#5a5347', 'start', 'Liberation Sans Narrow, sans-serif', 16);
+  return o;
+};
+
+/* ================= CSEE 2023: blueprint (cobalt, drawing grid, mono type, flag in a dimensioned frame) ================= */
+SCENES['csee-2023'] = function () {
+  var F = "'DejaVu Sans Mono', monospace", s = fit('NECTA CSEE', F, 700, 650);
+  var o = '<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2154d4"/><stop offset="1" stop-color="#14297a"/></linearGradient>' +
+    '<pattern id="g1" width="28" height="28" patternUnits="userSpaceOnUse"><path d="M28 0H0V28" fill="none" stroke="#fff" stroke-opacity=".08"/></pattern>' +
+    '<pattern id="g2" width="140" height="140" patternUnits="userSpaceOnUse"><path d="M140 0H0V140" fill="none" stroke="#fff" stroke-opacity=".2"/></pattern></defs>' +
+    '<rect width="1400" height="788" fill="url(#bg)"/><rect width="1400" height="788" fill="url(#g1)"/><rect width="1400" height="788" fill="url(#g2)"/>' +
+    '<rect x="34" y="34" width="1332" height="720" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="2"/><rect x="46" y="46" width="1308" height="696" fill="none" stroke="#fff" stroke-opacity=".3"/>' +
+    '<circle cx="1040" cy="380" r="330" fill="none" stroke="#fff" stroke-opacity=".16" stroke-dasharray="4 10"/><circle cx="1040" cy="380" r="240" fill="none" stroke="#fff" stroke-opacity=".12"/>' +
+    '<rect x="840" y="140" width="420" height="440" fill="none" stroke="#fde047" stroke-width="2" stroke-dasharray="12 8"/>';
+  [[840, 140], [1260, 140], [840, 580], [1260, 580]].forEach(function (p) { o += '<path d="M' + (p[0] - 14) + ' ' + p[1] + 'H' + (p[0] + 14) + 'M' + p[0] + ' ' + (p[1] - 14) + 'V' + (p[1] + 14) + '" stroke="#fde047" stroke-width="3"/>'; });
+  o += waveFlag({ id: 'c', x: 912, y: 232, w: 300, amp: 0.34, waves: 1.4, phase: 0.6, poleTop: 176, poleBottom: 540, shadow: 0.35 });
+  // dimension line under the frame
+  o += '<path d="M840 612H1260M840 600V624M1260 600V624" stroke="#bfdbfe" stroke-width="2"/>' + T(1050, 646, 'FLAG  3 : 2', { fam: F, wt: 700, size: 18, fill: '#bfdbfe', anchor: 'middle', sp: 0.1 });
+  o += T(90, 132, ORG, { fam: F, wt: 700, size: 15, fill: '#bfdbfe', sp: 0.06 });
+  o += T(86, 270, 'NECTA CSEE', { fam: F, wt: 700, size: s, fill: '#fff' }) + T(86, 270 + s * 1.05, 'RESULTS', { fam: F, wt: 700, size: s, fill: '#fff' });
+  o += '<rect x="90" y="' + f(270 + s * 1.05 + 36) + '" width="300" height="104" fill="#fde047"/>' + T(240, 270 + s * 1.05 + 36 + 82, Y, { fam: F, wt: 700, size: 96, fill: '#14297a', anchor: 'middle' });
+  o += T(420, 270 + s * 1.05 + 84, E.level, { fam: F, wt: 700, size: 30, fill: '#fff', sp: 0.08 }) + T(420, 270 + s * 1.05 + 120, 'CERTIFICATE OF SECONDARY', { fam: F, wt: 400, size: 16, fill: '#bfdbfe' }) + T(420, 270 + s * 1.05 + 142, 'EDUCATION EXAMINATION', { fam: F, wt: 400, size: 16, fill: '#bfdbfe' });
+  o += badge(160, 646, 58, '#fff', 3, '') + '<circle cx="160" cy="646" r="72" fill="none" stroke="#fff" stroke-opacity=".7" stroke-dasharray="6 7" stroke-width="2"/>';
+  o += foot(250, 652, '#bfdbfe', 'start', F, 15);
+  return o;
+};
+
+/* ================= ACSEE 2025: royal sunburst (deep purple, gold, serif, centred text, flag on the left) ================= */
+SCENES['acsee-2025'] = function () {
+  var F = "'Liberation Serif', 'DejaVu Serif', serif", cx = 915, s = Math.min(fit('NECTA ACSEE', F, 700, 660), 118);
+  var o = '<defs><radialGradient id="bg" cx=".6" cy="1.0" r="1.2"><stop offset="0" stop-color="#6d28d9"/><stop offset=".5" stop-color="#2e1065"/><stop offset="1" stop-color="#0f0a2e"/></radialGradient>' +
+    '<linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff0b8"/><stop offset=".5" stop-color="#e9b949"/><stop offset="1" stop-color="#b8821f"/></linearGradient></defs>' +
+    '<rect width="1400" height="788" fill="url(#bg)"/>';
+  for (var k = 0; k < 28; k++) {
+    var a1 = Math.PI * (1.0 + k / 27 * 1.0) - 0.03, a2 = a1 + 0.06, R = 1900, ox = 860, oy = 860;
+    o += '<path d="M' + ox + ' ' + oy + 'L' + f(ox + R * Math.cos(a1)) + ' ' + f(oy + R * Math.sin(a1)) + 'L' + f(ox + R * Math.cos(a2)) + ' ' + f(oy + R * Math.sin(a2)) + 'Z" fill="#f5d27a" fill-opacity="' + (k % 2 ? 0.07 : 0.03) + '"/>';
+  }
+  o += '<rect x="34" y="34" width="1332" height="720" rx="10" fill="none" stroke="#e9b949" stroke-opacity=".8" stroke-width="2.5"/><rect x="48" y="48" width="1304" height="692" rx="6" fill="none" stroke="#e9b949" stroke-opacity=".35" stroke-width="1.2"/>';
+  o += waveFlag({ id: 'd', x: 150, y: 150, w: 330, amp: 0.4, waves: 1.5, phase: 0.1, poleTop: 100, poleBottom: 700, shadowColor: '#0b0420', shadow: 0.55 });
+  o += badge(cx, 150, 62, '#e9b949', 5) + T(cx, 246, ORG, { fam: F, wt: 700, size: 17, fill: '#f5d27a', anchor: 'middle', sp: 0.2 });
+  o += T(cx, 350, 'NECTA ACSEE', { fam: F, wt: 700, size: s, fill: 'url(#gold)', anchor: 'middle' }) + T(cx, 350 + s * 0.98, 'RESULTS', { fam: F, wt: 700, size: s, fill: 'url(#gold)', anchor: 'middle' });
+  var yl = 350 + s * 0.98 + 38;
+  o += '<path d="M' + (cx - 250) + ' ' + yl + 'H' + (cx - 16) + 'M' + (cx + 16) + ' ' + yl + 'H' + (cx + 250) + '" stroke="#e9b949" stroke-width="2"/><path d="M' + cx + ' ' + (yl - 11) + 'l11 11l-11 11l-11 -11z" fill="#e9b949"/>';
+  o += T(cx, yl + 138, Y, { fam: F, wt: 700, size: 140, fill: '#fff', anchor: 'middle' }) + T(cx, yl + 184, E.level + '  ·  ADVANCED LEVEL', { fam: F, wt: 700, size: 19, fill: '#f5d27a', anchor: 'middle', sp: 0.24 });
+  o += foot(cx, 716, '#c9b8f2', 'middle', F, 15);
+  return o;
+};
+
+/* ================= ACSEE 2024: diagonal split (charcoal and amber, bold narrow italic type, big tilted flag) ================= */
+SCENES['acsee-2024'] = function () {
+  var F = "'Liberation Sans Narrow', 'Liberation Sans', sans-serif", s = fit('NECTA ACSEE', F, 700, 700, 0, 'italic');
+  var o = '<defs><linearGradient id="am" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fbbf24"/><stop offset=".55" stop-color="#f97316"/><stop offset="1" stop-color="#dc2626"/></linearGradient>' +
+    '<pattern id="st" width="26" height="26" patternUnits="userSpaceOnUse" patternTransform="rotate(32)"><rect width="9" height="26" fill="#fff" fill-opacity=".1"/></pattern>' +
+    '<linearGradient id="ch" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#16171c"/><stop offset="1" stop-color="#0b0c10"/></linearGradient></defs>' +
+    '<rect width="1400" height="788" fill="url(#ch)"/>' +
+    '<path d="M900 0H1400V788H620Z" fill="url(#am)"/><path d="M900 0H1400V788H620Z" fill="url(#st)"/>' +
+    '<path d="M900 0L620 788" stroke="#fff" stroke-width="6"/><path d="M936 0L656 788" stroke="#fff" stroke-opacity=".35" stroke-width="2"/>' +
+    T(40, 760, Y, { fam: F, wt: 700, size: 330, fill: 'none', style: 'italic', extra: 'stroke="#fff" stroke-opacity=".1" stroke-width="3"' });
+  o += waveFlag({ id: 'e', x: 898, y: 130, w: 430, amp: 0.42, waves: 1.45, phase: 0.35, poleTop: 72, poleBottom: 770, rot: -3, shadowColor: '#450a0a', shadow: 0.5 });
+  o += badge(124, 124, 52, '#fbbf24', 5) + T(196, 116, 'NATIONAL EXAMINATIONS', { fam: F, wt: 700, size: 21, fill: '#fbbf24', sp: 0.14 }) + T(196, 142, 'COUNCIL OF TANZANIA', { fam: F, wt: 700, size: 21, fill: '#fbbf24', sp: 0.14 });
+  o += T(54, 322, 'NECTA ACSEE', { fam: F, wt: 700, size: s, fill: '#fff', style: 'italic' }) + T(54, 322 + s * 0.92, 'RESULTS', { fam: F, wt: 700, size: s, fill: '#fbbf24', style: 'italic' });
+  var yb = 322 + s * 0.92;
+  o += '<path d="M54 ' + f(yb + 40) + 'h270l-26 86h-270z" fill="#fbbf24"/>' + T(80, yb + 114, Y, { fam: F, wt: 700, size: 104, fill: '#16171c', style: 'italic' });
+  o += T(352, yb + 82, E.level, { fam: F, wt: 700, size: 40, fill: '#fff', style: 'italic', sp: 0.08 }) + T(352, yb + 112, 'ADVANCED CERTIFICATE', { fam: F, wt: 400, size: 20, fill: '#d4d4d8', sp: 0.08 });
+  o += foot(54, 750, '#a1a1aa', 'start', F, 17);
+  return o;
+};
+
+/* ================= ACSEE 2023: dark luxury (black-green, gold contour lines, tall pole, hairline numerals) ================= */
+SCENES['acsee-2023'] = function () {
+  var F = 'Lato, sans-serif', o = '<defs><radialGradient id="bg" cx=".72" cy=".45" r="1"><stop offset="0" stop-color="#0d4a38"/><stop offset=".6" stop-color="#04241b"/><stop offset="1" stop-color="#020f0b"/></radialGradient>' +
+    '<linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f7e3a0"/><stop offset=".55" stop-color="#d9a93b"/><stop offset="1" stop-color="#9f6d14"/></linearGradient></defs><rect width="1400" height="788" fill="url(#bg)"/>';
+  for (var k = 1; k <= 26; k++) {
+    var d = '';
+    for (var a = 0; a <= 360; a += 4) {
+      var th = a * Math.PI / 180, r = k * 30 * (1 + 0.10 * Math.sin(3 * th + k * 0.35) + 0.07 * Math.sin(5 * th - k * 0.2) + 0.04 * Math.sin(2 * th + k * 0.6));
+      d += (a ? 'L' : 'M') + f(1010 + r * 1.25 * Math.cos(th)) + ' ' + f(400 + r * Math.sin(th));
+    }
+    o += '<path d="' + d + 'Z" fill="none" stroke="' + (k % 5 === 0 ? '#e0b44c' : '#38b58a') + '" stroke-opacity="' + (k % 5 === 0 ? 0.34 : 0.16) + '" stroke-width="' + (k % 5 === 0 ? 2 : 1.2) + '"/>';
+  }
+  o += waveFlag({ id: 'g', x: 132, y: 112, w: 360, amp: 0.36, waves: 1.4, phase: 0.8, poleTop: 56, poleBottom: 788, shadowColor: '#000', shadow: 0.6 });
+  var sx = 640;
+  o += T(sx, 218, ORG, { fam: F, wt: 700, size: 17, fill: '#e0b44c', sp: 0.28 });
+  o += T(sx, 300, 'NECTA ACSEE RESULTS', { fam: F, wt: 600, size: fit('NECTA ACSEE RESULTS', F, 600, 690, 0.12), fill: '#f3f7f5', sp: 0.12 });
+  o += T(sx - 8, 528, Y, { fam: F, wt: 300, size: fit(Y, F, 300, 690), fill: 'url(#gold)' });
+  o += '<path d="M' + sx + ' 566H1330" stroke="#e0b44c" stroke-opacity=".7" stroke-width="2"/>' +
+    T(sx, 606, E.level + '  ·  ADVANCED CERTIFICATE OF SECONDARY EDUCATION EXAMINATION', { fam: F, wt: 600, size: 15, fill: '#bfe3d3', sp: 0.1 });
+  o += badge(1250, 112, 54, '#e0b44c', 4);
+  o += foot(sx, 722, '#8fb9a8', 'start', F, 15);
+  return o;
+};
+
+/* ================= PSLE 2025: playful sky (blue sky, bunting, clouds, hills, flag on the hill, bold rounded type) ================= */
+SCENES['psle-2025'] = function () {
+  var F = 'Lato, sans-serif', s = Math.min(fit('NECTA PSLE', F, 900, 640), fit('RESULTS', F, 900, 640)), r = rnd(11);
+  var o = '<defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2aa7f0"/><stop offset=".7" stop-color="#9fdcff"/><stop offset="1" stop-color="#e6f7ff"/></linearGradient>' +
+    '<linearGradient id="hl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5fcf5a"/><stop offset="1" stop-color="#2f9e44"/></linearGradient></defs><rect width="1400" height="788" fill="url(#bg)"/>';
+  o += '<defs><radialGradient id="halo"><stop offset="0" stop-color="#fff6c2" stop-opacity=".9"/><stop offset="1" stop-color="#fff6c2" stop-opacity="0"/></radialGradient></defs><circle cx="1190" cy="150" r="190" fill="url(#halo)"/><circle cx="1190" cy="150" r="92" fill="#ffd43b"/>';
+  function cloud(x, y, k) { return '<g fill="#fff" fill-opacity=".95" transform="translate(' + x + ' ' + y + ') scale(' + k + ')"><circle cx="0" cy="0" r="36"/><circle cx="46" cy="-18" r="46"/><circle cx="98" cy="0" r="38"/><rect x="-36" y="0" width="170" height="38" rx="19"/></g>'; }
+  o += cloud(150, 220, 1.2) + cloud(560, 150, 0.9) + cloud(1050, 330, 1.1);
+  // bunting
+  var cols = ['#ff6b6b', '#ffd43b', '#51cf66', '#339af0', '#cc5de8', '#ff922b'], bd = 'M-20 30Q700 130 1420 30';
+  o += '<path d="' + bd + '" fill="none" stroke="#1c3d5a" stroke-width="3"/>';
+  for (var i = 0; i < 17; i++) { var t = (i + 0.5) / 17, x = -20 + 1440 * t, y = 30 + 2 * t * (1 - t) * 100 * 1 + 0; var yy = (1 - t) * (1 - t) * 30 + 2 * (1 - t) * t * 130 + t * t * 30; var xx = -20 + 1440 * t; o += '<path d="M' + f(xx - 28) + ' ' + f(yy) + 'L' + f(xx + 28) + ' ' + f(yy) + 'L' + f(xx) + ' ' + f(yy + 62) + 'Z" fill="' + cols[i % 6] + '"/>'; }
+  // confetti
+  for (i = 0; i < 40; i++) { var cx = r() * 1400, cy = 260 + r() * 330; if (cx > 80 && cx < 780 && cy > 180) continue; o += '<circle cx="' + f(cx) + '" cy="' + f(cy) + '" r="' + f(4 + r() * 6) + '" fill="' + cols[Math.floor(r() * 6)] + '" fill-opacity=".85"/>'; }
+  o += hill(640, 70, 0.0045, 0.4, '#8be08a') + hill(690, 55, 0.006, 2.2, 'url(#hl)');
+  o += waveFlag({ id: 'h', x: 192, y: 300, w: 300, amp: 0.42, waves: 1.6, phase: 0.2, poleTop: 262, poleBottom: 690, shadowColor: '#0a4b2a', shadow: 0.35 });
+  var tx = 600;
+  o += '<rect x="' + tx + '" y="214" width="250" height="46" rx="23" fill="#ff922b"/>' + T(tx + 125, 246, E.level, { fam: F, wt: 900, size: 22, fill: '#fff', anchor: 'middle', sp: 0.1 });
+  var st = 'paint-order="stroke" stroke="#12365b" stroke-width="14" stroke-linejoin="round"';
+  o += T(tx + 6, 392 + 6, 'NECTA PSLE', { fam: F, wt: 900, size: s, fill: '#ffd43b', extra: st }) + T(tx, 392, 'NECTA PSLE', { fam: F, wt: 900, size: s, fill: '#fff', extra: st });
+  o += T(tx + 6, 392 + s * 0.98 + 6, 'RESULTS', { fam: F, wt: 900, size: s, fill: '#ffd43b', extra: st }) + T(tx, 392 + s * 0.98, 'RESULTS', { fam: F, wt: 900, size: s, fill: '#fff', extra: st });
+  o += T(tx, 392 + s * 0.98 + 140, Y, { fam: F, wt: 900, size: 150, fill: '#ffd43b', extra: st });
+  o += badge(1230, 590, 66, '#ff922b', 7);
+  o += foot(60, 760, '#0f3d2a', 'start', F, 15);
+  return o;
+};
+
+/* ================= PSLE 2024: sunrise (indigo to orange sky, rising sun, Kilimanjaro, acacia, flag on the ridge) ================= */
+SCENES['psle-2024'] = function () {
+  var F = 'Lato, sans-serif', o = '<defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#27206b"/><stop offset=".35" stop-color="#8a2a8f"/><stop offset=".6" stop-color="#f0605d"/><stop offset=".78" stop-color="#ffa94d"/><stop offset="1" stop-color="#ffe08a"/></linearGradient>' +
+    '<radialGradient id="sun"><stop offset="0" stop-color="#fffbe0"/><stop offset=".55" stop-color="#ffe066"/><stop offset="1" stop-color="#ffb347"/></radialGradient>' +
+    '<radialGradient id="halo"><stop offset="0" stop-color="#ffe9a8" stop-opacity=".85"/><stop offset="1" stop-color="#ffe9a8" stop-opacity="0"/></radialGradient>' +
+    '<linearGradient id="yr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#ffe9a8"/></linearGradient></defs><rect width="1400" height="788" fill="url(#bg)"/>';
+  var r = rnd(5), i;
+  for (i = 0; i < 60; i++) { var sy = r() * 330; o += '<circle cx="' + f(r() * 1400) + '" cy="' + f(sy) + '" r="' + f(0.6 + r() * 1.5) + '" fill="#fff" fill-opacity="' + f(0.25 + r() * 0.5) + '"/>'; }
+  o += '<circle cx="700" cy="610" r="420" fill="url(#halo)"/>';
+  for (i = 0; i < 18; i++) { var a = Math.PI * (1.06 + i / 17 * 0.88); o += '<path d="M700 610L' + f(700 + 1500 * Math.cos(a - 0.02)) + ' ' + f(610 + 1500 * Math.sin(a - 0.02)) + 'L' + f(700 + 1500 * Math.cos(a + 0.02)) + ' ' + f(610 + 1500 * Math.sin(a + 0.02)) + 'Z" fill="#fff" fill-opacity=".07"/>'; }
+  o += '<circle cx="700" cy="610" r="190" fill="url(#sun)"/>';
+  // Kilimanjaro with a snow cap, two summits
+  o += '<path d="M150 650L420 470L470 452L560 500L640 470L700 520L860 650Z" fill="#6b3280"/><path d="M420 470L470 452L520 480L492 486L470 474L448 492L436 480Z" fill="#fff" fill-opacity=".92"/>';
+  o += hill(650, 38, 0.005, 1.0, '#a24a8a') + hill(690, 46, 0.0055, 2.0, '#3d2a6b') + hill(735, 36, 0.007, 3.3, '#1b1646');
+  // acacia on the left (flat-topped)
+  o += '<g fill="#120f33"><path d="M214 740Q220 650 212 600Q206 640 190 664L182 660Q204 630 210 590Q196 600 176 596L180 588Q206 588 214 570L222 572Q220 590 238 606Q262 596 280 600L276 608Q256 606 230 624Q224 650 232 740Z"/><ellipse cx="206" cy="560" rx="112" ry="24"/><ellipse cx="270" cy="578" rx="70" ry="17"/><ellipse cx="140" cy="578" rx="62" ry="15"/></g>';
+  o += waveFlag({ id: 'i', x: 1086, y: 470, w: 250, amp: 0.4, waves: 1.5, phase: 0.5, poleTop: 438, poleBottom: 748, shadowColor: '#1b0b3a', shadow: 0.35 });
+  o += T(700, 150, 'NECTA PSLE RESULTS', { fam: F, wt: 900, size: fit('NECTA PSLE RESULTS', F, 900, 1000, 0.02), fill: '#fff', anchor: 'middle', sp: 0.02 });
+  o += T(700, 405, Y, { fam: F, wt: 900, size: Math.min(fit(Y, F, 900, 410), 190), fill: 'url(#yr)', anchor: 'middle' });
+  o += '<rect x="540" y="186" width="320" height="42" rx="21" fill="#27206b" fill-opacity=".55"/>' + T(700, 215, E.level + '  ·  PSLE', { fam: F, wt: 800, size: 18, fill: '#ffe9a8', anchor: 'middle', sp: 0.12 });
+  o += badge(118, 124, 56, '#ffe9a8', 5);
+  o += foot(700, 766, '#ffe9c4', 'middle', F, 15);
+  return o;
+};
+
+/* ================= PSLE 2023: chalkboard (wood frame, green board, chalk lettering, flag standing in the tray) ================= */
+SCENES['psle-2023'] = function () {
+  var F = 'Lato, sans-serif', r = rnd(21), i;
+  var o = '<defs><linearGradient id="wood" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9a6a3a"/><stop offset=".5" stop-color="#7c4f26"/><stop offset="1" stop-color="#5e3a1a"/></linearGradient>' +
+    '<radialGradient id="bd" cx=".5" cy=".4" r=".8"><stop offset="0" stop-color="#2f5a4d"/><stop offset="1" stop-color="#1a3a31"/></radialGradient>' +
+    '<filter id="chalk" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="7" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="3.4" result="d"/><feComponentTransfer in="d"><feFuncA type="discrete" tableValues="0 .55 .8 .95 1 1"/></feComponentTransfer></filter>' +
+    '<filter id="dust"><feTurbulence type="fractalNoise" baseFrequency=".02 .03" numOctaves="3" seed="2"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .16 0"/></filter></defs>' +
+    '<rect width="1400" height="788" fill="#4a2e14"/><rect x="14" y="14" width="1372" height="760" rx="26" fill="url(#wood)"/>';
+  for (i = 0; i < 70; i++) { var gy = 16 + r() * 756; o += '<path d="M' + f(18 + r() * 60) + ' ' + f(gy) + 'H' + f(1382 - r() * 80) + '" stroke="#3f2510" stroke-opacity="' + f(0.1 + r() * 0.18) + '" stroke-width="' + f(0.6 + r() * 1.6) + '"/>'; }
+  o += '<rect x="64" y="54" width="1272" height="636" rx="10" fill="url(#bd)" stroke="#2b1a0b" stroke-width="6"/><rect x="64" y="54" width="1272" height="636" rx="10" filter="url(#dust)"/>' +
+    '<rect x="64" y="704" width="1272" height="38" rx="8" fill="#6d4420"/><rect x="64" y="704" width="1272" height="9" fill="#a8743c"/>';
+  o += '<rect x="360" y="690" width="70" height="14" rx="6" fill="#fff" transform="rotate(-3 395 697)"/><rect x="440" y="692" width="48" height="12" rx="5" fill="#ffb3c7" transform="rotate(4 464 698)"/>';
+  // chalk drawings
+  var ch = '<g filter="url(#chalk)">';
+  var s = Math.min(fit('NECTA PSLE', F, 800, 640), fit('RESULTS', F, 800, 640));
+  ch += T(250, 252, ORG, { fam: F, wt: 700, size: 16, fill: '#e9f5ef', sp: 0.2, extra: 'fill-opacity=".85"' });
+  ch += T(250, 360, 'NECTA PSLE', { fam: F, wt: 800, size: s, fill: '#fdfdf6' }) + T(250, 360 + s * 0.98, 'RESULTS', { fam: F, wt: 800, size: s, fill: '#fdfdf6' });
+  var yb = 360 + s * 0.98;
+  ch += '<path d="M250 ' + f(yb + 22) + 'Q330 ' + f(yb + 6) + ' 400 ' + f(yb + 24) + 'T560 ' + f(yb + 22) + 'T700 ' + f(yb + 24) + '" fill="none" stroke="#ffd966" stroke-width="5" stroke-linecap="round"/>';
+  ch += T(250, yb + 150, Y, { fam: F, wt: 800, size: 130, fill: '#ffd966' }) + '<ellipse cx="415" cy="' + f(yb + 108) + '" rx="204" ry="84" fill="none" stroke="#ffb3c7" stroke-width="5" transform="rotate(-2 415 ' + f(yb + 108) + ')"/>';
+  ch += T(650, yb + 118, E.level, { fam: F, wt: 800, size: 30, fill: '#ffb3c7', sp: 0.08 }) + T(650, yb + 150, 'PRIMARY SCHOOL LEAVING EXAMINATION', { fam: F, wt: 600, size: 15, fill: '#e9f5ef', sp: 0.04 });
+  // doodles: stars and an A B C
+  [[1000, 140, 22], [1290, 200, 16], [820, 150, 12], [1180, 560, 14]].forEach(function (p) { ch += '<path d="M' + p[0] + ' ' + (p[1] - p[2]) + 'L' + f(p[0] + p[2] * 0.3) + ' ' + f(p[1] - p[2] * 0.3) + 'L' + (p[0] + p[2]) + ' ' + p[1] + 'L' + f(p[0] + p[2] * 0.3) + ' ' + f(p[1] + p[2] * 0.3) + 'L' + p[0] + ' ' + (p[1] + p[2]) + 'L' + f(p[0] - p[2] * 0.3) + ' ' + f(p[1] + p[2] * 0.3) + 'L' + (p[0] - p[2]) + ' ' + p[1] + 'L' + f(p[0] - p[2] * 0.3) + ' ' + f(p[1] - p[2] * 0.3) + 'Z" fill="none" stroke="#ffd966" stroke-width="3.5" stroke-linejoin="round"/>'; });
+  ch += T(1230, 130, 'A  B  C', { fam: F, wt: 800, size: 44, fill: '#9ad8ff', anchor: 'middle', sp: 0.1 });
+  ch += '</g>';
+  o += ch;
+  o += waveFlag({ id: 'j', x: 1062, y: 240, w: 236, amp: 0.4, waves: 1.5, phase: 0.3, poleTop: 200, poleBottom: 704, shadowColor: '#000', shadow: 0.4 });
+  o += badge(150, 160, 66, '#fff', 4, 'transform="rotate(-8 150 160)"') + '<circle cx="150" cy="82" r="11" fill="#e03131"/><circle cx="147" cy="79" r="3.5" fill="#ff8787"/>';
+  o += foot(64, 766, '#e8cfa8', 'start', F, 14);
+  return o;
+};
+
+/* ================= LUXE family: the template for every NEW post (any exam, any year) =================
+   A restrained, expensive look: a deep base colour, ONE metallic accent (champagne gold, brass, rose gold, platinum, copper or pearl) and a warm
+   white for the words. Depth comes from a soft glow, a fine guilloche rosette (the engraved pattern of banknotes and certificates), gold dust and a
+   vignette, never from loud colours. The flag keeps its own four colours, so the base and metal are chosen to sit well beside green, blue,
+   yellow and black. Open ?scene=csee-2026 (any exam and year); add &palette=<name> and/or &layout=gala|salon|monolith to choose, or
+   ?scene=luxe-list to see the names. Without them the palette and layout follow the exam and the year, so neighbours differ. */
+var LUXE = {
+  'midnight-champagne': { bg1: '#050818', bg2: '#131f4d', glow: '#3d51b0', hi: '#fff3cf', mid: '#d9b66b', lo: '#8a6424', ink: '#f7f1e3', soft: '#b8bfdc' },
+  'emerald-brass':      { bg1: '#03150f', bg2: '#0b3d2f', glow: '#1f8a68', hi: '#fbe9b0', mid: '#cfa64a', lo: '#855f1c', ink: '#f2f6f1', soft: '#a9cdbd' },
+  'burgundy-rose-gold': { bg1: '#1d0610', bg2: '#4a1226', glow: '#a03358', hi: '#ffe6dc', mid: '#e0b09b', lo: '#9a6552', ink: '#fcf1ef', soft: '#e0b9c2' },
+  'ink-platinum':       { bg1: '#070a10', bg2: '#1a2333', glow: '#4f77b3', hi: '#ffffff', mid: '#c7d1de', lo: '#7d8a9c', ink: '#ffffff', soft: '#aab6c8' },
+  'onyx-copper':        { bg1: '#0a0807', bg2: '#251913', glow: '#9a4a22', hi: '#ffd9bd', mid: '#d98a56', lo: '#8a4a22', ink: '#f9f0e8', soft: '#c9ab96' },
+  'teal-pearl':         { bg1: '#031a1f', bg2: '#0a4852', glow: '#1fa0a8', hi: '#fffaf0', mid: '#e6d6ad', lo: '#9b8650', ink: '#f4fbfa', soft: '#a8d2d4' },
+  /* added 2026-11-10 for the older years (2003 to 2019): seven more palettes, same rules (one deep base, one metal, warm white words) */
+  'aubergine-gold':     { bg1: '#12061c', bg2: '#38174f', glow: '#8147b0', hi: '#fff1c4', mid: '#e6bd55', lo: '#a47a1c', ink: '#fbf3ea', soft: '#d6c0e8' },
+  'sapphire-silver':    { bg1: '#030c26', bg2: '#0b2d72', glow: '#2f79d8', hi: '#ffffff', mid: '#dbe0e8', lo: '#8d96a6', ink: '#ffffff', soft: '#cbd8f0' },
+  'olive-bronze':       { bg1: '#0b1206', bg2: '#26351a', glow: '#587a24', hi: '#faebc4', mid: '#e0b468', lo: '#9a6f2a', ink: '#f6f5e8', soft: '#d6e2b8' },
+  'sienna-sand':        { bg1: '#1c0a06', bg2: '#5a2514', glow: '#b4502a', hi: '#fff0d6', mid: '#efcd9e', lo: '#a97f4a', ink: '#fdf3e8', soft: '#f2d2bc' },
+  'graphite-gold':      { bg1: '#0b0b0d', bg2: '#2b2c31', glow: '#6d7078', hi: '#fff0bf', mid: '#e8c261', lo: '#9f7626', ink: '#f6f6f4', soft: '#cfd1d6' },
+  'indigo-amber':       { bg1: '#0a0624', bg2: '#2a1f78', glow: '#5b4fd0', hi: '#ffe9b5', mid: '#efb752', lo: '#a8741c', ink: '#f7f3ff', soft: '#c9c3f2' },
+  'mulberry-silver':    { bg1: '#1f0620', bg2: '#58144f', glow: '#b94aa6', hi: '#fff0fa', mid: '#e8cade', lo: '#a37e98', ink: '#fff5fb', soft: '#ebc4de' }
+};
+/* Layouts: gala, salon, monolith (the first three), masthead (new: one wide title line on top, year bottom left, flag bottom right) and three mirrored
+   versions (gala-right: flag on the right and text on the left; salon-left: arch on the left; monolith-left: flag on the left). The flag itself is never
+   mirrored: it always flies to the right of its pole. The built-in default (no &palette= or &layout=) still chooses among the first six palettes and the
+   first three layouts only, so a URL without parameters renders exactly as it did before. */
+var LUXE_NAMES = Object.keys(LUXE), LAYOUTS = ['gala', 'salon', 'monolith', 'masthead', 'gala-right', 'salon-left', 'monolith-left'];
+var LUXE_BASE = LUXE_NAMES.slice(0, 6), LAYOUTS_BASE = LAYOUTS.slice(0, 3);
+function rosette(cx, cy, R, n, k, stroke, op) {
+  var out = '', j, a;
+  for (j = 0; j < n; j++) {
+    var d = '';
+    for (a = 0; a <= 360; a += 3) { var th = a * Math.PI / 180, rr = R * (0.6 + 0.24 * Math.sin(k * th + j * Math.PI * 2 / n) + 0.07 * Math.sin(2 * k * th - j * 0.4)); d += (a ? 'L' : 'M') + f(cx + rr * Math.cos(th)) + ' ' + f(cy + rr * Math.sin(th)); }
+    out += '<path d="' + d + 'Z" fill="none" stroke="' + stroke + '" stroke-opacity="' + op + '" stroke-width="1"/>';
+  }
+  return out;
+}
+function luxe(name, palName, layout) {
+  var P = LUXE[palName], F = "'Liberation Serif', 'DejaVu Serif', serif", L = 'Lato, sans-serif', r = rnd(name.length * 97 + 13), i;
+  var o = '<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + P.bg1 + '"/><stop offset="1" stop-color="' + P.bg2 + '"/></linearGradient>' +
+    '<radialGradient id="gl"><stop offset="0" stop-color="' + P.glow + '" stop-opacity=".55"/><stop offset="1" stop-color="' + P.glow + '" stop-opacity="0"/></radialGradient>' +
+    '<radialGradient id="vg" cx=".5" cy=".5" r=".75"><stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".5"/></radialGradient>' +
+    '<linearGradient id="foil" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + P.hi + '"/><stop offset=".32" stop-color="' + P.mid + '"/><stop offset=".55" stop-color="' + P.lo + '"/><stop offset=".78" stop-color="' + P.mid + '"/><stop offset="1" stop-color="' + P.hi + '"/></linearGradient>' +
+    '<linearGradient id="foilh" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="' + P.lo + '"/><stop offset=".5" stop-color="' + P.hi + '"/><stop offset="1" stop-color="' + P.lo + '"/></linearGradient>' +
+    '<linearGradient id="foilv" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + P.lo + '"/><stop offset=".5" stop-color="' + P.hi + '"/><stop offset="1" stop-color="' + P.lo + '"/></linearGradient>' +
+    '<linearGradient id="pane" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".10"/><stop offset="1" stop-color="#fff" stop-opacity=".02"/></linearGradient>' +
+    '<filter id="blur"><feGaussianBlur stdDeviation="2.2"/></filter>' +
+    '<filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="3"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .05 0"/></filter></defs>' +
+    '<rect width="1400" height="788" fill="url(#bg)"/>';
+  var title1 = 'NECTA ' + E.abbr, title2 = 'RESULTS';
+  if (LAYOUTS_BASE.indexOf(layout) < 0) r = rnd(name.length * 97 + 13 + (Y | 0) * 31); // new layouts: dust also follows the year
+  function dust(x0, x1) { var g = ''; for (var d = 0; d < 46; d++) { var x = x0 + r() * (x1 - x0), y = r() * 788, rad = 1 + r() * 3.2; g += '<circle cx="' + f(x) + '" cy="' + f(y) + '" r="' + f(rad) + '" fill="' + P.mid + '" fill-opacity="' + f(0.12 + r() * 0.4) + '"' + (rad > 2.4 ? ' filter="url(#blur)"' : '') + '/>'; } return g; }
+  function corner(x, y) { return '<path d="M' + x + ' ' + (y - 9) + 'l9 9l-9 9l-9 -9z" fill="url(#foil)"/>'; }
+  function org(x, y, anchor) { return T(x, y, ORG, { fam: L, wt: 700, size: 16, fill: P.mid, anchor: anchor, sp: 0.26 }); }
+  function ft(x, y, anchor) { return foot(x, y, P.soft, anchor, L, 14); }
+  if (layout === 'gala' || layout === 'gala-right') {
+    var gr = layout === 'gala-right', cx = gr ? 485 : 915, s = Math.min(fit(title1, F, 700, 640), 112);
+    o += '<circle cx="' + (gr ? 400 : 1000) + '" cy="360" r="560" fill="url(#gl)"/>' + rosette(cx, 394, 400, 36, 7, P.mid, 0.1) + dust(60, 1340);
+    o += waveFlag({ id: 'lx', x: gr ? 990 : 150, y: 168, w: 330, amp: 0.38, waves: 1.5, phase: 0.2, poleTop: 112, poleBottom: 700, shadow: 0.55 });
+    o += '<circle cx="' + cx + '" cy="140" r="74" fill="none" stroke="url(#foil)" stroke-width="1.5" stroke-opacity=".8"/>' + badge(cx, 140, 60, P.mid, 4) + org(cx, 244, 'middle');
+    o += T(cx, 340, title1, { fam: F, wt: 700, size: s, fill: 'url(#foil)', anchor: 'middle' }) + T(cx, 340 + s * 0.96, title2, { fam: F, wt: 700, size: s, fill: 'url(#foil)', anchor: 'middle' });
+    var yl = 340 + s * 0.96 + 36;
+    o += '<path d="M' + (cx - 260) + ' ' + yl + 'H' + (cx - 18) + 'M' + (cx + 18) + ' ' + yl + 'H' + (cx + 260) + '" stroke="url(#foilh)" stroke-width="2"/>' + '<path d="M' + cx + ' ' + (yl - 10) + 'l10 10l-10 10l-10 -10z" fill="url(#foil)"/>';
+    o += T(cx, yl + 138, Y, { fam: L, wt: 300, size: 156, fill: P.ink, anchor: 'middle', sp: 0.04 }) + T(cx, yl + 182, E.level + '  \u00B7  ' + E.abbr, { fam: L, wt: 700, size: 17, fill: P.mid, anchor: 'middle', sp: 0.3 });
+    o += ft(cx, 722, 'middle');
+    o += '<rect x="36" y="36" width="1328" height="716" fill="none" stroke="url(#foil)" stroke-width="2.5"/><rect x="52" y="52" width="1296" height="684" fill="none" stroke="' + P.mid + '" stroke-opacity=".4"/>' + corner(36, 36) + corner(1364, 36) + corner(36, 752) + corner(1364, 752);
+  } else if (layout === 'salon' || layout === 'salon-left') {
+    var sl = layout === 'salon-left', ax = sl ? -760 : 0, dx = sl ? 528 : 0, s2 = Math.min(fit(title1, F, 700, 700), 118);
+    o += '<circle cx="' + (1080 + ax) + '" cy="380" r="520" fill="url(#gl)"/>' + rosette(1080 + ax, 400, 330, 34, 6, P.mid, 0.12) + dust(0, 1400);
+    var arch = 'M' + (850 + ax) + ' 716V340A230 230 0 0 1 ' + (1310 + ax) + ' 340V716Z';
+    o += '<path d="' + arch + '" fill="url(#pane)" stroke="url(#foil)" stroke-width="3"/><path d="M' + (866 + ax) + ' 700V340A214 214 0 0 1 ' + (1294 + ax) + ' 340V700Z" fill="none" stroke="' + P.mid + '" stroke-opacity=".45"/>';
+    o += waveFlag({ id: 'lx', x: 944 + ax, y: 232, w: 300, amp: 0.38, waves: 1.4, phase: 0.5, poleTop: 176, poleBottom: 700, shadow: 0.55 });
+    o += badge(140 + dx, 134, 52, P.mid, 4) + '<circle cx="' + (140 + dx) + '" cy="134" r="64" fill="none" stroke="url(#foil)" stroke-opacity=".7"/>' + org(220 + dx, 140, 'start').replace('size="16"', 'size="14"');
+    o += T(86 + dx, 330, title1, { fam: F, wt: 700, size: s2, fill: 'url(#foil)' }) + T(86 + dx, 330 + s2 * 0.96, title2, { fam: F, wt: 700, size: s2, fill: 'url(#foil)' });
+    var y2 = 330 + s2 * 0.96 + 36;
+    o += (sl ? '<rect x="' + (90 + dx) + '" y="' + f(y2 - 1) + '" width="210" height="2" fill="url(#foilh)"/>' : '<path d="M90 ' + y2 + 'H300" stroke="url(#foilh)" stroke-width="2"/>') + T(86 + dx, y2 + 150, Y, { fam: L, wt: 300, size: 160, fill: P.ink, sp: 0.03 }) + T(92 + dx, y2 + 196, E.level + '  ·  ' + E.abbr, { fam: L, wt: 700, size: 17, fill: P.mid, sp: 0.3 });
+    o += ft(86 + dx, 748, 'start');
+  } else if (layout === 'monolith' || layout === 'monolith-left') {
+    var ml = layout === 'monolith-left', mx = ml ? 564 : 0, s3 = Math.min(fit(title1, F, 700, 640), 108);
+    o += '<circle cx="' + (ml ? 400 : 1120) + '" cy="300" r="520" fill="url(#gl)"/>' + rosette(ml ? 400 : 1120, 330, 360, 36, 5, P.mid, 0.11) + dust(0, 1400);
+    o += waveFlag({ id: 'lx', x: ml ? 118 : 928, y: 126, w: ml ? 390 : 410, amp: 0.4, waves: 1.5, phase: 0.1, poleTop: 70, poleBottom: 700, shadow: 0.6 });
+    o += ml ? '<rect x="589" y="70" width="2" height="648" fill="url(#foilv)" fill-opacity=".8"/>' : '<path d="M810 70V718" stroke="url(#foil)" stroke-width="2" stroke-opacity=".8"/>';
+    o += badge(120 + mx, 124, 50, P.mid, 4) + '<circle cx="' + (120 + mx) + '" cy="124" r="62" fill="none" stroke="url(#foil)" stroke-opacity=".7"/>' + org(196 + mx, 130, 'start').replace('size="16"', 'size="14"');
+    o += T(86 + mx, 318, title1, { fam: F, wt: 700, size: s3, fill: 'url(#foil)' }) + T(86 + mx, 318 + s3 * 0.96, title2, { fam: F, wt: 700, size: s3, fill: P.ink });
+    o += T(80 + mx, 718, Y, { fam: L, wt: 200, size: fit(Y, L, 200, ml ? 640 : 700), fill: 'url(#foil)' });
+    o += T(92 + mx, 318 + s3 * 0.96 + 52, E.level + '  ·  ' + E.abbr, { fam: L, wt: 700, size: 17, fill: P.mid, sp: 0.3 }) + ft(86 + mx, 758, 'start');
+  } else { // masthead: a wide letterhead, the title on one line across the top, the year bottom left and the flag bottom right
+    var full = title1 + ' ' + title2, sm = Math.min(fit(full, F, 700, 1060), 94);
+    function tw(str, size, sp) { return (measure(str, L, 700) + str.length * sp) * size; }
+    function hr(x0, x1, y, h) { return '<rect x="' + x0 + '" y="' + f(y - h / 2) + '" width="' + (x1 - x0) + '" height="' + h + '" fill="url(#foilh)"/>'; }
+    o += '<circle cx="1000" cy="540" r="620" fill="url(#gl)"/>' + rosette(700, 450, 400, 38, 6, P.mid, 0.09) + dust(0, 1400);
+    o += hr(60, 1340, 44, 3) + hr(60, 1340, 54, 1) + hr(60, 1340, 734, 1) + hr(60, 1340, 744, 3) + corner(60, 49) + corner(1340, 49) + corner(60, 739) + corner(1340, 739);
+    var w1 = tw('NATIONAL EXAMINATIONS', 16, 0.26), w2 = tw('COUNCIL OF TANZANIA', 16, 0.26);
+    o += '<circle cx="700" cy="140" r="71" fill="none" stroke="url(#foil)" stroke-width="1.5" stroke-opacity=".8"/>' + badge(700, 140, 57, P.mid, 4);
+    o += T(618, 146, 'NATIONAL EXAMINATIONS', { fam: L, wt: 700, size: 16, fill: P.mid, anchor: 'end', sp: 0.26 }) + T(782, 146, 'COUNCIL OF TANZANIA', { fam: L, wt: 700, size: 16, fill: P.mid, sp: 0.26 });
+    o += hr(618 - w1 - 150, 618 - w1 - 20, 141, 1.5) + hr(782 + w2 + 20, 782 + w2 + 150, 141, 1.5);
+    o += T(700, 292 + (94 - sm) * 0.1, full, { fam: F, wt: 700, size: sm, fill: 'url(#foil)', anchor: 'middle' });
+    o += hr(150, 672, 342, 2) + hr(728, 1250, 342, 2) + '<path d="M700 331l11 11l-11 11l-11 -11z" fill="url(#foil)"/>';
+    o += T(92, 424, E.level + '  ·  ' + E.abbr, { fam: L, wt: 700, size: 17, fill: P.mid, sp: 0.3 });
+    o += waveFlag({ id: 'lx', x: 925, y: 416, w: 360, amp: 0.38, waves: 1.5, phase: 0.3, poleTop: 376, poleBottom: 680, shadow: 0.6 });
+    o += T(80, 676, Y, { fam: L, wt: 200, size: fit(Y, L, 200, 660), fill: 'url(#foil)' }) + ft(700, 716, 'middle');
+  }
+  o += '<rect width="1400" height="788" fill="url(#vg)"/><rect width="1400" height="788" filter="url(#grain)"/>';
+  return o;
+}
+/* ================= PHOTO covers: a free-licensed photo of school life in its natural colours, with the logo, the flying flag and the words on a panel =================
+   ?scene=<exam>-<year>&photo=<file>&layout=<composition>&tone=<name>&fx=<0-100>&fy=<0-100>
+   photo: file name, loaded from photos/<file> next to this page (serve a folder that has a photos link; the photos are not part of the repository)
+   layout (the composition, nine different ones, none of them only a mirror of another):
+     split-left   a deep-colour panel on the left (logo, flag, title, year), the photo full colour on the right
+     split-right  the photo on the left, an ornate framed panel on the right
+     arch         a poster with the photo inside a tall gilded arch on the left, the words and the flag beside it
+     frame        a poster with a gold-framed photo, the words under it, big faint numerals behind
+     top-band     a title band across the top, the photo below it, the year in a small card at the lower left
+     diagonal     the photo cut by a diagonal gold edge, the words on a panel at the right
+     circle       a round photo medallion with a guilloche ring on the left, the words on the right
+     bottom-band  the photo on top, a short band below with the flag, the title and the year
+     centre-band  the photo across the whole cover, a slim band in the middle with the title and the year, the flag on a small card
+   tone: navy, emerald, burgundy, charcoal, plum, forest (colours of the panels, frames and posters, with the metal; the photo is only lightly saturated)
+   fx, fy: which part of the photo stays in view when it is cropped (0 = left/top, 100 = right/bottom, default 50) */
+var TONES = { navy: 'midnight-champagne', emerald: 'emerald-brass', burgundy: 'burgundy-rose-gold', charcoal: 'graphite-gold', plum: 'aubergine-gold', forest: 'olive-bronze' };
+var PHOTO_LAYOUTS = ['split-left', 'split-right', 'arch', 'frame', 'top-band', 'diagonal', 'circle', 'bottom-band', 'centre-band'];
+function photoCover(file, comp, tone, fx, fy, iw, ih) {
+  var P = LUXE[TONES[tone]], F = "'Liberation Serif', 'DejaVu Serif', serif", L = 'Lato, sans-serif', r = rnd((Y | 0) * 7 + 13);
+  var title1 = 'NECTA ' + E.abbr, title2 = 'RESULTS', full = title1 + ' ' + title2, lvl = E.level + '  ·  ' + E.abbr, cn = 0;
+  function hr(x0, x1, y, h) { return '<rect x="' + x0 + '" y="' + f(y - h / 2) + '" width="' + f(x1 - x0) + '" height="' + h + '" fill="url(#foilh)"/>'; }
+  function vr(x, y0, y1, w) { return '<rect x="' + f(x - w / 2) + '" y="' + y0 + '" width="' + w + '" height="' + (y1 - y0) + '" fill="url(#foilv)"/>'; }
+  function corner(x, y) { return '<path d="M' + x + ' ' + (y - 9) + 'l9 9l-9 9l-9 -9z" fill="url(#foil)"/>'; }
+  function ring(cx, cy, rr) { return '<circle cx="' + cx + '" cy="' + cy + '" r="' + rr + '" fill="none" stroke="url(#foil)" stroke-width="1.5" stroke-opacity=".85"/>'; }
+  function org2(cx, y, anchor) { return T(cx, y, 'NATIONAL EXAMINATIONS', { fam: L, wt: 700, size: 13, fill: P.mid, anchor: anchor, sp: 0.26 }) + T(cx, y + 20, 'COUNCIL OF TANZANIA', { fam: L, wt: 700, size: 13, fill: P.mid, anchor: anchor, sp: 0.26 }); }
+  function org1(cx, y, anchor) { return T(cx, y, ORG, { fam: L, wt: 700, size: 13, fill: P.mid, anchor: anchor, sp: 0.26 }); }
+  function ft(x, y, anchor, size) { return foot(x, y, P.soft, anchor, L, size || 14); }
+  function photo(x, y, w, h, shape) { // cover-fit into a box, cut to a shape
+    var sc = Math.max(w / iw, h / ih), pw = iw * sc, ph = ih * sc, id = 'cp' + (cn++);
+    return '<clipPath id="' + id + '">' + (shape || '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '"/>') + '</clipPath>' +
+      '<image href="photos/' + esc(file) + '" x="' + f(x - (pw - w) * fx / 100) + '" y="' + f(y - (ph - h) * fy / 100) + '" width="' + f(pw) + '" height="' + f(ph) + '" preserveAspectRatio="none" clip-path="url(#' + id + ')" filter="url(#sat)"/>';
+  }
+  function dust(n, x0, x1) { var g = '', d; for (d = 0; d < n; d++) g += '<circle cx="' + f(x0 + r() * (x1 - x0)) + '" cy="' + f(r() * 788) + '" r="' + f(1 + r() * 2.6) + '" fill="' + P.mid + '" fill-opacity="' + f(0.12 + r() * 0.35) + '"/>'; return g; }
+  function pill(x, y, w, anchor) { return '<rect x="' + x + '" y="' + (y - 23) + '" width="' + w + '" height="34" rx="17" fill="' + P.bg1 + '" fill-opacity=".88"/>' + ft(anchor === 'middle' ? x + w / 2 : x + 20, y, anchor, 14); }
+  var o = '<defs><linearGradient id="foil" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + P.hi + '"/><stop offset=".32" stop-color="' + P.mid + '"/><stop offset=".55" stop-color="' + P.lo + '"/><stop offset=".78" stop-color="' + P.mid + '"/><stop offset="1" stop-color="' + P.hi + '"/></linearGradient>' +
+    '<linearGradient id="foilh" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="' + P.lo + '"/><stop offset=".5" stop-color="' + P.hi + '"/><stop offset="1" stop-color="' + P.lo + '"/></linearGradient>' +
+    '<linearGradient id="foilv" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + P.lo + '"/><stop offset=".5" stop-color="' + P.hi + '"/><stop offset="1" stop-color="' + P.lo + '"/></linearGradient>' +
+    '<linearGradient id="bgp" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + P.bg1 + '"/><stop offset="1" stop-color="' + P.bg2 + '"/></linearGradient>' +
+    '<radialGradient id="gl"><stop offset="0" stop-color="' + P.glow + '" stop-opacity=".5"/><stop offset="1" stop-color="' + P.glow + '" stop-opacity="0"/></radialGradient>' +
+    '<filter id="sat"><feColorMatrix type="saturate" values=".94"/></filter>' +
+    '<filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="3"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .04 0"/></filter></defs>' +
+    '<rect width="1400" height="788" fill="' + P.bg1 + '"/>';
+  function poster() { return '<rect width="1400" height="788" fill="url(#bgp)"/><circle cx="700" cy="380" r="640" fill="url(#gl)"/>'; }
+  var s, y2, cx;
+  if (comp === 'split-left') {
+    s = Math.min(fit(title1, F, 700, 470), 100); cx = 295;
+    o += photo(590, 0, 810, 788) + '<rect width="590" height="788" fill="url(#bgp)"/><circle cx="100" cy="260" r="420" fill="url(#gl)"/>' + rosette(300, 440, 290, 30, 6, P.mid, 0.08) + vr(590, 0, 788, 4) + vr(606, 0, 788, 1);
+    o += ring(116, 138, 62) + badge(116, 138, 49, P.mid, 4) + waveFlag({ id: 'pf', x: 392, y: 100, w: 150, amp: 0.36, waves: 1.4, phase: 0.2, poleTop: 62, poleBottom: 250, shadow: 0.55 });
+    o += org1(cx, 292, 'middle') + T(cx, 388, title1, { fam: F, wt: 700, size: s, fill: 'url(#foil)', anchor: 'middle' }) + T(cx, 388 + s * 0.96, title2, { fam: F, wt: 700, size: s, fill: 'url(#foil)', anchor: 'middle' });
+    y2 = 388 + s * 0.96 + 34;
+    o += hr(cx - 190, cx - 16, y2, 2) + hr(cx + 16, cx + 190, y2, 2) + '<path d="M' + cx + ' ' + (y2 - 10) + 'l10 10l-10 10l-10 -10z" fill="url(#foil)"/>';
+    o += T(cx, y2 + 130, Y, { fam: L, wt: 400, size: 130, fill: P.ink, anchor: 'middle', sp: 0.04 }) + T(cx, y2 + 172, lvl, { fam: L, wt: 700, size: 16, fill: P.mid, anchor: 'middle', sp: 0.3 }) + ft(cx, 730, 'middle', 13);
+  } else if (comp === 'split-right') {
+    s = Math.min(fit(title1, F, 700, 460), 96); cx = 1100;
+    o += photo(0, 0, 800, 788) + '<rect x="800" width="600" height="788" fill="url(#bgp)"/><circle cx="1300" cy="200" r="420" fill="url(#gl)"/>' + vr(800, 0, 788, 4);
+    o += '<rect x="826" y="34" width="548" height="720" fill="none" stroke="url(#foil)" stroke-width="2.2"/><rect x="840" y="48" width="520" height="692" fill="none" stroke="' + P.mid + '" stroke-opacity=".4"/>' + corner(826, 34) + corner(1374, 34) + corner(826, 754) + corner(1374, 754);
+    o += ring(cx, 112, 64) + badge(cx, 112, 51, P.mid, 4) + org2(cx, 206, 'middle');
+    o += T(cx, 304, title1, { fam: F, wt: 700, size: s, fill: 'url(#foil)', anchor: 'middle' }) + T(cx, 304 + s * 0.96, title2, { fam: F, wt: 700, size: s, fill: P.ink, anchor: 'middle' });
+    y2 = 304 + s * 0.96 + 30; o += hr(cx - 150, cx + 150, y2, 2);
+    o += T(cx, y2 + 104, Y, { fam: L, wt: 400, size: 112, fill: P.ink, anchor: 'middle', sp: 0.04 }) + T(cx, y2 + 142, lvl, { fam: L, wt: 700, size: 16, fill: P.mid, anchor: 'middle', sp: 0.3 });
+    o += waveFlag({ id: 'pf', x: 1046, y: 628, w: 130, amp: 0.36, waves: 1.4, phase: 0.4, poleTop: 600, poleBottom: 718, shadow: 0.55 }) + ft(cx, 732, 'middle', 12);
+  } else if (comp === 'arch') {
+    s = Math.min(fit(title1, F, 700, 640), 112);
+    o += poster() + '<circle cx="320" cy="400" r="520" fill="url(#gl)"/>' + rosette(325, 420, 330, 34, 6, P.mid, 0.1) + dust(36, 0, 1400);
+    var ar = 'M90 722V330A235 235 0 0 1 560 330V722Z';
+    o += photo(90, 95, 470, 627, '<path d="' + ar + '"/>') + '<path d="' + ar + '" fill="none" stroke="url(#foil)" stroke-width="3.5"/><path d="M104 708V330A221 221 0 0 1 546 330V708Z" fill="none" stroke="' + P.hi + '" stroke-opacity=".55"/>';
+    o += ring(702, 134, 58) + badge(702, 134, 46, P.mid, 4) + org2(776, 130, 'start');
+    o += T(640, 330, title1, { fam: F, wt: 700, size: s, fill: 'url(#foil)' }) + T(640, 330 + s * 0.96, title2, { fam: F, wt: 700, size: s, fill: 'url(#foil)' });
+    y2 = 330 + s * 0.96 + 34; o += hr(644, 860, y2, 2);
+    o += T(640, y2 + 150, Y, { fam: L, wt: 400, size: 150, fill: P.ink, sp: 0.03 }) + T(646, y2 + 196, lvl, { fam: L, wt: 700, size: 17, fill: P.mid, sp: 0.3 });
+    o += waveFlag({ id: 'pf', x: 1120, y: 520, w: 190, amp: 0.38, waves: 1.4, phase: 0.5, poleTop: 484, poleBottom: 700, shadow: 0.55 }) + ft(640, 752, 'start');
+  } else if (comp === 'frame') {
+    var sf = Math.min(fit(full, F, 700, 760), 78); cx = 1105;
+    o += poster() + '<circle cx="1100" cy="320" r="460" fill="url(#gl)"/>' + T(1370, 760, Y, { fam: L, wt: 200, size: fit(Y, L, 200, 1180), fill: 'url(#foil)', anchor: 'end', extra: 'fill-opacity=".1"' }) + dust(30, 0, 1400);
+    o += photo(76, 82, 748, 458) + '<rect x="76" y="82" width="748" height="458" fill="none" stroke="url(#foil)" stroke-width="2"/><rect x="58" y="64" width="784" height="494" fill="none" stroke="url(#foil)" stroke-width="2.5"/><rect x="66" y="72" width="768" height="478" fill="none" stroke="' + P.mid + '" stroke-opacity=".4"/>' + corner(58, 64) + corner(842, 64) + corner(58, 558) + corner(842, 558);
+    o += ring(cx, 150, 64) + badge(cx, 150, 51, P.mid, 4) + org2(cx, 246, 'middle');
+    o += waveFlag({ id: 'pf', x: 1006, y: 330, w: 200, amp: 0.38, waves: 1.4, phase: 0.4, poleTop: 300, poleBottom: 500, shadow: 0.55 });
+    o += T(cx, 620, Y, { fam: L, wt: 400, size: 118, fill: P.ink, anchor: 'middle', sp: 0.04 }) + T(cx, 662, lvl, { fam: L, wt: 700, size: 16, fill: P.mid, anchor: 'middle', sp: 0.3 });
+    o += hr(76, 824, 592, 2) + T(76, 592 + sf * 0.95 + 14, full, { fam: F, wt: 700, size: sf, fill: 'url(#foil)' }) + ft(76, 728, 'start');
+  } else if (comp === 'top-band') {
+    var st = Math.min(fit(full, F, 700, 860), 84);
+    o += photo(0, 244, 1400, 544) + '<rect width="1400" height="244" fill="url(#bgp)"/><circle cx="700" cy="60" r="520" fill="url(#gl)"/>' + hr(0, 1400, 244, 3) + hr(0, 1400, 254, 1);
+    o += ring(130, 126, 66) + badge(130, 126, 53, P.mid, 4) + org1(700, 100, 'middle') + T(700, 100 + 12 + st * 0.78, full, { fam: F, wt: 700, size: st, fill: 'url(#foil)', anchor: 'middle' }) + T(700, 100 + 12 + st * 0.78 + 36, lvl, { fam: L, wt: 700, size: 16, fill: P.mid, anchor: 'middle', sp: 0.3 });
+    o += waveFlag({ id: 'pf', x: 1196, y: 84, w: 130, amp: 0.36, waves: 1.4, phase: 0.2, poleTop: 54, poleBottom: 226, shadow: 0.5 });
+    o += '<rect x="36" y="632" width="404" height="124" rx="8" fill="url(#bgp)" fill-opacity=".94"/><rect x="36" y="632" width="404" height="124" rx="8" fill="none" stroke="url(#foil)" stroke-width="2"/>' + T(238, 726, Y, { fam: L, wt: 400, size: 92, fill: P.ink, anchor: 'middle', sp: 0.05 }) + pill(930, 746, 434, 'middle');
+  } else if (comp === 'diagonal') {
+    s = Math.min(fit(title1, F, 700, 470), 100); cx = 1130;
+    var pg = 'M900 0H1400V788H560Z';
+    o += photo(0, 0, 1400, 788) + '<path d="' + pg + '" fill="url(#bgp)"/><circle cx="1250" cy="250" r="420" fill="url(#gl)"/><path d="M900 0L560 788" stroke="url(#foil)" stroke-width="4"/><path d="M926 0L586 788" stroke="' + P.mid + '" stroke-opacity=".5" stroke-width="1.2"/>';
+    o += ring(cx, 126, 64) + badge(cx, 126, 51, P.mid, 4) + org1(cx, 232, 'middle') + T(cx, 322, title1, { fam: F, wt: 700, size: s, fill: 'url(#foil)', anchor: 'middle' }) + T(cx, 322 + s * 0.96, title2, { fam: F, wt: 700, size: s, fill: 'url(#foil)', anchor: 'middle' });
+    y2 = 322 + s * 0.96 + 32; o += hr(cx - 190, cx - 16, y2, 2) + hr(cx + 16, cx + 190, y2, 2) + '<path d="M' + cx + ' ' + (y2 - 10) + 'l10 10l-10 10l-10 -10z" fill="url(#foil)"/>';
+    o += waveFlag({ id: 'pf', x: 750, y: 568, w: 170, amp: 0.38, waves: 1.4, phase: 0.3, poleTop: 536, poleBottom: 732, shadow: 0.55 });
+    o += T(1340, 650, Y, { fam: L, wt: 400, size: 124, fill: P.ink, anchor: 'end', sp: 0.04 }) + T(1336, 690, lvl, { fam: L, wt: 700, size: 16, fill: P.mid, anchor: 'end', sp: 0.3 }) + ft(1135, 752, 'middle', 13);
+  } else if (comp === 'circle') {
+    s = Math.min(fit(title1, F, 700, 620), 110);
+    o += poster() + '<circle cx="340" cy="394" r="520" fill="url(#gl)"/>' + rosette(340, 394, 345, 44, 7, P.mid, 0.16) + dust(30, 0, 1400);
+    o += photo(70, 124, 540, 540, '<circle cx="340" cy="394" r="270"/>') + '<circle cx="340" cy="394" r="272" fill="none" stroke="url(#foil)" stroke-width="4"/><circle cx="340" cy="394" r="290" fill="none" stroke="url(#foil)" stroke-width="1.5" stroke-opacity=".8"/>' + corner(340, 104 - 0) + corner(340, 702 + 0);
+    o += ring(772, 134, 58) + badge(772, 134, 46, P.mid, 4) + org2(840, 130, 'start');
+    o += waveFlag({ id: 'pf', x: 1196, y: 96, w: 130, amp: 0.36, waves: 1.4, phase: 0.2, poleTop: 62, poleBottom: 236, shadow: 0.55 });
+    o += T(710, 340, title1, { fam: F, wt: 700, size: s, fill: 'url(#foil)' }) + T(710, 340 + s * 0.96, title2, { fam: F, wt: 700, size: s, fill: 'url(#foil)' });
+    y2 = 340 + s * 0.96 + 34; o += hr(714, 930, y2, 2) + T(710, y2 + 146, Y, { fam: L, wt: 400, size: 150, fill: P.ink, sp: 0.03 }) + T(716, y2 + 190, lvl, { fam: L, wt: 700, size: 17, fill: P.mid, sp: 0.3 }) + ft(710, 752, 'start');
+  } else if (comp === 'bottom-band') {
+    var sbb = Math.min(fit(full, F, 700, 640), 68);
+    o += photo(0, 0, 1400, 530) + '<rect y="530" width="1400" height="258" fill="url(#bgp)"/><circle cx="1000" cy="700" r="520" fill="url(#gl)"/>' + hr(0, 1400, 530, 3) + hr(0, 1400, 540, 1);
+    o += waveFlag({ id: 'pf', x: 100, y: 588, w: 190, amp: 0.36, waves: 1.4, phase: 0.2, poleTop: 556, poleBottom: 748, shadow: 0.55 });
+    o += ring(382, 584, 40) + badge(382, 584, 32, P.mid, 3) + org1(436, 589, 'start').replace('size="13"', 'size="12"');
+    o += T(340, 682, full, { fam: F, wt: 700, size: sbb, fill: 'url(#foil)' }) + T(344, 720, lvl, { fam: L, wt: 700, size: 15, fill: P.mid, sp: 0.3 }) + ft(340, 758, 'start', 13);
+    o += vr(996, 570, 740, 1.5) + T(1340, 704, Y, { fam: L, wt: 400, size: fit(Y, L, 400, 310), fill: P.ink, anchor: 'end' });
+  } else { // centre-band
+    var scb = Math.min(fit(full, F, 700, 700), 66);
+    o += photo(0, 0, 1400, 788) + '<rect y="326" width="1400" height="166" fill="url(#bgp)"/>' + hr(0, 1400, 326, 3) + hr(0, 1400, 492, 3);
+    o += ring(122, 409, 70) + badge(122, 409, 57, P.mid, 4) + org1(226, 366, 'start') + T(224, 366 + 12 + scb * 0.8 + 14, full, { fam: F, wt: 700, size: scb, fill: 'url(#foil)' }) + T(228, 466, lvl, { fam: L, wt: 700, size: 15, fill: P.mid, sp: 0.3 });
+    o += vr(996, 348, 470, 1.5) + T(1332, 450, Y, { fam: L, wt: 400, size: 112, fill: P.ink, anchor: 'end', sp: 0.03 });
+    o += '<rect x="38" y="566" width="250" height="180" rx="8" fill="url(#bgp)" fill-opacity=".94"/><rect x="38" y="566" width="250" height="180" rx="8" fill="none" stroke="url(#foil)" stroke-width="2"/>' + waveFlag({ id: 'pf', x: 86, y: 604, w: 150, amp: 0.36, waves: 1.4, phase: 0.3, poleTop: 580, poleBottom: 732, shadow: 0.5 }) + pill(936, 752, 428, 'middle');
+  }
+  return o + '<rect width="1400" height="788" filter="url(#grain)"/>';
+}
+
+/* explicit &palette= / &layout= win (any name from LUXE / LAYOUTS); without them the choice follows the exam and the year among the FIRST SIX palettes and
+   FIRST THREE layouts only (so addresses without parameters keep drawing what they always drew) */
+function pick(name, key, list, base) { var p = new URLSearchParams(location.search).get(key); if (p && list.indexOf(p) >= 0) return p; var q = name.split('-'), h = (q[1] | 0) + ['csee', 'acsee', 'psle'].indexOf(q[0]) * 2 + (key === 'layout' ? 1 : 0); return base[h % base.length]; }
+
+/* ---------- page ---------- */
+function build(name, pal, lay, uid) {
+  var p = name.split('-'); E = EXAMS[p[0]]; Y = p[1]; uid = uid || name;
+  // ids are made unique per scene so that ?scene=sheet can show all nine on one page
+  var inner = SCENES[name] ? SCENES[name]() : luxe(name, pal || pick(name, 'palette', LUXE_NAMES, LUXE_BASE), lay || pick(name, 'layout', LAYOUTS, LAYOUTS_BASE));
+  return svg(inner).replace(/ id="([^"]+)"/g, ' id="' + uid + '-$1"').replace(/url\(#/g, 'url(#' + uid + '-').replace(/href="#/g, 'href="#' + uid + '-');
+}
+var QS = new URLSearchParams(location.search), q = QS.get('scene') || 'csee-2025', stage = document.getElementById('stage');
+if (q === 'list') stage.textContent = NAMES.join('\n');
+else if (q === 'luxe-list') stage.textContent = 'palettes: ' + LUXE_NAMES.join(', ') + '   layouts: ' + LAYOUTS.join(', ');
+else if (q === 'sheet') { stage.id = 'sheet'; stage.innerHTML = NAMES.map(function (n) { return build(n); }).join(''); }
+else if (q === 'luxe-sheet') {
+  /* a contact sheet for choosing and checking, never part of a cover:
+       ?scene=luxe-sheet&sample=csee-2010&layout=gala            every palette in one layout
+       ?scene=luxe-sheet&sample=csee-2010&palette=teal-pearl     every layout in one palette
+       ?scene=luxe-sheet&list=csee-2019:sienna-sand:masthead,acsee-2018:olive-bronze:gala   exactly these covers (scene:palette:layout, comma-separated)
+     &cols=3 and &w=460 set the columns and the tile width in pixels */
+  var items = [], cols = +QS.get('cols') || 3, tw = +QS.get('w') || 460, sample = QS.get('sample') || 'csee-2010';
+  if (QS.get('list')) QS.get('list').split(',').forEach(function (t) { var a = t.split(':'); items.push({ scene: a[0], pal: a[1], lay: a[2] }); });
+  else (QS.get('palette') ? [QS.get('palette')] : LUXE_NAMES).forEach(function (pn) { (QS.get('layout') ? [QS.get('layout')] : LAYOUTS).forEach(function (ln) { items.push({ scene: sample, pal: pn, lay: ln }); }); });
+  stage.id = 'lsheet';
+  stage.innerHTML = '<style>#lsheet{width:' + (cols * (tw + 12)) + 'px;display:flex;flex-wrap:wrap;line-height:1.2}#lsheet figure{margin:0 6px 6px;width:' + tw + 'px}#lsheet svg{width:' + tw + 'px;height:' + Math.round(tw * 788 / 1400) + 'px}#lsheet figcaption{font:12px/16px sans-serif;color:#ccc;padding:2px 0}</style>' +
+    items.map(function (it, n) { return '<figure>' + build(it.scene, it.pal, it.lay, 's' + n) + '<figcaption>' + esc(it.scene + '  ' + it.pal + '  ' + it.lay) + '</figcaption></figure>'; }).join('');
+}
+else if (QS.get('photo')) {
+  var pp = q.split('-'), im = new Image(), pf = QS.get('photo'), pl = QS.get('layout') || 'split-left', pt = QS.get('tone') || 'navy';
+  E = EXAMS[pp[0]]; Y = pp[1];
+  im.onload = function () { var fx = QS.get('fx') == null ? 50 : +QS.get('fx'), fy = QS.get('fy') == null ? 50 : +QS.get('fy'); stage.innerHTML = svg(photoCover(pf, PHOTO_LAYOUTS.indexOf(pl) < 0 ? 'split-left' : pl, TONES[pt] ? pt : 'navy', fx, fy, im.naturalWidth, im.naturalHeight)); document.title = 'ready'; };
+  im.onerror = function () { stage.textContent = 'photo not found: photos/' + pf; };
+  im.src = 'photos/' + pf;
+}
+else stage.innerHTML = build(q);
+</script>
+</body>
+</html>

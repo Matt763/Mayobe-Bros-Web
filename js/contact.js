@@ -93,9 +93,24 @@
     status.appendChild(a);
     status.appendChild(doc.createTextNode('.'));
   }
+  // Focus a field or the status line without the browser's own scroll (with html { scroll-behavior: smooth } that races across a long
+  // page), then glide (js/motion.js) to it only when it is not fully on screen under the sticky header. Without MBMotion: one plain jump.
+  function bring(el) {
+    if (!el) return;
+    try { el.focus({ preventScroll: true }); } catch (e) { /* nothing to do */ }
+    try { // the scroll is a nicety: if anything in it fails, the focus above has already happened and the form still works
+      var r = el.getBoundingClientRect();
+      var head = doc.querySelector('.site-header');
+      var top = head ? head.getBoundingClientRect().bottom : 0;
+      if (r.top >= top + 8 && r.bottom <= window.innerHeight - 8) return;
+      var M = window.MBMotion;
+      if (M) M.glide(M.topOf(el, 96));
+      else el.scrollIntoView({ behavior: 'instant', block: 'center' });
+    } catch (e) { /* nothing to do */ }
+  }
   function showFallback(f, lead) {
     try { fallback(f, lead); } catch (e) { plainFallback(); }
-    try { status.focus(); } catch (e) { /* nothing to do */ }
+    bring(status);
   }
 
   form.addEventListener('submit', function (e) {
@@ -107,7 +122,7 @@
       fieldError(k, why);
       if (why && !first) first = f[k];
     });
-    if (first) { setStatus('err', 'Some fields need attention.'); first.focus(); return; }
+    if (first) { setStatus('err', 'Some fields need attention.'); bring(first); return; }
     var payload = { name: f.name.value.trim(), email: f.email.value.trim(), subject: f.subject.value.trim(), message: f.message.value.trim(), website: f.website ? f.website.value : '', ts: loaded, id: formId };
     sending = true;
     button.disabled = true;
@@ -118,14 +133,14 @@
         loaded = Date.now();
         formId = newId();
         setStatus('ok', 'Message sent.');
-        status.focus();
+        bring(status);
       } else if (r.status === 400 && r.body.field && RULES[r.body.field] && r.body.error) {
         fieldError(r.body.field, r.body.error);
         setStatus('err', 'Invalid input.');
-        f[r.body.field].focus();
+        bring(f[r.body.field]);
       } else if (r.status === 400 && r.body.field === 'check') {
         setStatus('err', 'Complete the security check.');
-        status.focus();
+        bring(status);
       } else if (r.status === 429) {
         showFallback(f, 'Too many attempts. Email us at ');
       } else {

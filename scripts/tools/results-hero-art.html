@@ -1,0 +1,501 @@
+<!doctype html>
+<!-- Draws the four hero pictures for the exam-results pages (assets/img/heroes/results-*.webp).
+     Open this file in a browser with ?scene=csee, ?scene=acsee, ?scene=psle or ?scene=guides to see one, or ?scene=list for all names.
+     Same family as hero-art.html (navy gradients, glow, glass, fine grain) but each scene is its own composition:
+       csee    Form Four results: glass result slip cluster, grade chips, division ring, bar chart. Emerald/teal. Weight on the right.
+       acsee   Form Six results: a bar staircase rising to a mortarboard and a columned building. Violet + amber. Strong diagonal.
+       psle    Standard Seven results: notebook, pencil, ruler, bag, ABC blocks, star, paper plane. Amber/orange + sky blue. Centred and round.
+       guides  Results guides: open guidebook, checklist, magnifier over a highlighted line, light bulb. Cyan + rose-pink. Weight on the left.
+     To regenerate the WebP files: screenshot each scene at 1920x1080 and convert with cwebp (see docs/hero-art.md).
+     Everything is drawn in code from original shapes: no photographs, no logos or emblems, no words. Letters (grades, Roman numerals)
+     are drawn as stroked paths, so they do not depend on any font. Nothing is requested from the network. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Results hero art</title>
+<style>html,body{margin:0;background:#070b14}svg{display:block;width:1920px;height:1080px}</style>
+</head>
+<body>
+<div id="stage"></div>
+<script>
+/* ---------- small helpers ---------- */
+function f(n) { return Math.round(n * 10) / 10; }
+function R(x, y, w, h, r, a) { return '<rect x="' + f(x) + '" y="' + f(y) + '" width="' + f(w) + '" height="' + f(h) + '" rx="' + f(r) + '" ' + (a || '') + '/>'; }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function mix(c1, c2, t) { // two #rrggbb colours
+  var a = [1, 3, 5].map(function (i) { return parseInt(c1.substr(i, 2), 16); }), b = [1, 3, 5].map(function (i) { return parseInt(c2.substr(i, 2), 16); });
+  return '#' + a.map(function (v, i) { var h = Math.round(lerp(v, b[i], t)).toString(16); return h.length < 2 ? '0' + h : h; }).join('');
+}
+function spline(p) { // smooth curve through points (Catmull-Rom turned into cubic Beziers)
+  var d = 'M' + f(p[0][0]) + ' ' + f(p[0][1]);
+  for (var i = 0; i < p.length - 1; i++) {
+    var p0 = p[i - 1] || p[i], p1 = p[i], p2 = p[i + 1], p3 = p[i + 2] || p2;
+    d += ' C' + f(p1[0] + (p2[0] - p0[0]) / 6) + ' ' + f(p1[1] + (p2[1] - p0[1]) / 6) + ' ' + f(p2[0] - (p3[0] - p1[0]) / 6) + ' ' + f(p2[1] - (p3[1] - p1[1]) / 6) + ' ' + f(p2[0]) + ' ' + f(p2[1]);
+  }
+  return d;
+}
+function starPts(cx, cy, Ro, Ri) {
+  var a = [];
+  for (var k = 0; k < 10; k++) { var ang = (-90 + k * 36) * Math.PI / 180, rad = k % 2 ? Ri : Ro; a.push(f(cx + rad * Math.cos(ang)) + ',' + f(cy + rad * Math.sin(ang))); }
+  return a.join(' ');
+}
+function sparkle(cx, cy, s, col, op) { // four-point twinkle
+  return '<path d="M' + cx + ' ' + (cy - s) + ' Q' + (cx + s * 0.12) + ' ' + (cy - s * 0.12) + ' ' + (cx + s) + ' ' + cy + ' Q' + (cx + s * 0.12) + ' ' + (cy + s * 0.12) + ' ' + cx + ' ' + (cy + s) + ' Q' + (cx - s * 0.12) + ' ' + (cy + s * 0.12) + ' ' + (cx - s) + ' ' + cy + ' Q' + (cx - s * 0.12) + ' ' + (cy - s * 0.12) + ' ' + cx + ' ' + (cy - s) + 'Z" fill="' + col + '" opacity="' + (op || 0.8) + '"/>';
+}
+function node(x, y, r, col) { return '<circle cx="' + f(x) + '" cy="' + f(y) + '" r="' + f(r * 2.6) + '" fill="' + col + '" opacity=".18"/><circle cx="' + f(x) + '" cy="' + f(y) + '" r="' + r + '" fill="' + col + '"/>'; }
+
+/* Letters and Roman numerals drawn as stroked paths in a box 13 high, centred on 0,0 (so they never depend on a font) */
+var GL = {
+  A: 'M-4.5 6.5 L0 -6.5 L4.5 6.5 M-2.7 2.2 H2.7',
+  B: 'M-3 -6.5 V6.5 M-3 -6.5 H1.2 A2.9 2.9 0 0 1 1.2 -0.7 H-3 M-3 -0.7 H1.8 A3.6 3.6 0 0 1 1.8 6.5 H-3',
+  C: 'M5.2 -3.8 A6 6 0 1 0 5.2 3.8',
+  D: 'M-3.5 -6.5 V6.5 H0 A6.5 6.5 0 0 0 0 -6.5 Z',
+  I: 'M-3.7 -6.5 H3.7 M0 -6.5 V6.5 M-3.7 6.5 H3.7',
+  II: 'M-6.8 -6.5 H-1.2 M-4 -6.5 V6.5 M-6.8 6.5 H-1.2 M1.2 -6.5 H6.8 M4 -6.5 V6.5 M1.2 6.5 H6.8'
+};
+function glyph(ch, cx, cy, h, sw, col, op) {
+  return '<g transform="translate(' + f(cx) + ' ' + f(cy) + ') scale(' + f(h / 13 * 1000) / 1000 + ')" fill="none" stroke="' + col + '" stroke-width="' + sw + '" stroke-linecap="round" stroke-linejoin="round"' + (op ? ' opacity="' + op + '"' : '') + '><path d="' + GL[ch] + '"/></g>';
+}
+function tick(cx, cy, s, col, sw) { // a check mark about s wide
+  return '<path d="M' + f(cx - s * 0.5) + ' ' + f(cy + s * 0.02) + ' L' + f(cx - s * 0.14) + ' ' + f(cy + s * 0.38) + ' L' + f(cx + s * 0.5) + ' ' + f(cy - s * 0.34) + '" fill="none" stroke="' + col + '" stroke-width="' + sw + '" stroke-linecap="round" stroke-linejoin="round"/>';
+}
+
+/* ---------- shared layers ---------- */
+function defs(S) {
+  var b = S.bg;
+  return '<defs>' +
+    '<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + b[0] + '"/><stop offset=".55" stop-color="' + b[1] + '"/><stop offset="1" stop-color="' + b[2] + '"/></linearGradient>' +
+    ['A', 'B', 'C'].map(function (k, i) { var c = [S.a, S.b, S.c][i]; return '<radialGradient id="blob' + k + '" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="' + c + '" stop-opacity=".62"/><stop offset="1" stop-color="' + c + '" stop-opacity="0"/></radialGradient>'; }).join('') +
+    '<linearGradient id="glass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".2"/><stop offset="1" stop-color="#fff" stop-opacity=".05"/></linearGradient>' +
+    '<linearGradient id="glassHi" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".3"/><stop offset="1" stop-color="#fff" stop-opacity=".09"/></linearGradient>' +
+    '<linearGradient id="shine" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".42"/><stop offset=".55" stop-color="#fff" stop-opacity=".04"/><stop offset="1" stop-color="#000" stop-opacity=".12"/></linearGradient>' +
+    '<linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + S.a + '"/><stop offset="1" stop-color="' + S.b + '"/></linearGradient>' +
+    '<pattern id="dots" width="40" height="40" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.6" fill="#fff"/></pattern>' +
+    '<radialGradient id="fade" cx=".5" cy=".5" r=".62"><stop offset=".25" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff" stop-opacity="1"/></radialGradient>' +
+    '<mask id="dotmask"><rect width="1920" height="1080" fill="url(#fade)"/></mask>' +
+    '<radialGradient id="calm" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="' + S.calm + '" stop-opacity="' + (S.calmOp || 0.42) + '"/><stop offset=".6" stop-color="' + S.calm + '" stop-opacity="' + ((S.calmOp || 0.42) * 0.45).toFixed(2) + '"/><stop offset="1" stop-color="' + S.calm + '" stop-opacity="0"/></radialGradient>' +
+    '<filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="4" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter>' +
+    '<filter id="blur30" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="26"/></filter>' +
+    '<filter id="blur14" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="12"/></filter>' +
+    '<filter id="blur6" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="5"/></filter>' +
+    '<filter id="shadow" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#000" flood-opacity=".42"/></filter>' +
+    '<filter id="shadowS" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="6" stdDeviation="7" flood-color="#000" flood-opacity=".38"/></filter>' +
+    '<filter id="shadowSoft" x="-40%" y="-40%" width="180%" height="190%"><feDropShadow dx="0" dy="18" stdDeviation="20" flood-color="#021018" flood-opacity=".4"/></filter>' +
+    '</defs>';
+}
+
+/* =====================================================================
+   CSEE: a glass result slip cluster (weight on the right, calm on the left)
+   ===================================================================== */
+function gradeChip(ch, cx, cy, w, h, col, rot) { // solid grade chip with a dark letter
+  return '<g transform="translate(' + cx + ' ' + cy + ') rotate(' + (rot || 0) + ')">' +
+    R(-w / 2, -h / 2, w, h, h * 0.3, 'fill="' + col + '"') + R(-w / 2, -h / 2, w, h, h * 0.3, 'fill="url(#shine)"') +
+    glyph(ch, 0, 0, h * 0.5, 2.5, '#042a26') + '</g>';
+}
+function csee(S) {
+  var o = [];
+  // calm left: a soft dial centred on the picture, like the family's rings, with a score arc
+  o.push('<g transform="translate(960 540)">' +
+    '<circle r="330" fill="none" stroke="#fff" stroke-opacity=".08" stroke-width="2"/>' +
+    '<circle r="214" fill="none" stroke="#fff" stroke-opacity=".07" stroke-width="2"/>' +
+    '<circle r="272" fill="none" stroke="#fff" stroke-opacity=".2" stroke-width="12" stroke-dasharray="2.4 21.3"/>' +
+    '<circle r="330" fill="none" stroke="' + S.a + '" stroke-width="16" stroke-linecap="round" stroke-dasharray="1260 2074" transform="rotate(-205)" filter="url(#blur14)" opacity=".42"/>' +
+    '<circle r="330" fill="none" stroke="url(#ringGrad)" stroke-width="5" stroke-linecap="round" stroke-dasharray="1260 2074" transform="rotate(-205)" opacity=".7"/>' +
+    node(330 * Math.cos(13.7 * Math.PI / 180), 330 * Math.sin(13.7 * Math.PI / 180), 10, S.a) + node(330 * Math.cos(-205 * Math.PI / 180), 330 * Math.sin(-205 * Math.PI / 180), 6, S.b) +
+    '</g>');
+  // a few outer arcs and nodes
+  o.push('<circle cx="1560" cy="520" r="560" fill="none" stroke="#fff" stroke-opacity=".08" stroke-width="2"/><circle cx="1560" cy="520" r="760" fill="none" stroke="#fff" stroke-opacity=".06" stroke-width="2" stroke-dasharray="3 16"/>');
+  o.push('<path d="M90 960 C420 990 760 930 980 800" fill="none" stroke="url(#ringGrad)" stroke-width="4" stroke-linecap="round" stroke-dasharray="1 15" opacity=".8"/>');
+  o.push(node(90, 960, 8, S.b), node(980, 800, 7, S.a));
+
+  // small calm chips on the left
+  var cs = [['A', 290, 300, 112, 80, -6], ['D', 190, 760, 96, 70, 5], ['B', 520, 880, 104, 74, -3]];
+  cs.forEach(function (c) {
+    o.push('<g transform="translate(' + c[1] + ' ' + c[2] + ') rotate(' + c[5] + ')" filter="url(#shadowS)" opacity=".92">' +
+      R(-c[3] / 2, -c[4] / 2, c[3], c[4], c[4] * 0.3, 'fill="url(#glass)" stroke="rgba(255,255,255,.28)" stroke-width="1.5"') +
+      glyph(c[0], 0, 0, c[4] * 0.48, 2.3, c[0] === 'A' ? S.a : c[0] === 'B' ? '#22d3ee' : '#9db4dd') + '</g>');
+  });
+
+  // back card (peeks out on the right)
+  o.push('<g transform="translate(1560 488) rotate(-3.5)"><g transform="translate(244 -34) rotate(8)" filter="url(#shadow)" opacity=".85">' +
+    R(-170, -290, 340, 580, 34, 'fill="rgba(6,26,34,.8)"') + R(-170, -290, 340, 580, 34, 'fill="url(#glass)" stroke="rgba(255,255,255,.22)" stroke-width="1.5"') +
+    [0, 1, 2, 3, 4].map(function (i) { return R(-124, -196 + i * 78, 190 - (i % 3) * 30, 12, 6, 'fill="#fff" opacity=".4"') + R(-124, -174 + i * 78, 110, 8, 4, 'fill="#fff" opacity=".2"') + R(86, -208 + i * 78, 42, 32, 10, 'fill="' + ['#34d399', '#22d3ee', '#34d399', '#5b8cff', '#22d3ee'][i] + '" opacity=".75"'); }).join('') +
+    '</g></g>');
+
+  // the main result slip
+  var rows = [['A', 168, '#34d399'], ['B', 134, '#22d3ee'], ['A', 190, '#34d399'], ['A', 120, '#34d399'], ['B', 158, '#22d3ee'], ['C', 146, '#5b8cff']];
+  var card = '<g transform="translate(1560 488) rotate(-3.5)"><g filter="url(#shadow)">' +
+    R(-230, -310, 460, 580, 40, 'fill="rgb(8,32,42)"') + R(-230, -310, 460, 580, 40, 'fill="url(#glass)" stroke="rgba(255,255,255,.32)" stroke-width="1.5"') + '</g>';
+  card += R(-190, -276, 54, 54, 16, 'fill="#34d399"') + R(-190, -276, 54, 54, 16, 'fill="url(#shine)"');
+  card += '<path d="M-176 -255 h26 M-176 -243 h18" stroke="#042a26" stroke-width="4" stroke-linecap="round"/>';
+  card += R(-122, -272, 150, 14, 7, 'fill="#fff" opacity=".82"') + R(-122, -246, 96, 10, 5, 'fill="#fff" opacity=".36"');
+  card += '<path d="M-190 -204 H190" stroke="#fff" stroke-opacity=".16" stroke-width="2"/>';
+  rows.forEach(function (r, i) {
+    var cy = -156 + i * 62;
+    card += '<circle cx="-182" cy="' + cy + '" r="8" fill="' + r[2] + '"/>' + R(-158, cy - 14, r[1], 12, 6, 'fill="#fff" opacity=".62"') + R(-158, cy + 4, 84, 8, 4, 'fill="#fff" opacity=".24"') + gradeChip(r[0], 152, cy, 76, 46, r[2], 0);
+    if (i < rows.length - 1) card += '<path d="M-190 ' + (cy + 31) + ' H190" stroke="#fff" stroke-opacity=".07" stroke-width="2"/>';
+  });
+  card += '<path d="M-190 198 H190" stroke="#fff" stroke-opacity=".16" stroke-width="2"/>' +
+    R(-190, 218, 380, 14, 7, 'fill="#fff" opacity=".14"') + R(-190, 218, 296, 14, 7, 'fill="url(#ringGrad)"') + '<circle cx="106" cy="225" r="12" fill="#fff"/><circle cx="106" cy="225" r="5.5" fill="#34d399"/>';
+  // the division ring badge that overlaps the top right corner
+  card += '<g transform="translate(172 -300)"><circle r="104" fill="#34d399" opacity=".24" filter="url(#blur14)"/>' +
+    '<circle r="76" fill="rgba(5,24,30,.94)" stroke="rgba(255,255,255,.3)" stroke-width="2"/>' +
+    '<circle r="58" fill="none" stroke="#fff" stroke-opacity=".15" stroke-width="11"/>' +
+    '<circle r="58" fill="none" stroke="url(#ringGrad)" stroke-width="11" stroke-linecap="round" stroke-dasharray="292 400" transform="rotate(-90)"/>' +
+    glyph('I', 0, 0, 42, 2.3, '#fff') + '</g>';
+  card += '</g>';
+  o.push(card);
+
+  // bar chart panel overlapping the card's bottom left corner
+  var hs = [30, 46, 42, 70, 64, 98, 128], bars = '';
+  hs.forEach(function (h, i) {
+    var x = -212 + i * 62, last = i === hs.length - 1;
+    bars += (last ? '<g filter="url(#blur6)" opacity=".8">' + R(x, 62 - h, 40, h, 10, 'fill="#34d399"') + '</g>' : '') + R(x, 62 - h, 40, h, 10, 'fill="' + (last ? '#34d399' : '#2dd4bf') + '" opacity="' + (last ? 1 : 0.34 + i * 0.07) + '"');
+  });
+  var pts = hs.map(function (h, i) { return [-192 + i * 62, 62 - h - 22]; });
+  o.push('<g transform="translate(1236 852) rotate(-2)"><g filter="url(#shadow)">' +
+    R(-250, -100, 500, 200, 30, 'fill="rgb(8,32,42)"') + R(-250, -100, 500, 200, 30, 'fill="url(#glass)" stroke="rgba(255,255,255,.3)" stroke-width="1.5"') + '</g>' +
+    '<path d="M-226 62 H226" stroke="#fff" stroke-opacity=".2" stroke-width="2"/>' + bars +
+    '<path d="' + spline(pts) + '" fill="none" stroke="#22d3ee" stroke-width="4" stroke-linecap="round" stroke-dasharray="1 11"/>' +
+    pts.map(function (p, i) { return i === pts.length - 1 ? node(p[0], p[1], 9, '#22d3ee') : '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="5" fill="#22d3ee"/>'; }).join('') + '</g>');
+  o.push(sparkle(1830, 170, 24, '#a7f3d0', 0.8), sparkle(1120, 150, 14, '#fff', 0.5), sparkle(1262, 330, 10, '#7dd3fc', 0.5));
+  return o.join('');
+}
+
+/* =====================================================================
+   ACSEE: a bar staircase rising to a mortarboard and a columned building (strong diagonal)
+   ===================================================================== */
+function mortarboard(cx, cy, rot, sc) {
+  return '<g transform="translate(' + cx + ' ' + cy + ') rotate(' + rot + ') scale(' + sc + ')">' +
+    '<path d="M-74 26 V82 C-74 116 74 116 74 82 V26 Z" fill="url(#capBand)"/>' +
+    '<path d="M-74 26 V82 C-74 116 74 116 74 82 V26" fill="none" stroke="rgba(255,255,255,.25)" stroke-width="2"/>' +
+    '<polygon points="-128,14 0,66 128,14 128,2 -128,2" fill="#b36a0d"/>' +
+    '<polygon points="-128,0 0,-56 128,0 0,56" fill="url(#capTop)" stroke="url(#capTop)" stroke-width="10" stroke-linejoin="round"/>' +
+    '<polygon points="-128,0 0,-56 0,56" fill="#fff" opacity=".12"/>' +
+    '<path d="M-100 -2 L0 -43 L100 -2" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<circle cx="0" cy="0" r="11" fill="#b36a0d"/><circle cx="0" cy="-2" r="7" fill="#ffd98a"/>' +
+    '<path d="M0 0 L108 14 L108 82" fill="none" stroke="#ffcf75" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<rect x="100" y="78" width="16" height="42" rx="7" fill="#f5b042"/><path d="M104 96 V118 M108 96 V120 M112 96 V118" stroke="#b36a0d" stroke-width="2" stroke-linecap="round"/>' +
+    '</g>';
+}
+function acsee(S) {
+  var o = [];
+  // diagonal beam and points arcs
+  o.push('<defs><linearGradient id="beam" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="' + S.a + '" stop-opacity=".34"/><stop offset=".6" stop-color="' + S.a + '" stop-opacity=".12"/><stop offset="1" stop-color="' + S.b + '" stop-opacity=".34"/></linearGradient>' +
+    '<linearGradient id="capTop" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe3a3"/><stop offset="1" stop-color="#f0a020"/></linearGradient>' +
+    '<linearGradient id="capBand" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6d4fe0"/><stop offset="1" stop-color="#34208f"/></linearGradient>' +
+    '<linearGradient id="barG" gradientUnits="userSpaceOnUse" x1="0" y1="340" x2="0" y2="1080"><stop offset="0" stop-color="#a78bfa" stop-opacity=".62"/><stop offset="1" stop-color="#6d4fe0" stop-opacity=".1"/></linearGradient>' +
+    '<linearGradient id="bldG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c4b5fd" stop-opacity=".3"/><stop offset="1" stop-color="#7c5cf0" stop-opacity=".08"/></linearGradient></defs>');
+  o.push('<g filter="url(#blur30)"><polygon points="-160,1200 380,1200 2060,-120 1500,-120" fill="url(#beam)"/></g>');
+  [380, 660, 940, 1220, 1500].forEach(function (r, i) {
+    o.push('<circle cx="120" cy="1040" r="' + r + '" fill="none" stroke="#fff" stroke-opacity="' + (0.16 - i * 0.02).toFixed(2) + '" stroke-width="3" stroke-linecap="round" stroke-dasharray="1 ' + (14 + i * 3) + '"/>');
+  });
+
+  // glow behind the goal
+  o.push('<circle cx="1680" cy="330" r="330" fill="' + S.b + '" opacity=".26" filter="url(#blur30)" style="mix-blend-mode:screen"/>');
+  o.push('<ellipse cx="1660" cy="990" rx="560" ry="260" fill="#7c5cf0" opacity=".3" filter="url(#blur30)"/>');
+
+  // the columned building (generic, original shapes), seen as a soft glass silhouette
+  var bld = '<g transform="translate(1714 662) scale(.86)">';
+  bld += R(-236, -34, 472, 34, 8, 'fill="url(#bldG)" stroke="rgba(255,255,255,.26)" stroke-width="2"') + R(-212, -64, 424, 30, 8, 'fill="url(#bldG)" stroke="rgba(255,255,255,.26)" stroke-width="2"');
+  for (var c = 0; c < 6; c++) {
+    var cx = -176 + c * 70.4;
+    bld += R(cx - 18, -252, 36, 188, 10, 'fill="url(#bldG)" stroke="rgba(255,255,255,.22)" stroke-width="2"') + R(cx - 25, -266, 50, 16, 5, 'fill="rgba(255,255,255,.22)"') + R(cx - 25, -74, 50, 12, 5, 'fill="rgba(255,255,255,.2)"') +
+      '<path d="M' + (cx - 6) + ' -236 V-82 M' + (cx + 6) + ' -236 V-82" stroke="#fff" stroke-opacity=".12" stroke-width="2" stroke-linecap="round"/>';
+  }
+  bld += R(-222, -304, 444, 38, 8, 'fill="url(#bldG)" stroke="rgba(255,255,255,.28)" stroke-width="2"') +
+    '<polygon points="-234,-304 0,-398 234,-304" fill="url(#bldG)" stroke="rgba(255,255,255,.3)" stroke-width="2" stroke-linejoin="round"/>' +
+    '<polygon points="-176,-316 0,-384 176,-316" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="2" stroke-linejoin="round"/>' +
+    '<circle cx="0" cy="-338" r="20" fill="none" stroke="#fff" stroke-opacity=".3" stroke-width="3"/><circle cx="0" cy="-338" r="7" fill="#f5b042" opacity=".9"/></g>';
+  o.push(bld);
+
+  // the staircase of stacked bars (dimmed in the middle, where the title sits)
+  o.push('<defs><radialGradient id="maskFade" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#4a4a4a"/><stop offset=".6" stop-color="#8c8c8c"/><stop offset="1" stop-color="#fff"/></radialGradient>' +
+    '<mask id="stairMask" maskUnits="userSpaceOnUse" x="0" y="0" width="1920" height="1080"><rect width="1920" height="1080" fill="#fff"/><ellipse cx="960" cy="590" rx="640" ry="340" fill="url(#maskFade)"/></mask></defs>');
+  o.push('<g mask="url(#stairMask)">');
+  var tops = [1000, 944, 878, 800, 712, 612, 500, 374], w = 156, pitch = 184, x0 = 40, centres = [];
+  tops.forEach(function (top, i) {
+    var x = x0 + i * pitch, t = Math.pow(i / 7, 1.7), capCol = mix('#a78bfa', '#f5b042', t);
+    centres.push([x + w / 2, top]);
+    var y = top + 52, seg = '';
+    // lower stacked blocks
+    while (y < 1100) { seg += R(x, y, w, 80, 14, 'fill="url(#barG)" stroke="rgba(255,255,255,.17)" stroke-width="1.5"'); y += 88; }
+    var head = '';
+    if (i >= 5) head += '<g filter="url(#blur14)" opacity="' + (0.35 + t * 0.4).toFixed(2) + '">' + R(x, top, w, 46, 16, 'fill="' + capCol + '"') + '</g>';
+    head += R(x, top, w, 46, 16, 'fill="' + capCol + '" opacity=".94"') + R(x, top, w, 46, 16, 'fill="url(#shine)"') + R(x + 14, top + 5, w - 28, 3, 1.5, 'fill="#fff" opacity=".45"');
+    o.push('<g filter="url(#shadowS)">' + seg + '</g>' + head);
+  });
+  o.push('</g>');
+
+  // dotted points arc over the tops, ending at the cap
+  var arc = centres.map(function (c) { return [c[0], c[1] - 56]; });
+  arc.push([1612, 376]);
+  var ad = spline(arc);
+  o.push('<path d="' + ad + '" fill="none" stroke="#f5b042" stroke-width="9" stroke-linecap="round" stroke-dasharray="0.1 19" opacity=".95"/>');
+  o.push('<path d="' + spline(arc.map(function (p, i) { return [p[0] - 30, p[1] - 70 - i * 3]; })) + '" fill="none" stroke="#a78bfa" stroke-width="4" stroke-linecap="round" stroke-dasharray="0.1 14" opacity=".6"/>');
+  arc.slice(1, 7).forEach(function (p, i) { o.push(node(p[0], p[1], 7 + i * 0.6, i > 3 ? '#f5b042' : '#c4b5fd')); });
+
+  // a small points badge (a mini staircase in a glass ring) near the top of the middle
+  var pb = '<g transform="translate(960 244)"><circle r="120" fill="#7c5cf0" opacity=".3" filter="url(#blur30)"/><g filter="url(#shadowS)"><circle r="66" fill="rgba(9,6,40,.6)"/><circle r="66" fill="url(#glass)" stroke="rgba(255,255,255,.34)" stroke-width="1.5"/></g>' +
+    '<circle r="88" fill="none" stroke="#f5b042" stroke-width="5" stroke-linecap="round" stroke-dasharray="0.1 13" opacity=".8"/><circle r="104" fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="2"/>';
+  [18, 32, 48, 66].forEach(function (h, i) { pb += R(-44 + i * 24, 32 - h, 18, h, 6, 'fill="' + mix('#a78bfa', '#f5b042', i / 3) + '" opacity=".95"') + R(-44 + i * 24, 32 - h, 18, 6, 3, 'fill="#fff" opacity=".35"'); });
+  pb += node(88 * Math.cos(-50 * Math.PI / 180), 88 * Math.sin(-50 * Math.PI / 180), 7, '#f5b042') + '</g>';
+  o.push(pb);
+
+  // the mortarboard
+  o.push('<circle cx="1700" cy="290" r="150" fill="#f5b042" opacity=".24" filter="url(#blur30)" style="mix-blend-mode:screen"/>');
+  o.push('<g filter="url(#shadow)">' + mortarboard(1700, 262, -9, 1.1) + '</g>');
+  o.push(sparkle(1530, 176, 22, '#ffe3a3', 0.9), sparkle(1850, 300, 16, '#fff', 0.6), sparkle(1650, 880, 14, '#c4b5fd', 0.55), sparkle(1800, 1000, 10, '#fff', 0.4), sparkle(1380, 330, 11, '#c4b5fd', 0.7), sparkle(260, 330, 14, '#c4b5fd', 0.5));
+  return o.join('');
+}
+
+/* =====================================================================
+   PSLE: a friendly, round scene around an open notebook (centred)
+   ===================================================================== */
+function pencil() {
+  return '<g filter="url(#shadowSoft)">' +
+    R(-244, -30, 50, 60, 16, 'fill="#ff8f7a"') + R(-244, -30, 50, 60, 16, 'fill="url(#shine)"') +
+    R(-196, -30, 42, 60, 0, 'fill="#b9cbe6"') + '<path d="M-184 -30 V30 M-172 -30 V30 M-160 -30 V30" stroke="#6f89b3" stroke-width="3"/>' +
+    R(-154, -30, 300, 20, 0, 'fill="#ffd68a"') + R(-154, -10, 300, 20, 0, 'fill="#f5b042"') + R(-154, 10, 300, 20, 0, 'fill="#d98d1c"') +
+    '<polygon points="142,-30 246,0 142,30" fill="#f6caa0" stroke="#f6caa0" stroke-width="4" stroke-linejoin="round"/>' +
+    '<polygon points="142,-30 246,0 142,-10" fill="#fff" opacity=".35"/>' +
+    '<polygon points="142,10 246,0 142,30" fill="#a8683a" opacity=".3"/>' +
+    '<polygon points="208,-10.8 246,0 208,10.8" fill="#2a3a5e" stroke="#2a3a5e" stroke-width="3" stroke-linejoin="round"/>' +
+    R(-150, -26, 292, 4, 2, 'fill="#fff" opacity=".4"') + '</g>';
+}
+function ruler() {
+  var t = '';
+  for (var i = 0; i <= 44; i++) { var x = -240 + i * 10.9, len = i % 10 === 0 ? 38 : i % 5 === 0 ? 28 : 17; t += 'M' + f(x) + ' -40 v' + len; }
+  return '<g filter="url(#shadowSoft)">' + R(-262, -44, 524, 88, 18, 'fill="#5ac8fa" opacity=".4"') + R(-262, -44, 524, 88, 18, 'fill="url(#glassHi)" stroke="rgba(255,255,255,.6)" stroke-width="2"') +
+    '<path d="' + t + '" stroke="#fff" stroke-opacity=".85" stroke-width="3" stroke-linecap="round" fill="none"/>' +
+    '<circle cx="228" cy="14" r="9" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="3"/>' + R(-250, 30, 440, 6, 3, 'fill="#fff" opacity=".18"') + '</g>';
+}
+function block(ch, cx, cy, s, c1, c2, rot, id) {
+  return '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + c1 + '"/><stop offset="1" stop-color="' + c2 + '"/></linearGradient></defs>' +
+    '<g transform="translate(' + cx + ' ' + cy + ') rotate(' + rot + ')" filter="url(#shadowSoft)">' +
+    R(-s / 2, -s / 2 + 12, s, s, s * 0.22, 'fill="' + c2 + '"') + R(-s / 2, -s / 2, s, s, s * 0.22, 'fill="url(#' + id + ')"') +
+    R(-s / 2 + 7, -s / 2 + 7, s - 14, s - 14, s * 0.17, 'fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="2.5"') +
+    glyph(ch, 0, 2, s * 0.5, s * 0.052, '#0f2f5c') + '</g>';
+}
+function plane() {
+  return '<g filter="url(#shadowSoft)">' +
+    '<polygon points="112,0 -92,-58 -36,10" fill="#fff" stroke="#fff" stroke-width="6" stroke-linejoin="round"/>' +
+    '<polygon points="112,0 -36,10 -74,52" fill="#bfe6ff" stroke="#bfe6ff" stroke-width="6" stroke-linejoin="round"/>' +
+    '<polygon points="-36,10 -74,52 -50,6" fill="#6cc0f4" stroke="#6cc0f4" stroke-width="4" stroke-linejoin="round"/>' +
+    '<polygon points="112,0 -92,-58 -60,-8" fill="#e6f5ff" opacity=".0"/>' +
+    '<path d="M112 0 L-36 10" stroke="#7ab8e8" stroke-width="2.5" stroke-linecap="round" opacity=".7"/></g>';
+}
+function backpack() {
+  return '<g filter="url(#shadowSoft)">' +
+    '<path d="M-44 -148 C-44 -196 44 -196 44 -148" fill="none" stroke="#c9691a" stroke-width="16" stroke-linecap="round"/>' +
+    R(-148, 28, 34, 92, 16, 'fill="#c9691a"') + R(114, 28, 34, 92, 16, 'fill="#c9691a"') +
+    '<path d="M-126 -62 C-126 -132 -82 -152 0 -152 C82 -152 126 -132 126 -62 V104 Q126 152 78 152 H-78 Q-126 152 -126 104 Z" fill="url(#bagG)"/>' +
+    '<path d="M-126 -62 C-126 -132 -82 -152 0 -152 C82 -152 126 -132 126 -62 C126 -14 80 6 0 6 C-80 6 -126 -14 -126 -62Z" fill="url(#bagFlap)"/>' +
+    '<path d="M-118 -30 C-96 -4 -50 6 0 6 C50 6 96 -4 118 -30" fill="none" stroke="#a8520f" stroke-opacity=".35" stroke-width="5" stroke-linecap="round"/>' +
+    R(-22, -10, 44, 30, 11, 'fill="#fff0cf"') + R(-22, -10, 44, 30, 11, 'fill="url(#shine)"') + R(-6, 0, 12, 10, 4, 'fill="#c9691a"') +
+    R(-92, 40, 184, 96, 38, 'fill="url(#bagPocket)"') + '<path d="M-72 66 H72" stroke="#fff" stroke-opacity=".7" stroke-width="4" stroke-linecap="round" stroke-dasharray="2 9"/>' +
+    '<circle cx="0" cy="102" r="9" fill="#fff" opacity=".9"/><circle cx="0" cy="102" r="3.5" fill="#2f9bf0"/>' +
+    '<ellipse cx="-62" cy="-92" rx="40" ry="22" fill="#fff" opacity=".22" transform="rotate(-28 -62 -92)"/></g>';
+}
+function psle(S) {
+  var o = [];
+  o.push('<defs><linearGradient id="bagG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb347"/><stop offset="1" stop-color="#ef7d1a"/></linearGradient>' +
+    '<linearGradient id="bagFlap" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd27a"/><stop offset="1" stop-color="#ffa63d"/></linearGradient>' +
+    '<linearGradient id="bagPocket" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6fd0ff"/><stop offset="1" stop-color="#2f93e6"/></linearGradient>' +
+    '<linearGradient id="starG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe08a"/><stop offset="1" stop-color="#f59e0b"/></linearGradient>' +
+    '<linearGradient id="pageG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".2"/><stop offset="1" stop-color="#fff" stop-opacity=".08"/></linearGradient>' +
+    '<linearGradient id="gutter" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".28"/></linearGradient>' +
+    '<linearGradient id="gutterR" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".28"/></linearGradient></defs>');
+  // soft clouds and bubbles
+  [[470, 150, 300, 86, '#7dd3fc', 0.14], [220, 560, 220, 70, '#7dd3fc', 0.08], [1760, 470, 240, 70, '#7dd3fc', 0.08]].forEach(function (c) {
+    o.push('<ellipse cx="' + c[0] + '" cy="' + c[1] + '" rx="' + c[2] + '" ry="' + c[3] + '" fill="' + c[4] + '" opacity="' + c[5] + '" filter="url(#blur30)"/>');
+  });
+  o.push('<circle cx="960" cy="560" r="470" fill="#7dd3fc" opacity=".07" filter="url(#blur30)"/>');
+  [[1260, 600, 7, '#7dd3fc'], [690, 250, 9, '#fbbf24'], [1650, 560, 8, '#fff'], [140, 440, 8, '#fbbf24'], [820, 980, 7, '#7dd3fc'], [1170, 900, 9, '#fbbf24'], [1830, 700, 6, '#fff'], [90, 690, 6, '#7dd3fc']].forEach(function (b) {
+    o.push('<circle cx="' + b[0] + '" cy="' + b[1] + '" r="' + b[2] + '" fill="' + b[3] + '" opacity=".6"/>');
+  });
+  o.push('<path d="M1230 930 q30 -34 60 0 t60 0 t60 0" fill="none" stroke="#7dd3fc" stroke-width="6" stroke-linecap="round" opacity=".55"/>');
+  o.push('<path d="M180 150 q26 -30 52 0 t52 0 t52 0" fill="none" stroke="#ff9d7a" stroke-width="6" stroke-linecap="round" opacity=".7"/>');
+
+  // the notebook
+  var nb = '<g transform="translate(960 565) rotate(-2.5)" filter="url(#shadowSoft)">' +
+    R(-358, -214, 716, 430, 36, 'fill="#0b4766" opacity=".92" stroke="rgba(255,255,255,.22)" stroke-width="2"') + '</g>' +
+    '<g transform="translate(960 565) rotate(-2.5)">' +
+    R(-338, -196, 332, 392, 24, 'fill="url(#pageG)" stroke="rgba(255,255,255,.34)" stroke-width="1.5"') + R(6, -196, 332, 392, 24, 'fill="url(#pageG)" stroke="rgba(255,255,255,.34)" stroke-width="1.5"') +
+    R(-80, -196, 74, 392, 0, 'fill="url(#gutter)"') + R(6, -196, 74, 392, 0, 'fill="url(#gutterR)"');
+  for (var k = 0; k < 8; k++) { var y = -130 + k * 44; nb += '<path d="M-298 ' + y + ' H-44 M44 ' + y + ' H298" stroke="#fff" stroke-opacity=".2" stroke-width="2.5" stroke-linecap="round"/>'; }
+  nb += '<path d="M-262 -178 V178" stroke="#ff8f7a" stroke-opacity=".4" stroke-width="2.5"/>';
+  for (var s = 0; s < 3; s++) nb += '<polygon points="' + starPts(112 + s * 58, -156, 19, 8.5) + '" fill="#fbbf24" stroke="#fbbf24" stroke-width="5" stroke-linejoin="round" opacity=".8"/>';
+  nb += '<circle cx="176" cy="76" r="64" fill="none" stroke="#fbbf24" stroke-opacity=".5" stroke-width="8"/>' + tick(176, 78, 62, '#fbbf24', 9).replace('stroke-linejoin="round"', 'stroke-linejoin="round" opacity=".6"');
+  for (var m = 0; m < 10; m++) nb += R(-22, -190 + m * 38, 44, 14, 7, 'fill="none" stroke="#8fd6ff" stroke-width="5" opacity=".85"');
+  nb += '</g>';
+  o.push(nb);
+
+  // items around it
+  o.push('<g transform="translate(296 248) rotate(-31) scale(.92)">' + pencil() + '</g>');
+  o.push('<g transform="translate(350 912) rotate(-6)">' + ruler() + '</g>');
+  o.push(block('A', 228, 800, 120, '#ffd27a', '#f0a020', -8, 'bkA') + block('B', 372, 796, 120, '#9be0ff', '#3aa6ee', 6, 'bkB') + block('C', 302, 676, 112, '#fff0d1', '#f5c46a', -3, 'bkC'));
+  o.push('<g transform="translate(1630 772) rotate(6)">' + backpack() + '</g>');
+  // dotted flight path and the plane
+  o.push('<path d="M1378 334 C1322 262 1214 262 1130 312" fill="none" stroke="#7dd3fc" stroke-width="5" stroke-linecap="round" stroke-dasharray="0.1 16" opacity=".8"/>');
+  o.push('<g transform="translate(1500 292) rotate(-16) scale(1.18)">' + plane() + '</g>');
+  // star and sparkles
+  o.push('<circle cx="990" cy="268" r="110" fill="#ffb347" opacity=".3" filter="url(#blur30)" style="mix-blend-mode:screen"/>');
+  o.push('<g filter="url(#shadowSoft)" transform="rotate(10 990 268)"><polygon points="' + starPts(990, 268, 62, 28) + '" fill="url(#starG)" stroke="url(#starG)" stroke-width="16" stroke-linejoin="round"/></g>');
+  o.push('<polygon points="' + starPts(1250, 180, 24, 11) + '" fill="#bfe6ff" stroke="#bfe6ff" stroke-width="7" stroke-linejoin="round" opacity=".85" transform="rotate(-14 1250 180)"/>');
+  o.push(sparkle(870, 190, 20, '#fff', 0.8), sparkle(1120, 330, 12, '#ffe08a', 0.8), sparkle(690, 400, 12, '#fff', 0.55), sparkle(1400, 760, 14, '#fff', 0.6), sparkle(1780, 240, 18, '#fff', 0.7));
+  return o.join('');
+}
+
+/* =====================================================================
+   GUIDES: an open guidebook, a checklist, a magnifier over one line, a light bulb (weight on the left)
+   ===================================================================== */
+function guides(S) {
+  var o = [];
+  o.push('<defs><linearGradient id="rosG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fbcfe8"/><stop offset="1" stop-color="#f472b6"/></linearGradient>' +
+    '<linearGradient id="cyG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a5f3fc"/><stop offset="1" stop-color="#22d3ee"/></linearGradient>' +
+    '<linearGradient id="rimG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#67dcef"/><stop offset=".5" stop-color="#1fb0cd"/><stop offset="1" stop-color="#0a7690"/></linearGradient>' +
+    '<linearGradient id="pg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset="1" stop-color="#fff" stop-opacity=".08"/></linearGradient>' +
+    '<linearGradient id="spineL" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".3"/></linearGradient>' +
+    '<linearGradient id="spineR" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".3"/></linearGradient>' +
+    '<radialGradient id="bulbG" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset=".55" stop-color="#22d3ee" stop-opacity=".22"/><stop offset="1" stop-color="#22d3ee" stop-opacity=".08"/></radialGradient>' +
+    '<clipPath id="lensClip"><circle r="136"/></clipPath></defs>');
+  // arcs radiating from the book, calm and thin on the right
+  [380, 580, 800, 1040, 1300].forEach(function (r, i) {
+    o.push('<circle cx="470" cy="640" r="' + r + '" fill="none" stroke="#fff" stroke-opacity="' + (0.13 - i * 0.02).toFixed(2) + '" stroke-width="2"' + (i === 2 ? ' stroke-dasharray="3 16"' : '') + '/>');
+  });
+  o.push('<circle cx="470" cy="640" r="580" fill="none" stroke="url(#ringGrad)" stroke-width="4" stroke-linecap="round" stroke-dasharray="330 3315" transform="rotate(-62 470 640)" opacity=".85"/>');
+  o.push('<circle cx="470" cy="640" r="1040" fill="none" stroke="#f472b6" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="420 6114" transform="rotate(-38 470 640)" opacity=".55"/>');
+
+  // the stack of glass pages under the book
+  o.push('<g transform="translate(470 650) rotate(-4)">' +
+    '<g transform="translate(-40 40) rotate(-6)" filter="url(#shadowS)" opacity=".7">' + R(-300, -204, 620, 408, 26, 'fill="rgba(8,24,52,.5)" stroke="rgba(255,255,255,.2)" stroke-width="1.5"') + R(-300, -204, 620, 408, 26, 'fill="url(#glass)"') + '</g>' +
+    '<g transform="translate(36 58) rotate(4)" filter="url(#shadowS)" opacity=".8">' + R(-300, -204, 620, 408, 26, 'fill="rgba(8,24,52,.5)" stroke="rgba(255,255,255,.22)" stroke-width="1.5"') + R(-300, -204, 620, 408, 26, 'fill="url(#glass)"') + '</g></g>');
+
+  // the open guidebook
+  var bk = '<g transform="translate(470 650) rotate(-4)"><g filter="url(#shadow)">' + R(-340, -216, 680, 436, 32, 'fill="rgba(7,22,50,.82)" stroke="rgba(255,255,255,.28)" stroke-width="2"') + '</g>';
+  bk += R(-330, 214, 660, 12, 6, 'fill="#fff" opacity=".1"') + R(-322, 226, 644, 8, 4, 'fill="#fff" opacity=".07"');
+  bk += R(-324, -200, 318, 400, 20, 'fill="url(#pg)" stroke="rgba(255,255,255,.34)" stroke-width="1.5"') + R(6, -200, 318, 400, 20, 'fill="url(#pg)" stroke="rgba(255,255,255,.34)" stroke-width="1.5"');
+  bk += R(-90, -200, 84, 400, 0, 'fill="url(#spineL)"') + R(6, -200, 84, 400, 0, 'fill="url(#spineR)"');
+  // left page: heading, a small grade ladder, text lines
+  bk += R(-286, -164, 150, 16, 8, 'fill="url(#cyG)"') + R(-286, -134, 100, 10, 5, 'fill="#fff" opacity=".3"');
+  [['A', '#22d3ee', 150], ['B', '#5b8cff', 120], ['C', '#f472b6', 92]].forEach(function (g, i) {
+    var y = -88 + i * 50;
+    bk += R(-286, y, 64, 36, 11, 'fill="' + g[1] + '"') + R(-286, y, 64, 36, 11, 'fill="url(#shine)"') + glyph(g[0], -254, y + 18, 19, 2.2, '#04202a') + R(-206, y + 6, g[2], 11, 5.5, 'fill="#fff" opacity=".55"') + R(-206, y + 22, g[2] * 0.6, 7, 3.5, 'fill="#fff" opacity=".22"');
+  });
+  [76, 106, 136, 166].forEach(function (y, i) { bk += R(-286, y, 218 - (i % 2) * 54, 9, 4.5, 'fill="#fff" opacity=".3"'); });
+  // right page: heading and result lines, one highlighted
+  bk += R(40, -164, 120, 16, 8, 'fill="url(#rosG)"') + R(40, -134, 170, 10, 5, 'fill="#fff" opacity=".3"');
+  var rl = [-88, -38, 12, 62, 112];
+  rl.forEach(function (y, i) {
+    if (i === 2) {
+      bk += R(26, y - 24, 288, 48, 14, 'fill="#f472b6" opacity=".38" stroke="#f9a8d4" stroke-width="2.5"') + R(40, y - 8, 160, 13, 6.5, 'fill="#fff" opacity=".9"') + R(40, y + 10, 90, 7, 3.5, 'fill="#fff" opacity=".42"') + R(244, y - 17, 54, 34, 11, 'fill="#fbcfe8"') + glyph('B', 271, y, 18, 2.2, '#5b0f3a');
+    } else {
+      bk += R(40, y - 8, 120 + ((i * 41) % 60), 11, 5.5, 'fill="#fff" opacity=".5"') + R(40, y + 9, 76, 7, 3.5, 'fill="#fff" opacity=".2"') + R(250, y - 14, 48, 28, 10, 'fill="#fff" opacity=".16"') + glyph(['A', 'B', '', 'A', 'C'][i] || 'A', 274, y, 16, 2, i === 3 ? '#22d3ee' : '#cfe3ff', 0.85);
+    }
+  });
+  bk += R(40, 156, 150, 9, 4.5, 'fill="#fff" opacity=".24"');
+  // bookmark ribbons (they hang over the lower edge)
+  bk += '<g filter="url(#shadowS)"><path d="M-52 -200 H-28 V246 L-40 232 L-52 246 Z" fill="url(#rosG)"/><path d="M-52 -200 H-28 V246 L-40 232 L-52 246 Z" fill="url(#shine)" opacity=".5"/></g>';
+  bk += '<g filter="url(#shadowS)"><path d="M30 -200 H52 V204 L41 192 L30 204 Z" fill="url(#cyG)"/><path d="M30 -200 H52 V204 L41 192 L30 204 Z" fill="url(#shine)" opacity=".5"/></g>';
+  bk += '</g>';
+  o.push(bk);
+
+  // checklist card (upper left)
+  var ck = '<g transform="translate(322 252) rotate(3)"><g filter="url(#shadow)">' + R(-206, -140, 412, 280, 32, 'fill="rgba(7,22,50,.72)"') + R(-206, -140, 412, 280, 32, 'fill="url(#glass)" stroke="rgba(255,255,255,.3)" stroke-width="1.5"') + '</g>';
+  ck += R(-168, -108, 130, 15, 7.5, 'fill="#fff" opacity=".85"') + R(-168, -84, 80, 9, 4.5, 'fill="#fff" opacity=".3"') + '<path d="M-168 -62 H168" stroke="#fff" stroke-opacity=".14" stroke-width="2"/>';
+  [[1, 196], [1, 152], [1, 176], [0, 130]].forEach(function (r, i) {
+    var y = -32 + i * 48;
+    if (r[0]) ck += '<circle cx="-146" cy="' + y + '" r="18" fill="url(#cyG)"/>' + tick(-146, y, 20, '#04202a', 4.2);
+    else ck += '<circle cx="-146" cy="' + y + '" r="17" fill="none" stroke="#f472b6" stroke-width="4" stroke-dasharray="2 8" stroke-linecap="round"/>';
+    ck += R(-112, y - 9, r[1], 12, 6, 'fill="#fff" opacity="' + (r[0] ? 0.62 : 0.4) + '"') + R(-112, y + 8, 78, 7, 3.5, 'fill="#fff" opacity=".2"');
+  });
+  ck += '</g>';
+  o.push(ck);
+
+  // the magnifier over the highlighted line
+  var lx = 690, ly = 636;
+  var mg = '<g transform="translate(' + lx + ' ' + ly + ')">' +
+    '<circle r="190" fill="#22d3ee" opacity=".16" filter="url(#blur30)"/>' +
+    '<g transform="rotate(45)" filter="url(#shadow)">' + R(138, -17, 160, 34, 17, 'fill="url(#rosG)"') + R(138, -17, 160, 34, 17, 'fill="url(#shine)"') + R(132, -22, 28, 44, 10, 'fill="#0e7490"') + R(138, -22, 6, 44, 3, 'fill="#fff" opacity=".4"') + '</g>' +
+    '<g filter="url(#shadow)"><circle r="146" fill="rgba(8,26,56,.5)"/></g>' +
+    '<g clip-path="url(#lensClip)"><rect x="-140" y="-140" width="280" height="280" fill="rgba(9,36,74,.72)"/>' +
+    R(-150, -128, 300, 40, 12, 'fill="#fff" opacity=".1"') + R(-150, 90, 300, 40, 12, 'fill="#fff" opacity=".1"') +
+    R(-170, -50, 340, 100, 26, 'fill="#f472b6" opacity=".46" stroke="#f9a8d4" stroke-width="3.5"') +
+    R(-118, -24, 150, 20, 10, 'fill="#fff" opacity=".8"') + R(-118, 8, 90, 11, 5.5, 'fill="#fff" opacity=".4"') +
+    R(54, -33, 66, 66, 21, 'fill="#f0b4d4"') + glyph('B', 87, 0, 34, 4.2, '#5b0f3a') +
+    '<path d="M-120 -112 a132 132 0 0 1 112 -34" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="9" stroke-linecap="round"/></g>' +
+    '<circle r="140" fill="none" stroke="url(#rimG)" stroke-width="15"/><circle r="130" fill="none" stroke="#fff" stroke-opacity=".28" stroke-width="2"/>' +
+    '<path d="M-98 -88 A132 132 0 0 1 -34 -128" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="7" stroke-linecap="round"/></g>';
+  o.push(mg);
+
+  // light bulb: the clarifying idea
+  var bx = 1040, by = 262;
+  o.push('<circle cx="' + bx + '" cy="' + by + '" r="150" fill="#f472b6" opacity=".26" filter="url(#blur30)" style="mix-blend-mode:screen"/>');
+  var rays = '';
+  for (var a = 0; a < 9; a++) { var ang = (-160 + a * 17.5) * Math.PI / 180; rays += 'M' + f(bx + 78 * Math.cos(ang)) + ' ' + f(by - 8 + 78 * Math.sin(ang)) + ' L' + f(bx + 104 * Math.cos(ang)) + ' ' + f(by - 8 + 104 * Math.sin(ang)); }
+  o.push('<path d="' + rays + '" stroke="#22d3ee" stroke-width="6" stroke-linecap="round" opacity=".7"/>');
+  o.push('<g filter="url(#shadowS)" transform="translate(' + bx + ' ' + by + ')">' +
+    '<path d="M-26 52 C-26 30 -56 22 -56 -14 C-56 -48 -30 -68 0 -68 C30 -68 56 -48 56 -14 C56 22 26 30 26 52 Z" fill="url(#bulbG)" stroke="#e0f7ff" stroke-opacity=".75" stroke-width="3.5" stroke-linejoin="round"/>' +
+    '<path d="M-16 32 C-16 8 -12 -6 -2 -14 C6 -20 12 -14 18 -6 C26 6 20 20 20 32" fill="none" stroke="#f472b6" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>' +
+    R(-26, 52, 52, 12, 5, 'fill="#9db4dd"') + R(-22, 66, 44, 12, 5, 'fill="#7f98c8"') + R(-14, 80, 28, 10, 5, 'fill="#9db4dd"') +
+    '<path d="M-40 -34 C-38 -48 -26 -56 -14 -58" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="5" stroke-linecap="round"/></g>');
+  // a dotted thread from the lens to the bulb
+  o.push('<path d="M796 530 C870 452 920 392 984 342" fill="none" stroke="#f472b6" stroke-width="5" stroke-linecap="round" stroke-dasharray="0.1 15" opacity=".85"/>');
+  o.push(node(796, 530, 7, '#f472b6'));
+  // sparkles and a few floating nodes; the right side stays calm
+  o.push(sparkle(1160, 180, 16, '#fff', 0.65), sparkle(900, 160, 11, '#a5f3fc', 0.7), sparkle(120, 140, 14, '#a5f3fc', 0.55), sparkle(84, 960, 12, '#fbcfe8', 0.55));
+  o.push(node(1430, 610, 7, '#22d3ee'), node(1590, 300, 6, '#f472b6'), node(1250, 880, 6, '#f472b6'), node(1760, 760, 5, '#22d3ee'));
+  return o.join('');
+}
+
+/* ---------- scenes: palette, glow blobs ([gradient, cx, cy, rx, ry, opacity]) and the drawing function ---------- */
+var SCENES = {
+  csee:   { bg: ['#040a14', '#072430', '#0a3a42'], a: '#34d399', b: '#2dd4bf', c: '#2f6bff', calm: '#03101a', calmOp: 0.4,
+            blobs: [['A', 260, 200, 720, 560, 0.55], ['B', 1560, 540, 760, 700, 1], ['C', 760, 1020, 760, 420, 0.5], ['B', 1500, 100, 520, 360, 0.35]], draw: csee },
+  acsee:  { bg: ['#05031a', '#150c4f', '#26186b'], a: '#a78bfa', b: '#f5b042', c: '#2f6bff', calm: '#06031c', calmOp: 0.5,
+            blobs: [['A', 220, 980, 940, 640, 0.9], ['B', 1680, 220, 760, 540, 0.42, 'screen'], ['C', 960, 420, 760, 460, 0.28], ['A', 1000, 80, 640, 300, 0.3]], draw: acsee },
+  psle:   { bg: ['#04132a', '#073560', '#0a5a6a'], a: '#38bdf8', b: '#ff9a3d', c: '#2dd4bf', calm: '#04182a', calmOp: 0.4,
+            blobs: [['A', 300, 220, 800, 580, 0.5], ['C', 1640, 880, 820, 600, 0.4], ['B', 240, 930, 700, 460, 0.55, 'screen'], ['B', 990, 170, 560, 340, 0.5, 'screen'], ['B', 1700, 1000, 520, 300, 0.45, 'screen']], draw: psle },
+  guides: { bg: ['#040a1c', '#082350', '#0c3a73'], a: '#22d3ee', b: '#f472b6', c: '#2f6bff', calm: '#040c24', calmOp: 0.5,
+            blobs: [['A', 400, 600, 800, 660, 0.7], ['B', 1700, 900, 760, 560, 0.5], ['C', 1560, 160, 640, 420, 0.5], ['B', 120, 100, 460, 300, 0.3]], draw: guides },
+  /* added 2026-11-10: the five newer exams reuse the drawings above with their own palettes */
+  ftna:   { bg: ['#05140b', '#0f3b26', '#1b5a3a'], a: '#4ade80', b: '#fbbf24', c: '#2dd4bf', calm: '#04120a', calmOp: 0.4,
+            blobs: [['A', 260, 200, 720, 560, 0.55], ['B', 1560, 540, 760, 700, 1], ['C', 760, 1020, 760, 420, 0.5], ['B', 1500, 100, 520, 360, 0.35]], draw: csee },
+  sfna:   { bg: ['#1a0a05', '#4a1f0c', '#7a3410'], a: '#fb923c', b: '#fde047', c: '#38bdf8', calm: '#1a0a05', calmOp: 0.4,
+            blobs: [['A', 300, 220, 800, 580, 0.5], ['C', 1640, 880, 820, 600, 0.4], ['B', 240, 930, 700, 460, 0.55, 'screen'], ['B', 990, 170, 560, 340, 0.5, 'screen'], ['B', 1700, 1000, 520, 300, 0.45, 'screen']], draw: psle },
+  dsee:   { bg: ['#1a0618', '#4a1245', '#6d1f66'], a: '#f472b6', b: '#fbbf24', c: '#a78bfa', calm: '#14041a', calmOp: 0.5,
+            blobs: [['A', 220, 980, 940, 640, 0.9], ['B', 1680, 220, 760, 540, 0.42, 'screen'], ['C', 960, 420, 760, 460, 0.28], ['A', 1000, 80, 640, 300, 0.3]], draw: acsee },
+  dpee:   { bg: ['#06151a', '#0b3b44', '#0f5a63'], a: '#2dd4bf', b: '#fbbf24', c: '#60a5fa', calm: '#04121a', calmOp: 0.5,
+            blobs: [['A', 220, 980, 940, 640, 0.9], ['B', 1680, 220, 760, 540, 0.42, 'screen'], ['C', 960, 420, 760, 460, 0.28], ['A', 1000, 80, 640, 300, 0.3]], draw: acsee },
+  dppee:  { bg: ['#1a1005', '#4a2c0c', '#7a4a12'], a: '#fbbf24', b: '#f472b6', c: '#38bdf8', calm: '#1a1005', calmOp: 0.4,
+            blobs: [['A', 300, 220, 800, 580, 0.5], ['C', 1640, 880, 820, 600, 0.4], ['B', 240, 930, 700, 460, 0.55, 'screen'], ['B', 990, 170, 560, 340, 0.5, 'screen'], ['B', 1700, 1000, 520, 300, 0.45, 'screen']], draw: psle },
+  dspee:  { bg: ['#0a1020', '#1a2d5a', '#2a4a8a'], a: '#60a5fa', b: '#a3e635', c: '#f472b6', calm: '#070d1c', calmOp: 0.5,
+            blobs: [['A', 400, 600, 800, 660, 0.7], ['B', 1700, 900, 760, 560, 0.5], ['C', 1560, 160, 640, 420, 0.5], ['B', 120, 100, 460, 300, 0.3]], draw: guides },
+  dte:    { bg: ['#0b0d12', '#1f2733', '#34414f'], a: '#94a3b8', b: '#f59e0b', c: '#38bdf8', calm: '#0b0d12', calmOp: 0.5,
+            blobs: [['A', 400, 600, 800, 660, 0.7], ['B', 1700, 900, 760, 560, 0.5], ['C', 1560, 160, 640, 420, 0.5], ['B', 120, 100, 460, 300, 0.3]], draw: guides },
+  qt:     { bg: ['#0a0a1f', '#1f2060', '#2f3a9a'], a: '#818cf8', b: '#34d399', c: '#f472b6', calm: '#08081c', calmOp: 0.45,
+            blobs: [['A', 260, 200, 720, 560, 0.55], ['B', 1560, 540, 760, 700, 1], ['C', 760, 1020, 760, 420, 0.5], ['B', 1500, 100, 520, 360, 0.35]], draw: csee }
+};
+
+function draw(name) {
+  var S = SCENES[name], o = [];
+  o.push('<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">' + defs(S));
+  o.push('<rect width="1920" height="1080" fill="url(#bg)"/>');
+  S.blobs.forEach(function (b) { o.push('<ellipse cx="' + b[1] + '" cy="' + b[2] + '" rx="' + b[3] + '" ry="' + b[4] + '" fill="url(#blob' + b[0] + ')" opacity="' + b[5] + '"' + (b[6] ? ' style="mix-blend-mode:' + b[6] + '"' : '') + '/>'); });
+  o.push('<rect width="1920" height="1080" fill="url(#dots)" opacity=".14" mask="url(#dotmask)"/>');
+  o.push(S.draw(S));
+  // keep the middle band quiet for the title and the line of text that sit on it
+  o.push('<ellipse cx="960" cy="540" rx="760" ry="400" fill="url(#calm)"/>');
+  // very fine grain: stops dark gradients from showing bands once the picture is compressed
+  o.push('<rect width="1920" height="1080" filter="url(#grain)" opacity=".07" style="mix-blend-mode:overlay"/>');
+  o.push('<rect x="0" y="0" width="1920" height="2" fill="#fff" opacity=".18"/>');
+  o.push('</svg>');
+  return o.join('');
+}
+
+var q = new URLSearchParams(location.search).get('scene') || 'csee';
+document.getElementById('stage').innerHTML = q === 'list' ? '<pre style="color:#fff;font:20px monospace">' + Object.keys(SCENES).join('\n') + '</pre>' : (SCENES[q] ? draw(q) : '');
+</script>
+</body>
+</html>

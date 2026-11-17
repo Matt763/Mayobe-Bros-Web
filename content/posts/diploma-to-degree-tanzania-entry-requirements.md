@@ -4,7 +4,7 @@ date: 2026-11-04
 author: Mclean Mbaga
 category: educational
 label: career-development
-excerpt: Can you join a bachelor's degree with an ordinary diploma? Here are the TCU minimum grades for 2026/27, the higher bars for health courses and how to check yours.
+excerpt: Can you join a bachelor's degree with an ordinary diploma? See the TCU minimum grades for 2026/27, the higher bars for health courses and how to check yours.
 image: assets/posts/diploma-to-degree-tanzania-entry-requirements.webp
 imageAlt: Graduates in black gowns with red and gold hoods walking in a group along a tree-lined campus path
 imageCredit: Photo: CC0, via rawpixel

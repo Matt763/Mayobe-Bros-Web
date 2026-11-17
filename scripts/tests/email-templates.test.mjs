@@ -32,6 +32,11 @@ const POSTS = [1, 2, 3].map((i) => ({
   ...(i === 2 ? { video: { image: IMG('video', `p${i}`, '89abcdef'), url: U(`post/x/p${i}/`) + '#video-1' } } : {}),
 }));
 
+// A launch-sized batch of results pages: one per exam and year, as the site's build names them.
+const RESULT_YEARS = { csee: [2003, 2025], acsee: [2004, 2025], psle: [2013, 2025], ftna: [2014, 2025], sfna: [2015, 2025], dsee: [2014, 2026], qt: [2015, 2023], dte: [2019, 2020], dpee: [2026, 2026], dppee: [2026, 2026], dspee: [2026, 2026] };
+const resultsPost = (exam, year) => ({ exam, year, url: `https://mayobebros.com/post/educational/results/necta-${exam}-results-${year}/` });
+const RESULT_POSTS = Object.entries(RESULT_YEARS).flatMap(([exam, [a, b]]) => Array.from({ length: b - a + 1 }, (_, i) => resultsPost(exam, a + i)));
+
 const LONG = {
   manageLinkEmail: { name: NAME, commentExcerpt: MSG, postTitle: EVIL + ' ' + 'Long title '.repeat(10), postUrl: U('post/a/b/'), manageUrl: U('manage/') + '#tok', notifyWanted: true },
   replyNoticeEmail: { name: NAME, postTitle: EVIL, postUrl: U('post/a/b/'), replyAuthor: NAME, replyBody: MSG, unsubscribeUrl: U('v1/notify/unsubscribe'), isTeam: false },
@@ -41,6 +46,7 @@ const LONG = {
   confirmSubscriptionEmail: { confirmUrl: U('newsletter/') + '#confirm' },
   welcomeEmail: { unsubscribeUrl: U('v1/newsletter/unsubscribe'), latestPosts: POSTS },
   newPostEmail: { post: { title: EVIL + ' ' + 'Long title '.repeat(12), url: U('post/x/y/'), excerpt: MSG.slice(0, 400), image: IMG('post', 'y'), imageAlt: EVIL, category: 'Educational', video: { image: IMG('video', 'y', '89abcdef'), url: U('post/x/y/') + '#video-1' } }, unsubscribeUrl: U('v1/newsletter/unsubscribe') },
+  resultsDigestEmail: { posts: RESULT_POSTS.slice(0, 107), unsubscribeUrl: U('v1/newsletter/unsubscribe') },
   farewellEmail: { resubscribeUrl: U('newsletter/') },
 };
 const SHORT = {
@@ -52,6 +58,7 @@ const SHORT = {
   confirmSubscriptionEmail: { confirmUrl: 'https://mayobebros.com/newsletter/#c' },
   welcomeEmail: { unsubscribeUrl: 'https://mayobebros.com/u', latestPosts: [{ title: 'Loans', url: 'https://mayobebros.com/post/a/', thumb: IMG('thumb', 'a') }] },
   newPostEmail: { post: { title: 'Loans', url: 'https://mayobebros.com/post/a/', excerpt: '', image: IMG('post', 'a') }, unsubscribeUrl: 'https://mayobebros.com/u' },
+  resultsDigestEmail: { posts: [resultsPost('csee', 2025)], unsubscribeUrl: 'https://mayobebros.com/u' },
   farewellEmail: { resubscribeUrl: 'https://mayobebros.com/newsletter/' },
 };
 const BUILDERS = Object.keys(LONG);
@@ -179,6 +186,7 @@ function weirdData(name, w) {
   const d = Object.fromEntries(keys.map((k) => [k, w]));
   if (name === 'newPostEmail') d.post = Object.fromEntries(Object.keys(LONG.newPostEmail.post).map((k) => [k, w]));
   if (name === 'welcomeEmail' && typeof w === 'string') d.latestPosts = [{ title: w, url: w, excerpt: w }, w, null];
+  if (name === 'resultsDigestEmail' && typeof w === 'string') d.posts = [{ exam: w, year: w, url: w }, w, null];
   return d;
 }
 for (const name of BUILDERS) {

@@ -619,6 +619,87 @@ export function newPostEmail(data, site) {
   });
 }
 
+/* ------------------------------------------------------------------ results digest (one email for a whole batch of results pages) */
+
+// NECTA results pages come in batches of a hundred or more (one page per exam and year), so they are never emailed one by one:
+// this one email lists the whole batch, grouped by exam, and points to the Results section. Fixed text and our own links only.
+// The level words come from NECTA's own names; an exam NECTA gives no long form for (DPEE, DPPEE, DSPEE, DTE) shows its letters only.
+const DIGEST_EXAMS = [
+  ['csee', 'CSEE', 'Form Four'],
+  ['acsee', 'ACSEE', 'Form Six'],
+  ['psle', 'PSLE', 'Standard Seven'],
+  ['ftna', 'FTNA', 'Form Two'],
+  ['sfna', 'SFNA', 'Standard Four'],
+  ['dsee', 'DSEE', 'Diploma in Secondary Education Examinations'],
+  ['dpee', 'DPEE', ''],
+  ['dppee', 'DPPEE', ''],
+  ['dspee', 'DSPEE', ''],
+  ['dte', 'DTE', ''],
+  ['qt', 'QT', 'Qualifying Test'],
+];
+// Each year is one link of about 180 bytes and an email stays under 40,000 bytes (Gmail cuts a message at about 102,000), so a batch
+// larger than this lists its newest years and says how many more are on the Results page.
+export const DIGEST_MAX_LINKS = 120;
+const RESULTS_PAGE = '/category/educational/results/';
+const bigList = (v, max) => { try { return Array.isArray(v) ? Array.from(v).slice(0, max) : []; } catch { return []; } };
+
+// data = { posts: [{ exam: 'csee', year: 2025, url }], unsubscribeUrl }
+export function resultsDigestEmail(data, site) {
+  const d = pick(data, ['posts', 'unsubscribeUrl']);
+  const { origin } = resolveSite(site);
+  const unsub = ownUrl(d.unsubscribeUrl, origin, `${origin}/contact/`);
+  const rank = new Map(DIGEST_EXAMS.map((x, i) => [x[0], i]));
+  const rankOf = (id) => (rank.has(id) ? rank.get(id) : 99);
+  const seen = new Set();
+  const all = [];
+  for (const raw of bigList(d.posts, 2000)) {
+    const x = pick(raw, ['exam', 'year', 'url']);
+    const exam = str(x.exam).toLowerCase();
+    const year = Number(x.year);
+    const url = ownUrl(x.url, origin, '');
+    if (!/^[a-z]{2,6}$/.test(exam) || !Number.isInteger(year) || year < 1990 || year > 2100 || !url || seen.has(url)) continue;
+    seen.add(url);
+    all.push({ exam, year, url });
+  }
+  all.sort((a, b) => b.year - a.year || rankOf(a.exam) - rankOf(b.exam) || (a.exam < b.exam ? -1 : a.exam > b.exam ? 1 : 0));
+  const shown = all.slice(0, DIGEST_MAX_LINKS);
+  const more = all.length - shown.length;
+  const byExam = new Map();
+  for (const x of shown) { if (!byExam.has(x.exam)) byExam.set(x.exam, []); byExam.get(x.exam).push(x); }
+  const groups = [...byExam.entries()]
+    .sort((a, b) => rankOf(a[0]) - rankOf(b[0]) || (a[0] < b[0] ? -1 : 1))
+    .map(([id, items]) => { const meta = DIGEST_EXAMS.find((m) => m[0] === id); return { code: meta ? meta[1] : id.toUpperCase(), level: meta ? meta[2] : '', items }; });
+  const n = all.length;
+  const first = n ? all[n - 1].year : 0, last = n ? all[0].year : 0;
+  const span = n ? (first === last ? String(last) : `${first} to ${last}`) : '';
+  const codes = groups.map((g) => g.code);
+  const a = n
+    ? `We added ${n} NECTA results ${n === 1 ? 'page' : 'pages'}${span ? `, from ${span}` : ''}. Each page lets you search by school or centre name, centre number or candidate number.`
+    : 'We added new NECTA results pages. Each page lets you search by school or centre name, centre number or candidate number.';
+  const b = 'Pick an exam and a year below, or open the Results section to see every exam in one place.';
+  const c = 'Mayobe Bros is an independent website. It is not run or endorsed by the National Examinations Council of Tanzania (NECTA).';
+  const e = 'You can stop these emails at any time with the unsubscribe link below.';
+  const moreLine = more > 0 ? `And ${more} more results ${more === 1 ? 'page is' : 'pages are'} in the Results section.` : '';
+  const groupHtml = (g) => `<p class="mb-heading" style="margin:0 0 2px;${SANS}font-size:16px;line-height:1.5;font-weight:bold;color:${L.heading};">${esc(g.code)}${g.level ? ` <span class="mb-muted" style="font-weight:normal;color:${L.muted};">· ${esc(g.level)}</span>` : ''}</p>`
+    + `<p class="mb-body" style="margin:0 0 14px;${SANS}font-size:16px;line-height:2;color:${L.body};">${g.items.map((x) => link(x.url, esc(x.year))).join(' &nbsp;·&nbsp; ')}</p>`;
+  const pre = `NECTA results for ${codes.slice(0, 3).join(', ')} and more are now on Mayobe Bros. Search by school, centre or candidate number.`;
+  const fallbackPre = 'New NECTA results pages are on Mayobe Bros. Open one, then search by school or centre name, centre number or candidate number.';
+  const list = groups.length ? kicker('All new results') + groups.map(groupHtml).join('') + (moreLine ? p(esc(moreLine), { muted: true, mb: 16 }) : '') : '';
+  const textList = groups.length
+    ? ['All new results:\n\n' + groups.map((g) => `${g.code}${g.level ? ` (${g.level})` : ''}\n${g.items.map((x) => `${x.year}: ${x.url}`).join('\n')}`).join('\n\n') + (moreLine ? `\n\n${moreLine}` : '')]
+    : [];
+  return build({
+    site, subject: n ? `New on Mayobe Bros: NECTA results, ${span}` : 'New on Mayobe Bros: NECTA results',
+    preheader: codes.length && pre.length >= 90 && pre.length <= 130 ? pre : fallbackPre,
+    kickerText: 'New results', heading: H(esc('NECTA results are now on Mayobe Bros'), 'NECTA RESULTS ARE NOW ON MAYOBE BROS'),
+    html: { before: p(esc(a)) + p(esc(b)), after: hairline(24) + list + p(esc(c), { muted: true }) + p(esc(e), { muted: true }) },
+    text: { before: [a, b], after: [...textList, c, e] },
+    buttonUrl: `${origin}${RESULTS_PAGE}`, buttonLabel: 'See all results',
+    why: 'You got this email because you subscribed to new articles from mayobebros.com.',
+    links: [['Unsubscribe', unsub], ...commonLinks(origin)],
+  });
+}
+
 export function farewellEmail(data, site) {
   const d = pick(data, ['resubscribeUrl']);
   const { origin } = resolveSite(site);

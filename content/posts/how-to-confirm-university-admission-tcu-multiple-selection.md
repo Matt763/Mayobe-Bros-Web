@@ -4,6 +4,7 @@ date: 2026-11-04
 author: Mclean Mbaga
 category: educational
 label: results
+section: [guides]
 excerpt: Selected by more than one university in Tanzania? Learn the one-confirmation rule, how the confirmation code works, and what to ask your university.
 image: assets/posts/how-to-confirm-university-admission-tcu-multiple-selection.webp
 imageAlt: A woman's hand holding a smartphone beside a laptop and a glass of water on a white table

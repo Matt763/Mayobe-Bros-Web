@@ -472,13 +472,24 @@
     if (!low) return;
     if (M) M.glide(to); else node.scrollIntoView({ behavior: 'instant', block: 'start' });
   }
+  // Put a node in the middle of the space under the sticky header with the shared glide (js/motion.js): the browser's own smooth scroll
+  // has no easing or duration and can race across a long page. covered: the list was just redrawn, so part of a long trip is one jump.
+  // Without MBMotion: one plain jump.
+  function centreIn(node, covered) {
+    if (!node) return;
+    var M = window.MBMotion;
+    if (!M) { node.scrollIntoView({ behavior: 'instant', block: 'center' }); return; }
+    var head = doc.querySelector('.site-header');
+    var room = window.innerHeight - (head ? head.getBoundingClientRect().bottom : 0);
+    M.glide(M.topOf(node, Math.max(M.GAP, (room - node.getBoundingClientRect().height) / 2)), { covered: !!covered });
+  }
   function startReply(c) {
     form.elements.parent.value = c.id;
     var cancel = $('[data-cancel-reply]', form);
     cancel.hidden = false;
     var s = $('.form-status', form);
     s.className = 'form-status'; s.textContent = 'Replying to ' + c.name + '.';
-    form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    centreIn(form, false);
     form.elements.body.focus({ preventScroll: true });
   }
   function refresh() {
@@ -553,7 +564,7 @@
           shownTop = Math.max(shownTop, COMMENT_BATCH);
           refresh().then(function () {
             var node = doc.getElementById('comment-' + j.comment.id);
-            if (node) node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            centreIn(node, true);
           });
         } else if (j && j.status === 'duplicate') {
           setStatus('is-ok', 'Comment received.');

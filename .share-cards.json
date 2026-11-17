@@ -31,6 +31,66 @@
    "bytes": 79970,
    "quality": 2
   },
+  "label-educational-results-csee": {
+   "hash": "c9e5f3aca92ee52de65d8d3c74d8c5eac5a0e67a",
+   "bytes": 75948,
+   "quality": 2
+  },
+  "label-educational-results-acsee": {
+   "hash": "6435e2c6a54ed056c62ec58bb59fd8b886e7ba72",
+   "bytes": 73890,
+   "quality": 2
+  },
+  "label-educational-results-psle": {
+   "hash": "bb4dbdb254d7f4ac9e1507c37e892805f68a8722",
+   "bytes": 80727,
+   "quality": 2
+  },
+  "label-educational-results-ftna": {
+   "hash": "ba030d753c8270571c3c6a21449c89267ee6c7db",
+   "bytes": 76464,
+   "quality": 2
+  },
+  "label-educational-results-sfna": {
+   "hash": "a02676d9d6dfdc808c1d09e293b7b24560da4b69",
+   "bytes": 78349,
+   "quality": 2
+  },
+  "label-educational-results-dsee": {
+   "hash": "2fb30c81ea0df69f569e58e194042931b0ff3c65",
+   "bytes": 71165,
+   "quality": 2
+  },
+  "label-educational-results-dpee": {
+   "hash": "145609e995a176b58e620414d0d649b5bc6cc51d",
+   "bytes": 72966,
+   "quality": 2
+  },
+  "label-educational-results-dppee": {
+   "hash": "584bbdfc4f91a8238fedf85aa0328432bb4bcd51",
+   "bytes": 78259,
+   "quality": 2
+  },
+  "label-educational-results-dspee": {
+   "hash": "9d4bc0588d88642126d554838b322564e36b7513",
+   "bytes": 76250,
+   "quality": 2
+  },
+  "label-educational-results-dte": {
+   "hash": "5c6a0313d49badee410e57a0d56e7f399eaad83b",
+   "bytes": 75358,
+   "quality": 2
+  },
+  "label-educational-results-qt": {
+   "hash": "4b2798e9f142ee20a9963cd3002cce37a2c57f38",
+   "bytes": 73149,
+   "quality": 2
+  },
+  "label-educational-results-guides": {
+   "hash": "8b8e7958c223ba8afbf1b0eb7813daf9393f4184",
+   "bytes": 78182,
+   "quality": 2
+  },
   "category-business-ideas": {
    "hash": "112905c9783dd2386f79422aa48ca600d237fb31",
    "bytes": 186676,
@@ -94,6 +154,216 @@
   "category-tanzania-news": {
    "hash": "cdf24bac5b627cb1fea511b4885af837f09448cd",
    "bytes": 183233,
+   "quality": 2
+  },
+  "post-necta-dpee-results-2026": {
+   "hash": "2d9b071789c3933dfd6c086bff1eab289cfbca8d",
+   "bytes": 121679,
+   "quality": 2
+  },
+  "post-necta-dppee-results-2026": {
+   "hash": "eed5676e420c3e135ccf88d371fb2caa28e27400",
+   "bytes": 117737,
+   "quality": 2
+  },
+  "post-necta-dsee-results-2025": {
+   "hash": "89946dc21c275f8179715925947018dd047ee3ba",
+   "bytes": 100293,
+   "quality": 2
+  },
+  "post-necta-dsee-results-2026": {
+   "hash": "fb886a544351e71a477f122ec979b888ca2db919",
+   "bytes": 103353,
+   "quality": 2
+  },
+  "post-necta-dspee-results-2026": {
+   "hash": "93688cff1802b376a3b2b2c80ddf78910030f0a4",
+   "bytes": 97058,
+   "quality": 2
+  },
+  "post-necta-ftna-results-2025": {
+   "hash": "048bc27f6095cf2bb045deb5154f95333fb7fd65",
+   "bytes": 106204,
+   "quality": 2
+  },
+  "post-necta-sfna-results-2025": {
+   "hash": "66933d7a47a72646b773ea765cad17ac811370c6",
+   "bytes": 111410,
+   "quality": 2
+  },
+  "post-necta-acsee-results-2025": {
+   "hash": "c249bac9ee59254fa592917bbfcbd5a85f3de1b4",
+   "bytes": 109366,
+   "quality": 2
+  },
+  "post-necta-csee-results-2025": {
+   "hash": "12ce82f48794763aea0c167d1e6c7f663529ddee",
+   "bytes": 98500,
+   "quality": 2
+  },
+  "post-necta-dsee-results-2024": {
+   "hash": "f2005318a3ed8d8765d91cac30e283ee525314b8",
+   "bytes": 102585,
+   "quality": 2
+  },
+  "post-necta-ftna-results-2024": {
+   "hash": "487f5ead2b26c4b47d25a8bf808633e40e940bb8",
+   "bytes": 121355,
+   "quality": 2
+  },
+  "post-necta-psle-results-2025": {
+   "hash": "095f0437c1eb09d4d5645ae3e14f16f29f7c9e62",
+   "bytes": 123226,
+   "quality": 2
+  },
+  "post-necta-sfna-results-2024": {
+   "hash": "5cfae486aa5343ec225329f7e48fd0a3c61aab96",
+   "bytes": 109346,
+   "quality": 2
+  },
+  "post-necta-acsee-results-2024": {
+   "hash": "2edc05f9c87c9e2ae6800197340a0a0c55040acf",
+   "bytes": 115261,
+   "quality": 2
+  },
+  "post-necta-csee-results-2024": {
+   "hash": "1b4638c4c5672b118880b76ead6ed5fa379f3b0d",
+   "bytes": 104845,
+   "quality": 2
+  },
+  "post-necta-dsee-results-2023": {
+   "hash": "912b79c00163c91375c0fd8c8846a1b3317d6be0",
+   "bytes": 114273,
+   "quality": 2
+  },
+  "post-necta-ftna-results-2023": {
+   "hash": "8a49797e6b655a9c43738b59c447af3f07f3531f",
+   "bytes": 95002,
+   "quality": 2
+  },
+  "post-necta-psle-results-2024": {
+   "hash": "fe2243c08b72e4ec901a47ad0d03dd848f522513",
+   "bytes": 96189,
+   "quality": 2
+  },
+  "post-necta-qt-results-2023": {
+   "hash": "528691ff64ef72d4fedebc721e014897e84937fe",
+   "bytes": 111925,
+   "quality": 2
+  },
+  "post-necta-sfna-results-2023": {
+   "hash": "d3d06afa5ce60b25614f3d9002d9b4f2825dfee9",
+   "bytes": 112825,
+   "quality": 2
+  },
+  "post-necta-acsee-results-2023": {
+   "hash": "76bd9c17a28dbb8d93f0a3739c7878f00c9f3e33",
+   "bytes": 116573,
+   "quality": 2
+  },
+  "post-necta-csee-results-2023": {
+   "hash": "60a840163fb4011779a4dd7112f8a33b5f4c0149",
+   "bytes": 126109,
+   "quality": 2
+  },
+  "post-necta-dsee-results-2022": {
+   "hash": "dca66552e2241356f79e56678702d79727dddbf4",
+   "bytes": 108979,
+   "quality": 2
+  },
+  "post-necta-ftna-results-2022": {
+   "hash": "cb9ba1d0498ba1496a08442ddd24e0d4c4f7297e",
+   "bytes": 115447,
+   "quality": 2
+  },
+  "post-necta-psle-results-2023": {
+   "hash": "1ad913e8d1e355219f9f653d7709ba1d1b5be33c",
+   "bytes": 117483,
+   "quality": 2
+  },
+  "post-necta-qt-results-2022": {
+   "hash": "25cd8bac4c527f747d2536bd277fe730ff0beaba",
+   "bytes": 98292,
+   "quality": 2
+  },
+  "post-necta-sfna-results-2022": {
+   "hash": "953e3b71f2796e5ce456586e6701eb3969def5ae",
+   "bytes": 95098,
+   "quality": 2
+  },
+  "post-necta-acsee-results-2022": {
+   "hash": "7c74850515f631981c241d64a695a2e663a5ac25",
+   "bytes": 109954,
+   "quality": 2
+  },
+  "post-necta-csee-results-2022": {
+   "hash": "d768d1a6cd8b75c38499606c06821af4e072a98e",
+   "bytes": 119560,
+   "quality": 2
+  },
+  "post-necta-dsee-results-2021": {
+   "hash": "3abd5622eb0e2c4844b4fb30ad629e626b43cd2e",
+   "bytes": 98073,
+   "quality": 2
+  },
+  "post-necta-ftna-results-2021": {
+   "hash": "d14f93494b09d45cb72d45f05365c94354b73263",
+   "bytes": 108756,
+   "quality": 2
+  },
+  "post-necta-psle-results-2022": {
+   "hash": "185643ce7919f5f48e5fbb0caf35a226cc59d96e",
+   "bytes": 98524,
+   "quality": 2
+  },
+  "post-necta-qt-results-2021": {
+   "hash": "85583f5a24df532ffba756d96f884f148e4b5fbc",
+   "bytes": 99018,
+   "quality": 2
+  },
+  "post-necta-sfna-results-2021": {
+   "hash": "96aa647eb138a39071dfe3f3603ba3581112e68d",
+   "bytes": 112555,
+   "quality": 2
+  },
+  "post-necta-acsee-results-2021": {
+   "hash": "bbfc6e7f815fbaa06cdfe8f4b8b5a3825b5078f0",
+   "bytes": 97507,
+   "quality": 2
+  },
+  "post-necta-csee-results-2021": {
+   "hash": "f5a551e32c9c39ed395f97e22aa512bb30e921e9",
+   "bytes": 103783,
+   "quality": 2
+  },
+  "post-necta-dsee-results-2020": {
+   "hash": "cf3682acd62100f7a0780113249177d608c4d1c6",
+   "bytes": 120721,
+   "quality": 2
+  },
+  "post-necta-dte-results-2020": {
+   "hash": "00fcf90c3a954029a860fd6806f277e6593b3c8c",
+   "bytes": 104724,
+   "quality": 2
+  },
+  "post-necta-ftna-results-2020": {
+   "hash": "37da96fcc292dca25cbec36656f5c144f051f670",
+   "bytes": 108035,
+   "quality": 2
+  },
+  "post-necta-psle-results-2021": {
+   "hash": "1e903b1390bc6bd0748e395b2c981ba195c5423b",
+   "bytes": 120390,
+   "quality": 2
+  },
+  "post-necta-qt-results-2020": {
+   "hash": "f12810ef6f033030f09f11dfb1367b9aa883552d",
+   "bytes": 109587,
+   "quality": 2
+  },
+  "post-necta-sfna-results-2020": {
+   "hash": "d461af6984988a1852b536016ed12ee7d534ba62",
+   "bytes": 111608,
    "quality": 2
   },
   "post-mobile-money-send-back-scam-wrong-number": {
@@ -162,8 +432,8 @@
    "quality": 2
   },
   "post-hacked-facebook-account-what-to-do": {
-   "hash": "904bba4218bd2778b01d6ed3c9f754930e73c16f",
-   "bytes": 143583,
+   "hash": "714565041f1b6ea9a0b59070557023924fa3d9f2",
+   "bytes": 77830,
    "quality": 2
   },
   "post-fake-followers-and-guaranteed-sales-scams": {
@@ -232,9 +502,9 @@
    "quality": 2
   },
   "post-how-tanganyika-won-independence": {
-   "hash": "37b23ac27e04e67d89617ab097d70da43ff78855",
-   "bytes": 169287,
-   "quality": 4
+   "hash": "6079a74d6a19042d151bac9a2a431549907dac18",
+   "bytes": 74847,
+   "quality": 2
   },
   "post-united-nations-how-it-began": {
    "hash": "725669ac0bc1ec806e21ef0be75ac4a4efce473c",
@@ -377,8 +647,8 @@
    "quality": 2
   },
   "post-keeping-children-safe-online-parents-guide": {
-   "hash": "904bba4218bd2778b01d6ed3c9f754930e73c16f",
-   "bytes": 143583,
+   "hash": "f192bcadf52aa9ced951895ce3d0a1107851ea6f",
+   "bytes": 78036,
    "quality": 2
   },
   "post-kilwa-kisiwani-swahili-trade-city": {
@@ -421,9 +691,49 @@
    "bytes": 66513,
    "quality": 2
   },
+  "post-necta-acsee-results-2020": {
+   "hash": "8fb5d44a6f70ab4c6653ab7790f0d8559acd0d04",
+   "bytes": 101724,
+   "quality": 2
+  },
+  "post-necta-csee-results-2020": {
+   "hash": "df9756beda2b65e2ceb99d1a56c6a8e17ed8a728",
+   "bytes": 95326,
+   "quality": 2
+  },
+  "post-necta-dsee-results-2019": {
+   "hash": "4a99bd41639cdaf8f4e423124deb521830ecba06",
+   "bytes": 107867,
+   "quality": 2
+  },
+  "post-necta-dte-results-2019": {
+   "hash": "79d386319dc3753cd1b8a494b54c30b185d71048",
+   "bytes": 109220,
+   "quality": 2
+  },
+  "post-necta-ftna-results-2019": {
+   "hash": "e6ac357b609621fc38658eecd2527b9b4da39607",
+   "bytes": 105741,
+   "quality": 2
+  },
+  "post-necta-psle-results-2020": {
+   "hash": "a252ae819deb72b7c593c00e3309add8aa56e67d",
+   "bytes": 101660,
+   "quality": 2
+  },
+  "post-necta-qt-results-2019": {
+   "hash": "dbb03fd4d7fc4ed8bfe10aa510904cb534e08d0c",
+   "bytes": 102669,
+   "quality": 2
+  },
   "post-necta-result-codes-abs-x-w-i-meaning": {
    "hash": "b13b28d354a84cb6fd0da03dd1a874aa6efff346",
    "bytes": 105468,
+   "quality": 2
+  },
+  "post-necta-sfna-results-2019": {
+   "hash": "0530840db7cb646cd46405a39d7044a9fbdd1ae5",
+   "bytes": 98572,
    "quality": 2
   },
   "post-heslb-loan-not-allocated-what-to-do-appeal": {
@@ -507,13 +817,13 @@
    "quality": 2
   },
   "post-sell-on-jiji-tanzania-rules-safe-deals-ad-limits": {
-   "hash": "112905c9783dd2386f79422aa48ca600d237fb31",
-   "bytes": 186676,
-   "quality": 4
+   "hash": "2acdc0e4e60f87ec0c8d0f264cf07ec834aa075c",
+   "bytes": 75695,
+   "quality": 2
   },
   "post-sim-swap-fraud-what-to-do": {
-   "hash": "904bba4218bd2778b01d6ed3c9f754930e73c16f",
-   "bytes": 143583,
+   "hash": "acb891f180eb5ff3288bf16f3716b1ca8af13ae2",
+   "bytes": 82470,
    "quality": 2
   },
   "post-simple-business-records-small-traders-cash-book-tanzania": {
@@ -644,6 +954,291 @@
   "post-zanzibar-slave-trade-and-how-it-ended": {
    "hash": "e5b4359caefbe9fb31dc755326526488e1cdd856",
    "bytes": 144878,
+   "quality": 2
+  },
+  "post-necta-acsee-results-2019": {
+   "hash": "13fabf151b2546176100a8bbaf7ad30d970d6a17",
+   "bytes": 160490,
+   "quality": 2
+  },
+  "post-necta-csee-results-2019": {
+   "hash": "d7a4426f87e2294793c751a4975713b9f77519e2",
+   "bytes": 101275,
+   "quality": 2
+  },
+  "post-necta-dsee-results-2018": {
+   "hash": "7833a3c0b58483ea1cdb989258320fcf3bc75289",
+   "bytes": 104218,
+   "quality": 2
+  },
+  "post-necta-ftna-results-2018": {
+   "hash": "8e25036cb349bc78203a3d52cd609ad594ee66e6",
+   "bytes": 102800,
+   "quality": 2
+  },
+  "post-necta-psle-results-2019": {
+   "hash": "2b52041bc1824707c8a93ffac546fbbbc4eb39b9",
+   "bytes": 189769,
+   "quality": 2
+  },
+  "post-necta-qt-results-2018": {
+   "hash": "52d28ba1750b414a6486c3b9e974a7f4cc09bf9b",
+   "bytes": 115950,
+   "quality": 2
+  },
+  "post-necta-sfna-results-2018": {
+   "hash": "de2c122e4ce557e7640e6e3d88dc80ea428fb9ac",
+   "bytes": 110971,
+   "quality": 2
+  },
+  "post-necta-acsee-results-2018": {
+   "hash": "37b5a2e609976d346dd1eadfd59548e4b5ef0d2c",
+   "bytes": 105485,
+   "quality": 2
+  },
+  "post-necta-csee-results-2018": {
+   "hash": "9939866ad0f3095e1261f0936a223ac6bdbc1e78",
+   "bytes": 131759,
+   "quality": 2
+  },
+  "post-necta-dsee-results-2017": {
+   "hash": "10a25ccdfe485e1dd443be3af94d2811233d93e5",
+   "bytes": 100726,
+   "quality": 2
+  },
+  "post-necta-ftna-results-2017": {
+   "hash": "5266375de585a2d07381808d89c7e95fd5b2f93c",
+   "bytes": 119748,
+   "quality": 2
+  },
+  "post-necta-psle-results-2018": {
+   "hash": "8d826eab9c726aa7c2af1c1c89134b5e10af1ccf",
+   "bytes": 117861,
+   "quality": 2
+  },
+  "post-necta-qt-results-2017": {
+   "hash": "84a8d7f982d70a6a0554bdeed58bb922527a73ed",
+   "bytes": 99850,
+   "quality": 2
+  },
+  "post-necta-sfna-results-2017": {
+   "hash": "5e88b39929dccf4072af7c861a97b441612b379f",
+   "bytes": 114811,
+   "quality": 2
+  },
+  "post-necta-acsee-results-2017": {
+   "hash": "d61b2fa5bb951cff0701282dcd7c222e10a06334",
+   "bytes": 132249,
+   "quality": 2
+  },
+  "post-necta-csee-results-2017": {
+   "hash": "5595c3ee834a3cb5e1c942f8f3f49b6277786948",
+   "bytes": 99869,
+   "quality": 2
+  },
+  "post-necta-dsee-results-2016": {
+   "hash": "f5c155ba5c515ddcedd3591b473ec62f8cd01052",
+   "bytes": 116323,
+   "quality": 2
+  },
+  "post-necta-ftna-results-2016": {
+   "hash": "1c2dce2425c20fc2b04979ba0ac200f7ed99e806",
+   "bytes": 99532,
+   "quality": 2
+  },
+  "post-necta-psle-results-2017": {
+   "hash": "5f329f79b72692c2c336d76adf866cc01b85abc1",
+   "bytes": 111015,
+   "quality": 2
+  },
+  "post-necta-qt-results-2016": {
+   "hash": "bb7eff1031382c2c76db7983ae661cc72ea394e7",
+   "bytes": 118300,
+   "quality": 2
+  },
+  "post-necta-sfna-results-2016": {
+   "hash": "1790665eb44353bc4d2385070cdbc2e5af14663a",
+   "bytes": 119531,
+   "quality": 2
+  },
+  "post-necta-acsee-results-2016": {
+   "hash": "3433516bc8d1a9ab5d239f040b899d4c93aa269a",
+   "bytes": 106408,
+   "quality": 2
+  },
+  "post-necta-csee-results-2016": {
+   "hash": "3aab5f83a3bdc3b3b7b4c2639e0d58471a9276b6",
+   "bytes": 124715,
+   "quality": 2
+  },
+  "post-necta-dsee-results-2015": {
+   "hash": "ab8d05bf6b19efc47189bde01ec98c3efb6336de",
+   "bytes": 115613,
+   "quality": 2
+  },
+  "post-necta-ftna-results-2015": {
+   "hash": "b073f539c03bf2613171fb4feebd7c8ea421143b",
+   "bytes": 111684,
+   "quality": 2
+  },
+  "post-necta-psle-results-2016": {
+   "hash": "2b25860952d96a06f413185bf4754877176f2299",
+   "bytes": 161467,
+   "quality": 2
+  },
+  "post-necta-qt-results-2015": {
+   "hash": "a5422cca1798583ce9977763bd8c7d62b7edf4fd",
+   "bytes": 101869,
+   "quality": 2
+  },
+  "post-necta-sfna-results-2015": {
+   "hash": "c88ff663f2b0e289b0ebf4ae802f2bb8ea1da1ed",
+   "bytes": 97100,
+   "quality": 2
+  },
+  "post-necta-acsee-results-2015": {
+   "hash": "340856dc96a2087d2bd9221140deaacab23c5715",
+   "bytes": 167541,
+   "quality": 2
+  },
+  "post-necta-csee-results-2015": {
+   "hash": "8a9709f76d2c177ee60ed661a31de5163c8fa6e5",
+   "bytes": 100011,
+   "quality": 2
+  },
+  "post-necta-dsee-results-2014": {
+   "hash": "b826c9d7626907c69559ddcc8e1379bd9b0410b6",
+   "bytes": 95821,
+   "quality": 2
+  },
+  "post-necta-ftna-results-2014": {
+   "hash": "9337d18dfc3a2a234d3e209f3a7b77e1f8101030",
+   "bytes": 102688,
+   "quality": 2
+  },
+  "post-necta-psle-results-2015": {
+   "hash": "b04172b311865f73ca79e6158ded238f143057fb",
+   "bytes": 114532,
+   "quality": 2
+  },
+  "post-necta-acsee-results-2014": {
+   "hash": "6a68a924ce113ba980757eefd0ed72708e05013f",
+   "bytes": 112036,
+   "quality": 2
+  },
+  "post-necta-csee-results-2014": {
+   "hash": "767a60feb55e61a5aaf5f168bc84f9c726fdaaf0",
+   "bytes": 126759,
+   "quality": 2
+  },
+  "post-necta-psle-results-2014": {
+   "hash": "8b48eb7f798e2752691492994afec4465870faaa",
+   "bytes": 171616,
+   "quality": 2
+  },
+  "post-necta-acsee-results-2013": {
+   "hash": "bfcdac5b6aa28c53c0a2d8f22282748cfb27894b",
+   "bytes": 174932,
+   "quality": 3
+  },
+  "post-necta-csee-results-2013": {
+   "hash": "f530a333e4e1df63d7f41782bd72233717400894",
+   "bytes": 120063,
+   "quality": 2
+  },
+  "post-necta-psle-results-2013": {
+   "hash": "dc5eb6e7e574c88423b8fd6b7321464dbb22cbf4",
+   "bytes": 106433,
+   "quality": 2
+  },
+  "post-necta-acsee-results-2012": {
+   "hash": "4336d2c04c679e9fab5312ad0d48e1a90c920b3e",
+   "bytes": 101696,
+   "quality": 2
+  },
+  "post-necta-csee-results-2012": {
+   "hash": "bbc1483bddc7bc6d87177bbc566745b7bdd64475",
+   "bytes": 145974,
+   "quality": 2
+  },
+  "post-necta-acsee-results-2011": {
+   "hash": "6c3aa64a6350b5a316cbdb567cd57d25a54b5a0a",
+   "bytes": 113921,
+   "quality": 2
+  },
+  "post-necta-csee-results-2011": {
+   "hash": "7fdb10c24fa782edd94aeb6f2efd40b4d14a2b7e",
+   "bytes": 103043,
+   "quality": 2
+  },
+  "post-necta-acsee-results-2010": {
+   "hash": "da1f1875b8596809c686d301eef1fa4040d71574",
+   "bytes": 104875,
+   "quality": 2
+  },
+  "post-necta-csee-results-2010": {
+   "hash": "6ddba0494b0e8bb36ce2e50b731b74be2309362a",
+   "bytes": 166500,
+   "quality": 2
+  },
+  "post-necta-acsee-results-2009": {
+   "hash": "24475b4b3878af8f65484b4fa717e47642f5cf9e",
+   "bytes": 99935,
+   "quality": 2
+  },
+  "post-necta-csee-results-2009": {
+   "hash": "7b1c9cc5888863de92617215132e99401ede1562",
+   "bytes": 109569,
+   "quality": 2
+  },
+  "post-necta-csee-results-2008": {
+   "hash": "1cba4460683e5877d72dba02b7b56d053c446df2",
+   "bytes": 127205,
+   "quality": 2
+  },
+  "post-necta-acsee-results-2007": {
+   "hash": "0670343ac9f41aa4c9231027f1c1a90874e42b75",
+   "bytes": 103766,
+   "quality": 2
+  },
+  "post-necta-csee-results-2007": {
+   "hash": "eea26a66bf3328462e37e84aab1e6fec9109cea8",
+   "bytes": 98822,
+   "quality": 2
+  },
+  "post-necta-acsee-results-2006": {
+   "hash": "f11cb40e28c4dcfbc6b1e607ef87cf8474a533c6",
+   "bytes": 112927,
+   "quality": 2
+  },
+  "post-necta-csee-results-2006": {
+   "hash": "85a9af3288edb06d4e6214888127a6cf0630e1e9",
+   "bytes": 129487,
+   "quality": 2
+  },
+  "post-necta-acsee-results-2005": {
+   "hash": "8570bd9a6a461e585c1ed0e9717e7bd865bc1597",
+   "bytes": 169011,
+   "quality": 2
+  },
+  "post-necta-csee-results-2005": {
+   "hash": "05d38d8b97fd0c2749c089c53cf9ea12275ed619",
+   "bytes": 102911,
+   "quality": 2
+  },
+  "post-necta-acsee-results-2004": {
+   "hash": "dfa11a7f84143a6ec967bbab49e0c26e1895d5c2",
+   "bytes": 110854,
+   "quality": 2
+  },
+  "post-necta-csee-results-2004": {
+   "hash": "b969df7f7fe0c4d5cec34a58f3ed3345e066f3f4",
+   "bytes": 126179,
+   "quality": 2
+  },
+  "post-necta-csee-results-2003": {
+   "hash": "782d285569b68e648a45f807971af31eecffc693",
+   "bytes": 101973,
    "quality": 2
   },
   "post-low-cost-online-business-ideas-tanzania": {

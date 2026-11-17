@@ -35,6 +35,13 @@ Suggested shape (adapt to the topic, do not force it):
 5. `## What to do next`: 2-4 concrete next steps (not a generic "in conclusion").
 6. `## Sources and further reading`: real links only (see below).
 
+## Search title and description (added 2026-11-17, from the SEO research in the session notes)
+Google gives no official character limit for titles or descriptions; it cuts them to the width of the screen (about 600 px, roughly 55 to 60 characters, for a title on a computer; about 150 to 160 characters for a description) and it writes its own text when yours does not match the page. So:
+- **Title:** put the words a reader would type first (the subject and the place or year), the reason to click after it. Plain English, no capitals for emphasis, no clickbait, no brand (the search engine shows the site name). Keep the title and the page's own heading about the same thing, because a mismatch makes Google rewrite it. A year goes in only when the post really depends on it. Use `metaTitle:` when the heading must stay longer than about 60 characters.
+- **Excerpt (the description):** 120 to 160 characters. The first 110 characters must already say what the reader gets (a fact, a number, a step), and every word must be true of the page. Say what is in the post, never what is not (no "download", no "official", no promises of results or income). Every excerpt is different from every other.
+- **Tanzania:** many readers search in Swahili or mix both languages. Where a post is about a Swahili term people use (`matokeo ya kidato cha nne`, `leseni ya biashara`), say that term once, naturally, in the first paragraph or a heading, in plain text. Never repeat keywords to please a search engine.
+- **Picture:** a real, literal `imageAlt`. The cover is also the link-preview and image-search picture, so it must show the subject.
+
 ## Voice: simple English that sounds like a person
 - Aim for Grade 6-8 reading level. Average sentence about 12-18 words. Prefer short everyday words ("use", not "utilise"; "help", not "facilitate"). Explain any technical word the first time.
 - Talk to the reader as "you". Write like a knowledgeable local editor explaining things to a friend: direct, calm, specific. Vary sentence length. A short sentence now and then is fine. Contractions are fine ("you'll", "don't").

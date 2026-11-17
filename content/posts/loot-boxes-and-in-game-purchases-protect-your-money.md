@@ -3,7 +3,7 @@ title: "Loot Boxes and In-Game Purchases: How to Protect Your Money"
 date: 2026-11-04
 author: Mclean Mbaga
 category: video-games-updates
-excerpt: What loot boxes and in-game purchases are, why spending adds up fast, how to turn on purchase checks on Google Play, and what to try after a charge you did not mean.
+excerpt: What loot boxes and in-game purchases are, why spending adds up fast, how to turn on Google Play purchase checks and what to try after an unwanted charge.
 image: assets/posts/loot-boxes-and-in-game-purchases-protect-your-money.webp
 imageAlt: A young boy lying on a wooden floor, holding a smartphone close to his face
 imageCredit: Photo: Andi Graf, CC0, via Wikimedia Commons

@@ -5,6 +5,9 @@ author: Mclean Mbaga
 category: technology-solutions
 label: cyber-security
 excerpt: Posts you did not write, or a login that no longer works? Follow a calm order of steps to secure your Facebook account, and learn how to lock it down.
+image: assets/posts/hacked-facebook-account-what-to-do.webp
+imageAlt: Drawing on a dark blue background: a login card with a row of password dots, a profile card with a red alert badge and a warning message, and a large blue padlock with a key beside it
+imageCredit: Cover drawn by Mayobe Bros.
 tags: [online safety, scams, smartphones, tanzania]
 ---
 

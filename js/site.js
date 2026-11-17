@@ -41,6 +41,7 @@
     var dark = isDark();
     root.classList.toggle('dark', dark);
     root.classList.toggle('light', m === 'light');
+    $$('[data-theme-state]').forEach(function (b) { b.textContent = dark ? 'Dark' : 'Light'; });
     $$('[data-theme-toggle]').forEach(function (b) {
       b.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
       b.setAttribute('title', dark ? 'Light mode' : 'Dark mode');
@@ -81,6 +82,39 @@
     else if (!e.shiftKey && doc.activeElement === last) { e.preventDefault(); first.focus(); }
   }
 
+  /* ------------------------------------------- flyout beside a label with sections (Results) */
+  var flies = $$('.sub-fly');
+  function closeFlies(except) {
+    flies.forEach(function (f) {
+      if (f === except) return;
+      f.classList.remove('is-open');
+      var b = $('.sub-fly-btn', f);
+      if (b) b.setAttribute('aria-expanded', 'false');
+    });
+  }
+  flies.forEach(function (f) {
+    var b = $('.sub-fly-btn', f);
+    if (!b) return;
+    b.addEventListener('click', function (e) {
+      e.preventDefault();
+      var open = !f.classList.contains('is-open');
+      closeFlies(f);
+      f.classList.toggle('is-open', open);
+      b.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+  });
+  if (flies.length) {
+    doc.addEventListener('click', function (e) { if (!e.target.closest || !e.target.closest('.sub-fly')) closeFlies(null); });
+    doc.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') return;
+      var open = flies.filter(function (f) { return f.classList.contains('is-open'); })[0];
+      if (!open) return;
+      closeFlies(null);
+      var b = $('.sub-fly-btn', open);
+      if (b) b.focus();
+    });
+  }
+
   /* ---------------------------------------------------------- mobile drawer */
   var drawer = $('#drawer');
   var backdrop = $('.drawer-backdrop');
@@ -91,8 +125,9 @@
     backdrop.classList.toggle('is-open', open);
     drawer.setAttribute('aria-hidden', open ? 'false' : 'true');
     $$('[data-drawer-open]').forEach(function (b) { b.setAttribute('aria-expanded', open ? 'true' : 'false'); });
-    doc.body.classList.toggle('no-scroll', open);
-    if (open) { var c = $('[data-drawer-close]', drawer); if (c) c.focus(); }
+    doc.body.classList.toggle('no-scroll', open || !!(modal && !modal.hidden && !modal.classList.contains('is-closing'))); // the search overlay keeps the page still when the menu hands over to it
+    if (open) drawerShow();
+    if (open) { var c = $('[data-drawer-close]', drawer); if (c) window.setTimeout(function () { c.focus({ preventScroll: true }); }, 60); } // after the drawer is visible: a hidden element cannot take focus (audit 2026-11-11)
     else if (drawerOpener) { drawerOpener.focus(); drawerOpener = null; }
   }
   $$('[data-drawer-open]').forEach(function (b) { b.addEventListener('click', function () { drawerOpener = b; setDrawer(true); }); });
@@ -101,6 +136,108 @@
     drawer.addEventListener('keydown', function (e) { trapTab(drawer, e); });
     window.matchMedia('(min-width: 1280px)').addEventListener('change', function (e) { if (e.matches) setDrawer(false); });
   }
+
+  /* ----------------------------------------------------- menus: close after a choice, the phone menu opens smoothly */
+  var reduceMq = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+  var EASE_OUT = 'cubic-bezier(0.22, 1, 0.36, 1)';
+  function pathKey(p) { return String(p || '').replace(/[?#].*$/, '').replace(/\/+$/, '') || '/'; }
+  // Before the drawer slides in: mark the link of the page being read, open the groups around it (and fold the others), bring it into view,
+  // and let the first items rise in one after the other.
+  function drawerShow() {
+    var here = pathKey(location.pathname), found = null;
+    $$('.has-current', drawer).forEach(function (d) { d.classList.remove('has-current'); });
+    $$('.drawer-nav a[href]', drawer).forEach(function (a) {
+      a.classList.remove('is-current'); a.removeAttribute('aria-current');
+      var h; try { h = pathKey(new URL(a.getAttribute('href'), location.href).pathname); } catch (err) { return; }
+      if (h !== here) return;
+      a.classList.add('is-current'); a.setAttribute('aria-current', 'page'); found = a;
+    });
+    $$('details', drawer).forEach(function (d) { if (d._a) { d._a.cancel(); d._a = null; } d.classList.remove('is-closing'); d.open = false; });
+    for (var d = found && found.closest('details'); d; d = d.parentNode.closest ? d.parentNode.closest('details') : null) { d.open = true; d.classList.add('has-current'); }
+    var nav = $('.drawer-nav', drawer);
+    if (nav) {
+      nav.scrollTop = 0;
+      if (found) { var r = found.getBoundingClientRect(), n = nav.getBoundingClientRect(), by = (r.top - n.top) - n.height / 3; if (r.bottom > n.bottom - 24 && by > 0) nav.scrollTop = by; } // only when the open page is not already in view
+      if (!(reduceMq && reduceMq.matches)) {
+        Array.prototype.slice.call(nav.children, 0, 12).forEach(function (n2, i) {
+          if (n2.animate) n2.animate([{ opacity: 0, transform: 'translateX(-10px)' }, { opacity: 1, transform: 'none' }], { duration: 320, delay: 90 + i * 28, easing: EASE_OUT, fill: 'backwards' });
+        });
+      }
+    }
+  }
+  function groupBody(d) { return d.querySelector(':scope > .drawer-sub, :scope > .drawer-sub2'); }
+  // Open or fold one group: the height eases open and the items rise in one after the other; folding eases shut and then really closes it.
+  function setGroup(d, open) {
+    var body = groupBody(d);
+    if (d._a) { d._a.cancel(); d._a = null; }
+    d.classList.remove('is-closing');
+    if (!body || !body.animate || (reduceMq && reduceMq.matches)) { d.open = open; return; }
+    var h;
+    if (open) {
+      d.open = true;
+      h = body.offsetHeight;
+      body.style.overflow = 'hidden';
+      d._a = body.animate([{ height: '0px' }, { height: h + 'px' }], { duration: 340, easing: EASE_OUT });
+      d._a.onfinish = d._a.oncancel = function () { body.style.overflow = ''; };
+      Array.prototype.slice.call(body.children, 0, 9).forEach(function (n, i) {
+        n.animate([{ opacity: 0, transform: 'translateY(-8px)' }, { opacity: 1, transform: 'none' }], { duration: 300, delay: 50 + i * 35, easing: EASE_OUT, fill: 'backwards' });
+      });
+    } else {
+      h = body.offsetHeight;
+      d.classList.add('is-closing');
+      body.style.overflow = 'hidden';
+      d._a = body.animate([{ height: h + 'px', opacity: 1 }, { height: '0px', opacity: 0 }], { duration: 240, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' });
+      d._a.onfinish = function () { d.open = false; d.classList.remove('is-closing'); body.style.overflow = ''; d._a = null; };
+      d._a.oncancel = function () { body.style.overflow = ''; };
+    }
+  }
+  // after a group opened, glide the menu's own scroll so the group and its items are in view (the menu is its own scroll box)
+  function keepGroupInView(d) {
+    var nav = $('.drawer-nav', drawer), s = d.querySelector(':scope > summary'), body = groupBody(d);
+    if (!nav || !s || !body) return;
+    window.setTimeout(function () {
+      var n = nav.getBoundingClientRect(), sr = s.getBoundingClientRect();
+      var over = sr.bottom + body.scrollHeight - (n.bottom - 12);
+      var by = Math.min(over, sr.top - n.top - 8);
+      if (by > 4) nav.scrollTo({ top: nav.scrollTop + by, behavior: reduceMq && reduceMq.matches ? 'auto' : 'smooth' });
+    }, 250);
+  }
+  if (drawer) {
+    $$('summary', drawer).forEach(function (s) {
+      s.addEventListener('click', function (e) {
+        e.preventDefault();
+        var d = s.parentNode, open = !(d.open && !d.classList.contains('is-closing'));
+        if (open && d.classList.contains('drawer-group')) {
+          $$('.drawer-group', drawer).forEach(function (o) { if (o !== d && o.open) setGroup(o, false); }); // one group at a time keeps the list short
+        }
+        setGroup(d, open);
+        if (open) keepGroupInView(d);
+      });
+    });
+  }
+  // A choice in any menu closes the menu. The dropdowns open by hover and focus, so they are shut on purpose until the pointer leaves or
+  // the keyboard comes back (a link to the page you are already on, or a page that changes in place, used to leave them open).
+  $$('.has-sub').forEach(function (it) {
+    var unshut = function () { it.classList.remove('is-shut'); };
+    it.addEventListener('mouseleave', unshut);
+    it.addEventListener('focusin', unshut);
+  });
+  doc.addEventListener('click', function (e) {
+    var a = e.target.closest ? e.target.closest('.header-nav a[href], .drawer a[href]') : null;
+    if (!a) return;
+    closeFlies(null);
+    var item = a.closest('.has-sub');
+    if (item) { item.classList.add('is-shut'); var f = doc.activeElement; if (f && f.blur && item.contains(f)) f.blur(); }
+    if (drawer && drawer.contains(a)) setDrawer(false);
+  });
+  // the search bar of the menu hands over to the search overlay
+  $$('.drawer [data-search-open]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var r = b.getBoundingClientRect(), box = { left: r.left, top: r.top, width: r.width, height: r.height };
+      setDrawer(false);
+      window.setTimeout(function () { openSearch(box); }, reduceMq && reduceMq.matches ? 0 : 160); // the menu starts to leave first, then the search grows out of where its bar was
+    });
+  });
 
   /* --------------------------------------------------------------- search */
   var index = null;
@@ -165,9 +302,33 @@
   var results = $('#search-results');
   var searchOpener = null;
   var timer = null;
+  var riseOnce = false, closeTimer = 0;
+  function reduceSearch() { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
+  // Draws the list, then makes the change smooth: the first results rise in one after another, and the list eases to its new height
+  // instead of jumping when the number of results changes while the reader types.
   function renderModal() {
+    var live = !modal.hidden && modal.classList.contains('is-open');
+    var h0 = results.offsetHeight;
+    buildModal();
+    if (!live || reduceSearch() || !results.animate) return;
+    var items = $$('.result, .search-all, .search-hint', results);
+    if (riseOnce && items.length) {
+      riseOnce = false;
+      items.forEach(function (n, i) {
+        n.animate([{ opacity: 0, transform: 'translateY(12px)' }, { opacity: 1, transform: 'none' }], { duration: 420, delay: 60 + Math.min(i, 8) * 45, easing: EASE_OUT, fill: 'backwards' });
+      });
+    }
+    var h1 = results.offsetHeight;
+    if (h0 > 0 && Math.abs(h1 - h0) > 2) {
+      results.style.overflowY = 'hidden';
+      var a = results.animate([{ height: h0 + 'px' }, { height: h1 + 'px' }], { duration: 300, easing: EASE_OUT });
+      a.onfinish = a.oncancel = function () { results.style.overflowY = ''; };
+    }
+  }
+  function buildModal() {
     var q = input.value.trim();
     results.textContent = '';
+    results.scrollTop = 0; // a new search always starts at its first result, even if the reader had scrolled the old list
     if (!index) { results.appendChild(el('p', 'search-hint', 'Loading…')); return; }
     var terms = tokens(q);
     var list = terms.length ? search(q, 6) : index.slice(0, 5);
@@ -180,26 +341,47 @@
       results.appendChild(all);
     }
   }
-  function openSearch() {
+  // Opens with a soft fade and blur of the page, and the panel grows out of the button that was pressed (the menu's search bar gives its
+  // rectangle; anything else grows from the top edge). `from` is an element or { left, top, width, height }. The first results rise in one
+  // after another. Closing plays the same in reverse, a little faster, and only then hides the dialog.
+  function openSearch(from) {
     if (!modal) return;
+    clearTimeout(closeTimer);
+    modal.classList.remove('is-closing');
     searchOpener = doc.activeElement;
+    var wasHidden = modal.hidden;
     modal.hidden = false;
     doc.body.classList.add('no-scroll');
-    input.focus();
-    renderModal();
+    var panel = $('.search-panel', modal);
+    if (panel) {
+      var fr = from && from.getBoundingClientRect ? from.getBoundingClientRect() : from;
+      panel.style.setProperty('--so', fr && fr.width ? (fr.left + fr.width / 2 - panel.offsetLeft) + 'px ' + (fr.top + fr.height / 2 - panel.offsetTop) + 'px' : '50% 0');
+    }
+    riseOnce = true;
+    if (wasHidden && !reduceSearch()) {
+      modal.classList.remove('is-open');
+      void modal.offsetWidth; // the closed state is painted first, so the open state can transition from it
+      window.requestAnimationFrame(function () { window.requestAnimationFrame(function () { modal.classList.add('is-open'); renderModal(); }); });
+    } else { modal.classList.add('is-open'); renderModal(); }
+    window.setTimeout(function () { input.focus({ preventScroll: true }); }, wasHidden && !reduceSearch() ? 140 : 0);
     loadIndex().then(renderModal).catch(function () {
       results.textContent = '';
       results.appendChild(el('p', 'search-hint', 'Search is unavailable right now.'));
     });
   }
   function closeSearch() {
-    if (!modal || modal.hidden) return;
-    modal.hidden = true;
+    if (!modal || modal.hidden || modal.classList.contains('is-closing')) return;
+    modal.classList.remove('is-open');
+    modal.classList.add('is-closing');
     doc.body.classList.remove('no-scroll');
     if (searchOpener && searchOpener.focus) searchOpener.focus();
+    closeTimer = window.setTimeout(function () { modal.hidden = true; modal.classList.remove('is-closing'); }, reduceSearch() ? 0 : 300);
   }
   if (modal) {
-    $$('[data-search-open]').forEach(function (b) { b.addEventListener('click', openSearch); });
+    $$('[data-search-open]').forEach(function (b) {
+      if (b.closest('.drawer')) return; // the menu's search bar hands over after the menu has started to slide away (below)
+      b.addEventListener('click', function () { openSearch(b); });
+    });
     $$('[data-search-close]').forEach(function (b) { b.addEventListener('click', closeSearch); });
     input.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(renderModal, 80); });
     modal.addEventListener('keydown', function (e) {

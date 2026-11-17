@@ -4,6 +4,7 @@ date: 2026-11-04
 author: Mclean Mbaga
 category: educational
 label: results
+section: [guides]
 excerpt: See how ACSEE grades become the points that universities use, how to add your two best principal passes, and what the 4.0 minimum means.
 image: assets/posts/how-to-read-acsee-results-points-and-divisions.webp
 imageAlt: A large crowd of graduates seen from above, wearing black gowns with orange-trimmed hoods inside a hall

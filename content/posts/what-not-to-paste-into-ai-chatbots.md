@@ -4,7 +4,7 @@ date: 2026-11-04
 author: Mclean Mbaga
 category: technology-solutions
 label: ai-tools
-excerpt: Treat the chat box like a public noticeboard. Learn what to keep out of AI chatbots, what Google and Anthropic say about your chats, and what to do after a mistake.
+excerpt: Treat the chat box like a public noticeboard. See what to keep out of AI chatbots, what Google and Anthropic say about your chats and what to do after a slip.
 image: assets/posts/what-not-to-paste-into-ai-chatbots.webp
 imageAlt: An open combination padlock standing on the keyboard of a laptop
 imageCredit: Photo: CC0, via rawpixel

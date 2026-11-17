@@ -5,6 +5,9 @@ author: Mclean Mbaga
 category: technology-solutions
 label: cyber-security
 excerpt: How to talk with your child about phones, set up simple controls, and know where to get help in Tanzania, including the free child helpline on 116.
+image: assets/posts/keeping-children-safe-online-parents-guide.webp
+imageAlt: Drawing of a smartphone showing a blue shield with a heart and three switches, beside two chat cards and a card with a grown-up and a child joined by a small pink heart
+imageCredit: Cover drawn by Mayobe Bros.
 tags: [online safety, parental controls, smartphones, tanzania]
 ---
 

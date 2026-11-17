@@ -42,7 +42,7 @@ const csvCell = (s) => { let v = safe(s); if (/^[=+\-@]/.test(v)) v = `'${v}`; r
 
 function show(r) {
   console.log(`mode: ${safe(r.paused ? 'paused (NEWSLETTER_SEND is not "true")' : 'sending on')}`);
-  console.log(`articles to send: ${(r.posts || []).map((p) => `${safe(p.slug)} (${safe(p.recipients)} recipients)`).join(', ') || 'none'}`);
+  console.log(`emails to send: ${(r.posts || []).map((p) => `${safe(p.slug)} (${safe(p.recipients)} recipients${p.posts ? `, one email listing ${safe(p.posts)} results pages` : ''})`).join(', ') || 'none'}`);
   console.log(`seeded: ${safe((r.seeded || []).length ? [].concat(r.seeded).join(', ') : 'none')}`);
   console.log(`too old, recorded and never emailed: ${safe((r.tooOld || []).join(', ') || 'none')}`);
   if (r.stopped) console.log(`stopped: ${safe(r.stopped)}`);
@@ -70,7 +70,7 @@ try {
     console.log(`news mail units used today (UTC): ${safe(c.newsToday)} of ${safe(c.newsCap)} (article emails stop at ${safe(c.articleCap)}; the rest is kept for confirmations, welcomes and goodbyes)`);
     console.log(c.paused ? 'sending of new-article emails is paused (NEWSLETTER_SEND is not "true")' : 'sending of new-article emails is on');
     if (!c.queue.length) console.log('no article is being sent now');
-    for (const q of c.queue) console.log(`being sent: ${safe(q.slug)}  sent ${safe(q.sent)}, still to send ${safe(q.left)}`);
+    for (const q of c.queue) console.log(`being sent: ${safe(q.slug)}${q.posts ? ` (one email listing ${safe(q.posts)} results pages)` : ''}  sent ${safe(q.sent)}, still to send ${safe(q.left)}`);
   } else if (cmd === 'remove') {
     if (!rest[0]) throw new Error('Usage: remove <email> --yes');
     if (!yes) throw new Error(`Removing ${safe(rest[0])} cannot be undone. Run it again with --yes to confirm.`);

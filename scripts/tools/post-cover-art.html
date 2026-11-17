@@ -1,0 +1,226 @@
+<!doctype html>
+<!-- Covers for article posts that have no photograph (1400 x 788). Everything is drawn in code from the brand colours: no photograph,
+     no logo, no real person's face, nothing copied from anywhere. Open with ?scene=<name> to see one (names: see SCENES below);
+     scripts/tools/make-post-covers.mjs draws every scene with headless Chromium and writes assets/posts/<slug>.webp.
+     The article hero puts the title at the bottom left, so each scene keeps its main subject in the upper and middle right. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Post cover art</title>
+<style>html,body{margin:0;background:#070b14}svg{display:block;width:1400px;height:788px}</style>
+</head>
+<body>
+<div id="stage"></div>
+<script>
+var FONT = "'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
+
+/* ---------- small helpers ---------- */
+function bar(x, y, w, h, fill, op) { return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="' + (h / 2) + '" fill="' + fill + '" fill-opacity="' + (op == null ? 1 : op) + '"/>'; }
+function star(x, y, s, fill, op) {
+  return '<path transform="translate(' + x + ' ' + y + ') scale(' + s + ')" d="M0-10C1.2-3 3-1.2 10 0 3 1.2 1.2 3 0 10-1.2 3-3 1.2-10 0-3-1.2-1.2-3 0-10Z" fill="' + fill + '" fill-opacity="' + (op == null ? .7 : op) + '"/>';
+}
+function dot(x, y, r, fill, ring) {
+  return '<circle cx="' + x + '" cy="' + y + '" r="' + (r + 9) + '" fill="' + fill + '" fill-opacity=".16"/><circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="' + fill + '"/>';
+}
+/* a frosted card, drawn at x,y with its own coordinate system, turned by rot degrees about its middle */
+function glass(x, y, w, h, r, rot, inner, tint) {
+  return '<g transform="translate(' + x + ' ' + y + ') rotate(' + rot + ' ' + (w / 2) + ' ' + (h / 2) + ')" filter="url(#shadow)">' +
+    '<rect width="' + w + '" height="' + h + '" rx="' + r + '" fill="' + (tint || '#0c1730') + '" fill-opacity=".74"/>' +
+    '<rect width="' + w + '" height="' + h + '" rx="' + r + '" fill="url(#glass)" stroke="#fff" stroke-opacity=".2" stroke-width="1.5"/>' + inner + '</g>';
+}
+function defs(c) {
+  return '<defs>' +
+    '<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + c.bg[0] + '"/><stop offset=".55" stop-color="' + c.bg[1] + '"/><stop offset="1" stop-color="' + c.bg[2] + '"/></linearGradient>' +
+    '<linearGradient id="glass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".17"/><stop offset="1" stop-color="#fff" stop-opacity=".04"/></linearGradient>' +
+    '<linearGradient id="gA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + c.a[0] + '"/><stop offset="1" stop-color="' + c.a[1] + '"/></linearGradient>' +
+    '<linearGradient id="gB" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + c.b[0] + '"/><stop offset="1" stop-color="' + c.b[1] + '"/></linearGradient>' +
+    '<linearGradient id="gC" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + c.c[0] + '"/><stop offset="1" stop-color="' + c.c[1] + '"/></linearGradient>' +
+    '<filter id="shadow" x="-25%" y="-25%" width="150%" height="160%"><feDropShadow dx="0" dy="22" stdDeviation="20" flood-color="#000" flood-opacity=".5"/></filter>' +
+    '<filter id="soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="46"/></filter>' +
+    '<filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>' +
+    '<pattern id="dots" width="30" height="30" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.1" fill="#fff" fill-opacity=".08"/></pattern>' +
+    '</defs>';
+}
+function backdrop(c) {
+  return '<rect width="1400" height="788" fill="url(#bg)"/>' +
+    '<g filter="url(#soft)"><circle cx="' + c.glow[0][0] + '" cy="' + c.glow[0][1] + '" r="250" fill="' + c.glow[0][2] + '" fill-opacity=".34"/>' +
+    '<circle cx="' + c.glow[1][0] + '" cy="' + c.glow[1][1] + '" r="300" fill="' + c.glow[1][2] + '" fill-opacity=".26"/></g>' +
+    '<rect width="1400" height="788" fill="url(#dots)"/>' +
+    '<g fill="none" stroke="#fff" stroke-opacity=".07" stroke-width="2"><circle cx="880" cy="400" r="360"/><circle cx="880" cy="400" r="520"/></g>';
+}
+
+/* ---------- 1. Facebook account hacked: password card, profile card with an alert, padlock ---------- */
+function sceneHacked() {
+  var c = { bg: ['#070d1f', '#0b2550', '#2b2a66'], a: ['#4f8cff', '#7c5cff'], b: ['#2dd4e6', '#3b82f6'], c: ['#ff7a90', '#e11d48'], glow: [[300, 560, '#2563eb'], [1080, 260, '#7c3aed']] };
+  var out = defs(c) + backdrop(c);
+  /* password card, behind */
+  out += glass(120, 330, 400, 250, 30, -7,
+    bar(36, 38, 150, 16, '#fff', .9) + bar(36, 66, 220, 10, '#fff', .35) +
+    '<rect x="36" y="104" width="328" height="54" rx="16" fill="#fff" fill-opacity=".08" stroke="#fff" stroke-opacity=".22"/>' +
+    [0, 1, 2, 3, 4, 5, 6].map(function (i) { return '<circle cx="' + (64 + i * 28) + '" cy="131" r="6.5" fill="#fff" fill-opacity=".85"/>'; }).join('') +
+    '<rect x="36" y="178" width="196" height="42" rx="21" fill="url(#gB)"/>' + bar(62, 195, 100, 9, '#06142c', .75) +
+    '<g transform="translate(300 186)" fill="none" stroke="#fff" stroke-opacity=".8" stroke-width="5" stroke-linecap="round"><path d="M10 6a17 17 0 1 1-6 16"/><path d="M2 -2l8 8-9 5"/></g>');
+  /* profile card */
+  out += glass(470, 110, 520, 400, 34, 3,
+    '<circle cx="86" cy="86" r="48" fill="url(#gA)"/><circle cx="86" cy="72" r="17" fill="#fff" fill-opacity=".92"/><path d="M52 118c6-22 20-30 34-30s28 8 34 30z" fill="#fff" fill-opacity=".92"/>' +
+    bar(160, 58, 220, 20, '#fff', .92) + bar(160, 92, 140, 11, '#fff', .38) +
+    '<rect x="40" y="168" width="440" height="190" rx="20" fill="#fff" fill-opacity=".07" stroke="#fff" stroke-opacity=".14"/>' +
+    bar(64, 192, 300, 14, '#fff', .55) + bar(64, 218, 380, 10, '#fff', .28) + bar(64, 238, 330, 10, '#fff', .28) +
+    '<rect x="64" y="268" width="392" height="66" rx="14" fill="url(#gC)" fill-opacity=".22" stroke="#ff7a90" stroke-opacity=".7"/>' +
+    '<g transform="translate(86 284)"><path d="M17 3 33 33H1Z" fill="#ff7a90" stroke="#ff7a90" stroke-width="4" stroke-linejoin="round"/><path d="M17 13v10M17 27.5v.5" stroke="#3a0716" stroke-width="3.4" stroke-linecap="round"/></g>' +
+    bar(142, 285, 250, 13, '#ffd6dc', .9) + bar(142, 308, 170, 9, '#ffd6dc', .55) +
+    '<circle cx="124" cy="46" r="17" fill="url(#gC)" stroke="#0c1730" stroke-width="5"/><path d="M124 38v9M124 52v.5" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/>');
+  /* padlock, in front */
+  out += '<g transform="translate(900 300)" filter="url(#shadow)">' +
+    '<path d="M44 124V84a66 66 0 0 1 132 0v40" fill="none" stroke="url(#gB)" stroke-width="26" stroke-linecap="round"/>' +
+    '<rect x="0" y="108" width="220" height="190" rx="36" fill="url(#gA)"/>' +
+    '<rect x="0" y="108" width="220" height="190" rx="36" fill="url(#glass)" stroke="#fff" stroke-opacity=".3" stroke-width="1.5"/>' +
+    '<circle cx="110" cy="184" r="24" fill="#0b1633"/><path d="M99 196h22l6 46h-34z" fill="#0b1633"/>' +
+    '</g>';
+  /* key */
+  out += '<g transform="translate(1090 560) rotate(-32)" filter="url(#shadow)"><circle cx="0" cy="0" r="38" fill="none" stroke="url(#gB)" stroke-width="16"/><rect x="34" y="-9" width="150" height="18" rx="9" fill="url(#gB)"/><rect x="132" y="6" width="14" height="34" rx="6" fill="url(#gB)"/><rect x="158" y="6" width="14" height="24" rx="6" fill="url(#gB)"/></g>';
+  out += star(1220, 150, 1.6, '#fff') + star(1040, 74, 1, '#7fe3ff') + star(120, 170, 1.3, '#fff', .5) + dot(1260, 420, 7, '#ff7a90') + dot(190, 690, 6, '#2dd4e6') + dot(760, 700, 6, '#7c5cff');
+  return out;
+}
+
+/* ---------- 2. Independence of Tanganyika: sunrise over a snow-capped mountain, a calendar leaf ---------- */
+function sceneIndependence() {
+  var c = { bg: ['#091329', '#18386a', '#3a3a6e'], a: ['#ffd166', '#f59e0b'], b: ['#34d399', '#059669'], c: ['#ef4444', '#b91c1c'], glow: [[760, 470, '#f59e0b'], [1180, 150, '#3b82f6']] };
+  var out = defs(c) + '<rect width="1400" height="788" fill="url(#bg)"/>';
+  out += '<defs><linearGradient id="dawn" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f59e0b" stop-opacity="0"/><stop offset=".72" stop-color="#f59e0b" stop-opacity=".5"/><stop offset="1" stop-color="#fb7185" stop-opacity=".55"/></linearGradient>' +
+    '<radialGradient id="sun" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff3c4"/><stop offset=".55" stop-color="#ffd166"/><stop offset="1" stop-color="#f59e0b"/></radialGradient>' +
+    '<linearGradient id="snow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#bcd3f0"/></linearGradient>' +
+    '<linearGradient id="rock" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c3a66"/><stop offset="1" stop-color="#0d1f40"/></linearGradient></defs>';
+  out += '<rect x="0" y="260" width="1400" height="528" fill="url(#dawn)"/><rect width="1400" height="788" fill="url(#dots)" opacity=".7"/>';
+  /* rays and sun */
+  var rays = '';
+  for (var i = 0; i < 17; i++) { var a = (-170 + i * 10.6) * Math.PI / 180; rays += '<line x1="' + (700 + Math.cos(a) * 200) + '" y1="' + (440 + Math.sin(a) * 200) + '" x2="' + (700 + Math.cos(a) * (i % 2 ? 262 : 298)) + '" y2="' + (440 + Math.sin(a) * (i % 2 ? 262 : 298)) + '" stroke="#ffd166" stroke-opacity=".55" stroke-width="7" stroke-linecap="round"/>'; }
+  out += rays + '<circle cx="700" cy="440" r="176" fill="#ffb84d" fill-opacity=".22"/><circle cx="700" cy="440" r="140" fill="url(#sun)" filter="url(#glow)"/>';
+  /* far ridge, the mountain (a broad dome with a snow cap, a jagged lower peak to its left), hills, an acacia */
+  out += '<path d="M0 560C120 520 230 548 360 520S600 540 760 505 1060 540 1180 510 1330 540 1400 530V788H0Z" fill="#17335f" fill-opacity=".9"/>';
+  out += '<path d="M120 640 250 520 300 545 352 470 400 520 470 555 560 640Z" fill="url(#rock)"/><path d="M335 500 352 470 372 498 362 492 352 504 343 490Z" fill="url(#snow)"/>';
+  out += '<path d="M380 700C470 640 520 520 650 470 720 445 800 445 880 470 1010 520 1090 620 1190 700Z" fill="url(#rock)"/>';
+  out += '<path d="M650 470C720 445 800 445 880 470 902 480 920 492 936 506 900 508 880 524 850 516 820 530 800 514 770 524 745 512 712 526 690 512 660 520 645 498 636 486Z" fill="url(#snow)"/>';
+  out += '<path d="M0 700C150 650 280 690 430 665S700 690 860 664 1160 690 1400 650V788H0Z" fill="#0c1f3d"/><path d="M0 745C200 710 360 745 560 722S900 750 1100 724 1300 740 1400 726V788H0Z" fill="#071328"/>';
+  /* acacia, right: a thin forked trunk and a wide flat crown */
+  out += '<g fill="#050d1d"><path d="M1124 742 1128 694Q1126 676 1110 656L1118 650Q1132 664 1136 682Q1142 662 1162 650L1168 656Q1148 670 1142 696L1146 742Z"/><ellipse cx="1136" cy="640" rx="100" ry="15"/><ellipse cx="1100" cy="650" rx="56" ry="12"/><ellipse cx="1176" cy="648" rx="58" ry="12"/><ellipse cx="1138" cy="628" rx="58" ry="11"/></g>';
+  /* calendar leaf */
+  out += glass(1000, 96, 270, 310, 30, 5,
+    '<path d="M0 30a30 30 0 0 1 30-30h210a30 30 0 0 1 30 30v62H0z" fill="url(#gC)"/>' +
+    '<text x="135" y="64" text-anchor="middle" font-family="' + FONT + '" font-size="30" font-weight="800" letter-spacing="6" fill="#fff">DECEMBER</text>' +
+    '<text x="135" y="214" text-anchor="middle" font-family="' + FONT + '" font-size="124" font-weight="800" fill="#fff">9</text>' +
+    '<text x="135" y="266" text-anchor="middle" font-family="' + FONT + '" font-size="40" font-weight="700" letter-spacing="4" fill="#ffd166">1961</text>' +
+    '<circle cx="62" cy="-12" r="9" fill="#0c1730" stroke="#fff" stroke-opacity=".5" stroke-width="3"/><circle cx="208" cy="-12" r="9" fill="#0c1730" stroke="#fff" stroke-opacity=".5" stroke-width="3"/>');
+  out += star(250, 140, 1.5, '#fff') + star(560, 90, 1, '#fff', .6) + star(900, 150, 1.2, '#ffe6a3') + star(130, 330, 1, '#fff', .5) + dot(1300, 520, 6, '#34d399') + dot(90, 480, 5, '#ffd166');
+  return out;
+}
+
+/* ---------- 3. Keeping children safe online: a phone with a shield and heart, controls, chat bubbles ---------- */
+function sceneChildren() {
+  var c = { bg: ['#07122a', '#0a3250', '#1c3f6e'], a: ['#2dd4e6', '#3b82f6'], b: ['#ff8fb3', '#c026d3'], c: ['#34d399', '#10b981'], glow: [[780, 400, '#06b6d4'], [1150, 600, '#c026d3']] };
+  var out = defs(c) + backdrop(c);
+  /* chat bubbles, left */
+  out += glass(150, 220, 360, 140, 34, -5,
+    '<circle cx="62" cy="70" r="30" fill="url(#gA)"/><circle cx="52" cy="62" r="4.5" fill="#06142c"/><circle cx="72" cy="62" r="4.5" fill="#06142c"/><path d="M48 78q14 12 28 0" fill="none" stroke="#06142c" stroke-width="4.5" stroke-linecap="round"/>' +
+    bar(112, 46, 190, 15, '#fff', .9) + bar(112, 76, 140, 11, '#fff', .4));
+  out += glass(100, 420, 400, 140, 34, 4,
+    '<circle cx="62" cy="70" r="30" fill="url(#gB)"/><circle cx="62" cy="62" r="11" fill="#fff" fill-opacity=".92"/><path d="M42 92c4-14 12-18 20-18s16 4 20 18z" fill="#fff" fill-opacity=".92"/>' +
+    bar(112, 46, 230, 15, '#fff', .9) + bar(112, 76, 170, 11, '#fff', .4));
+  /* phone */
+  out += '<g transform="translate(560 70) rotate(2 150 330)" filter="url(#shadow)">' +
+    '<rect width="320" height="640" rx="52" fill="#0a1226" stroke="#fff" stroke-opacity=".32" stroke-width="3"/>' +
+    '<rect x="14" y="14" width="292" height="612" rx="40" fill="url(#bg)"/><rect x="14" y="14" width="292" height="612" rx="40" fill="url(#glass)"/>' +
+    '<rect x="112" y="28" width="96" height="24" rx="12" fill="#050a18"/>' +
+    '<path d="M160 118 88 146v70c0 46 30 82 72 98 42-16 72-52 72-98v-70z" fill="url(#gA)" filter="url(#glow)"/>' +
+    '<path d="M160 268c-22-16-38-30-38-48a20 20 0 0 1 38-9 20 20 0 0 1 38 9c0 18-16 32-38 48z" fill="#fff"/>' +
+    [0, 1, 2].map(function (i) {
+      var y = 366 + i * 76;
+      return '<rect x="40" y="' + y + '" width="240" height="56" rx="18" fill="#fff" fill-opacity=".09" stroke="#fff" stroke-opacity=".16"/>' + bar(58, y + 16, 110 - i * 8, 12, '#fff', .85) + bar(58, y + 34, 74, 8, '#fff', .35) +
+        '<rect x="214" y="' + (y + 14) + '" width="48" height="28" rx="14" fill="' + (i === 1 ? '#fff' : 'url(#gC)') + '" fill-opacity="' + (i === 1 ? .22 : 1) + '"/><circle cx="' + (i === 1 ? 228 : 248) + '" cy="' + (y + 28) + '" r="10" fill="#fff"/>';
+    }).join('') + '</g>';
+  /* adult and child, joined by a heart, right */
+  out += glass(960, 250, 330, 250, 36, -4,
+    '<circle cx="96" cy="100" r="44" fill="url(#gA)"/><path d="M40 190c6-40 30-52 56-52s50 12 56 52z" fill="url(#gA)"/>' +
+    '<circle cx="232" cy="130" r="30" fill="url(#gB)"/><path d="M194 196c4-30 20-38 38-38s34 8 38 38z" fill="url(#gB)"/>' +
+    '<path d="M164 62c-12-9-20-17-20-27a11 11 0 0 1 20-5 11 11 0 0 1 20 5c0 10-8 18-20 27z" transform="translate(0 4)" fill="#ff8fb3" filter="url(#glow)"/>');
+  out += glass(1010, 540, 220, 76, 38, 3, '<path d="M54 38l16 16 30-34" fill="none" stroke="#34d399" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" transform="translate(-2 0)"/>' + bar(116, 28, 70, 11, '#fff', .8) + bar(116, 46, 48, 8, '#fff', .35));
+  out += star(1250, 120, 1.7, '#fff') + star(520, 90, 1.1, '#7fe3ff') + star(960, 740, 1, '#fff', .5) + dot(1320, 690, 7, '#ff8fb3') + dot(90, 130, 6, '#2dd4e6') + dot(600, 750, 6, '#34d399');
+  return out;
+}
+
+/* ---------- 4. Selling on a classifieds site: a listing card, a price tag, a safe-deal badge ---------- */
+function sceneSelling() {
+  var c = { bg: ['#07140f', '#0b3b34', '#10506a'], a: ['#34d399', '#06b6d4'], b: ['#fbbf24', '#f59e0b'], c: ['#60a5fa', '#6366f1'], glow: [[760, 380, '#10b981'], [1150, 600, '#0ea5e9']] };
+  var out = defs(c) + backdrop(c);
+  /* listing card */
+  out += glass(420, 90, 470, 560, 38, -3,
+    '<rect x="26" y="26" width="418" height="250" rx="26" fill="url(#gC)" fill-opacity=".28"/><rect x="26" y="26" width="418" height="250" rx="26" fill="none" stroke="#fff" stroke-opacity=".2"/>' +
+    '<circle cx="330" cy="100" r="34" fill="#fbbf24" fill-opacity=".95"/><path d="M26 276V212l96-86 80 70 56-44 186 90v34z" fill="#0b1b3a" fill-opacity=".75"/><path d="M26 276V232l110-70 90 74 66-40 152 80v0z" fill="#fff" fill-opacity=".1"/>' +
+    bar(30, 304, 300, 20, '#fff', .92) + bar(30, 338, 210, 11, '#fff', .38) +
+    '<rect x="30" y="378" width="170" height="56" rx="28" fill="url(#gB)"/>' + bar(58, 400, 84, 12, '#3b2a00', .8) +
+    bar(30, 462, 390, 10, '#fff', .26) + bar(30, 484, 330, 10, '#fff', .26) +
+    '<rect x="30" y="512" width="180" height="22" rx="11" fill="none"/>' +
+    '<rect x="236" y="378" width="176" height="56" rx="28" fill="#fff" fill-opacity=".1" stroke="#fff" stroke-opacity=".3"/><path d="M264 396h44a6 6 0 0 1 6 6v18a6 6 0 0 1-6 6h-26l-12 10v-10h-6a6 6 0 0 1-6-6v-18a6 6 0 0 1 6-6z" fill="none" stroke="#fff" stroke-width="3.4" stroke-linejoin="round" transform="translate(0 -2)"/>' + bar(332, 400, 52, 11, '#fff', .7));
+  /* price tag, upper right */
+  out += '<g transform="translate(920 150) rotate(-12 130 80)" filter="url(#shadow)">' +
+    '<path d="M0 34a34 34 0 0 1 34-34h150l76 80-76 80H34a34 34 0 0 1-34-34z" fill="url(#gB)"/>' +
+    '<path d="M0 34a34 34 0 0 1 34-34h150l76 80-76 80H34a34 34 0 0 1-34-34z" fill="url(#glass)"/>' +
+    '<circle cx="52" cy="80" r="17" fill="#0b3b34" fill-opacity=".85"/>' + bar(92, 62, 110, 20, '#3b2a00', .8) + bar(92, 94, 74, 12, '#3b2a00', .4) + '</g>';
+  /* shield with a check, lower right */
+  out += '<g transform="translate(950 380)" filter="url(#shadow)"><path d="M130 0 20 44v96c0 74 50 122 110 150 60-28 110-76 110-150V44z" fill="url(#gA)"/><path d="M130 0 20 44v96c0 74 50 122 110 150z" fill="#fff" fill-opacity=".14"/><path d="M82 142l36 38 62-76" fill="none" stroke="#fff" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/></g>';
+  /* coins and a location pin, left */
+  out += '<g transform="translate(150 470)" filter="url(#shadow)">' +
+    [0, 1, 2, 3].map(function (i) { return '<ellipse cx="90" cy="' + (150 - i * 28) + '" rx="84" ry="26" fill="url(#gB)"/><ellipse cx="90" cy="' + (140 - i * 28) + '" rx="84" ry="26" fill="#fde68a"/><ellipse cx="90" cy="' + (140 - i * 28) + '" rx="56" ry="15" fill="none" stroke="#f59e0b" stroke-width="4"/>'; }).join('') + '</g>';
+  out += '<g transform="translate(300 210)" filter="url(#shadow)"><path d="M46 0C20 0 0 20 0 46c0 34 46 84 46 84s46-50 46-84C92 20 72 0 46 0z" fill="url(#gC)"/><circle cx="46" cy="46" r="16" fill="#fff"/></g>';
+  out += star(1280, 110, 1.6, '#fff') + star(380, 70, 1, '#9ff3d0') + star(1230, 720, 1, '#fff', .5) + dot(80, 250, 6, '#34d399') + dot(1330, 380, 7, '#fbbf24') + dot(640, 735, 6, '#60a5fa');
+  return out;
+}
+
+/* ---------- 5. SIM swap fraud: two SIM cards trading places, a phone without signal, a code being intercepted ---------- */
+function simCard(x, y, rot, fillA, chipA, label) {
+  return '<g transform="translate(' + x + ' ' + y + ') rotate(' + rot + ' 110 150)" filter="url(#shadow)">' +
+    '<path d="M0 26a26 26 0 0 1 26-26h118l76 76v198a26 26 0 0 1-26 26H26a26 26 0 0 1-26-26z" fill="' + fillA + '"/>' +
+    '<path d="M0 26a26 26 0 0 1 26-26h118l76 76v198a26 26 0 0 1-26 26H26a26 26 0 0 1-26-26z" fill="url(#glass)" stroke="#fff" stroke-opacity=".3" stroke-width="2"/>' +
+    '<rect x="50" y="96" width="120" height="104" rx="16" fill="' + chipA + '"/>' +
+    '<path d="M50 148h120M92 96v104M128 96v104" stroke="#3b2a00" stroke-opacity=".5" stroke-width="3"/><rect x="92" y="130" width="36" height="36" rx="8" fill="none" stroke="#3b2a00" stroke-opacity=".5" stroke-width="3"/>' +
+    bar(48, 234, 90, 10, '#fff', .55) + bar(48, 256, 60, 8, '#fff', .3) + '</g>';
+}
+function sceneSimSwap() {
+  var c = { bg: ['#0b0a1f', '#1d1a55', '#4a1d5e'], a: ['#a78bfa', '#6366f1'], b: ['#fbbf24', '#f59e0b'], c: ['#fb7185', '#e11d48'], glow: [[780, 380, '#7c3aed'], [1180, 640, '#e11d48']] };
+  var out = defs(c) + backdrop(c);
+  out += simCard(430, 220, -9, '#3b3f8f', '#fcd34d', 'a');
+  out += simCard(700, 150, 11, '#6d3aa8', '#fcd34d', 'b');
+  /* swap arrows between the cards */
+  out += '<g fill="none" stroke="url(#gB)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)">' +
+    '<path d="M650 556c40 40 122 40 168-6"/><path d="M790 532l32 18-6 36" /><path d="M744 250c-40-40-122-40-168 6"/><path d="M604 274l-32-18 6-36" /></g>';
+  /* phone with no signal, left */
+  out += '<g transform="translate(120 190) rotate(-6 100 210)" filter="url(#shadow)">' +
+    '<rect width="210" height="420" rx="40" fill="#0a1226" stroke="#fff" stroke-opacity=".32" stroke-width="3"/><rect x="11" y="11" width="188" height="398" rx="30" fill="url(#bg)"/><rect x="11" y="11" width="188" height="398" rx="30" fill="url(#glass)"/>' +
+    '<rect x="74" y="22" width="62" height="16" rx="8" fill="#050a18"/>' +
+    [0, 1, 2, 3].map(function (i) { return '<rect x="' + (46 + i * 28) + '" y="' + (150 - i * 18) + '" width="18" height="' + (28 + i * 18) + '" rx="5" fill="#fff" fill-opacity=".28"/>'; }).join('') +
+    '<path d="M38 100 172 238" stroke="#fb7185" stroke-width="12" stroke-linecap="round"/>' +
+    bar(40, 290, 130, 13, '#fff', .5) + bar(40, 316, 90, 10, '#fff', .28) + '</g>';
+  /* the code message that goes to the wrong phone */
+  out += glass(930, 130, 340, 190, 34, 4,
+    '<rect x="30" y="30" width="62" height="62" rx="20" fill="url(#gC)"/><path d="M46 52l15 12 15-12M46 52h30v26H46z" fill="none" stroke="#fff" stroke-width="5" stroke-linejoin="round" transform="translate(0 0)"/>' +
+    bar(112, 38, 150, 16, '#fff', .9) + bar(112, 66, 100, 10, '#fff', .4) +
+    [0, 1, 2, 3, 4, 5].map(function (i) { return '<rect x="' + (34 + i * 48) + '" y="116" width="38" height="52" rx="12" fill="#fff" fill-opacity=".1" stroke="#fff" stroke-opacity=".3"/><circle cx="' + (53 + i * 48) + '" cy="142" r="7" fill="#fff" fill-opacity=".9"/>'; }).join(''));
+  out += '<g transform="translate(1214 78) rotate(8 44 40)" filter="url(#shadow)"><path d="M44 0 88 76H0z" fill="url(#gC)" stroke="#fb7185" stroke-width="10" stroke-linejoin="round"/><path d="M44 28v26M44 62v.5" stroke="#fff" stroke-width="7" stroke-linecap="round"/></g>';
+  out += star(1280, 450, 1.6, '#fff') + star(520, 90, 1.2, '#c4b5fd') + star(880, 740, 1, '#fff', .5) + dot(80, 120, 6, '#a78bfa') + dot(1340, 640, 7, '#fb7185') + dot(540, 720, 6, '#fbbf24');
+  return out;
+}
+
+var SCENES = {
+  'hacked-facebook-account-what-to-do': sceneHacked,
+  'how-tanganyika-won-independence': sceneIndependence,
+  'keeping-children-safe-online-parents-guide': sceneChildren,
+  'sell-on-jiji-tanzania-rules-safe-deals-ad-limits': sceneSelling,
+  'sim-swap-fraud-what-to-do': sceneSimSwap
+};
+var q = new URLSearchParams(location.search).get('scene') || 'list';
+var stage = document.getElementById('stage');
+if (SCENES[q]) stage.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 788" width="1400" height="788">' + SCENES[q]() + '</svg>';
+else stage.innerHTML = '<pre style="color:#9cf;font:16px monospace;padding:24px">' + Object.keys(SCENES).join('\n') + '</pre>';
+</script>
+</body>
+</html>

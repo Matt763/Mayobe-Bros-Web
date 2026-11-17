@@ -3,7 +3,7 @@ title: "Who Built Great Zimbabwe? The Myths and the Facts"
 date: 2026-11-04
 author: Mclean Mbaga
 category: world-histories
-excerpt: Great Zimbabwe was built by the ancestors of the Shona between about 1100 and 1450. See what the evidence shows and why the Sheba, Ophir and Phoenician stories fail.
+excerpt: Great Zimbabwe was built by the ancestors of the Shona between about 1100 and 1450. See the evidence and why the Sheba, Ophir and Phoenician stories fail.
 image: assets/posts/who-built-great-zimbabwe-myths-and-facts.webp
 imageAlt: Curved dry-stone wall of the Great Enclosure at Great Zimbabwe under a pale blue sky, with rubble stones in the foreground
 imageCredit: Photo: Fanny Schertzer, CC BY 3.0, via Wikimedia Commons

@@ -9,5 +9,8 @@ node_modules/
 .playwright-cli/
 .taste-skill/
 .indexnow-state.json
+.indexnow-results-state.json
 # an empty file the owner keeps in css/: never commit it
 css/Mayobe AI
+# compact results data for the results app: built by scripts/results-data.mjs, too big for git
+results-data/

@@ -4,6 +4,7 @@ date: 2026-11-04
 author: Mclean Mbaga
 category: educational
 label: results
+section: [guides]
 excerpt: A plain guide to the letters ABS, X, W, I, E and FLD on NECTA results, what each one means, and who to contact if your result is held back.
 image: assets/posts/necta-result-codes-abs-x-w-i-meaning.webp
 imageAlt: A sharpened pencil resting on a multiple-choice exam answer sheet with rows of numbered circles

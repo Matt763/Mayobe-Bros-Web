@@ -4,7 +4,7 @@ date: 2026-11-04
 author: Mclean Mbaga
 category: technology-solutions
 label: ai-tools
-excerpt: A four-step way to use an AI chatbot to tidy your CV and job email without inventing anything. Includes prompts you can copy and a list of things AI must never add.
+excerpt: A four-step way to use an AI chatbot to tidy your CV and job email without inventing anything. Includes prompts to copy and a list of things AI must never add.
 image: assets/posts/using-ai-for-cv-and-job-application-emails.webp
 imageAlt: White stencil letters reading Job Applications on an orange background
 imageCredit: Photo: CC0, via rawpixel

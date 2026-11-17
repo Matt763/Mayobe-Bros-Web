@@ -4,6 +4,7 @@ date: 2026-11-04
 author: Mclean Mbaga
 category: educational
 label: results
+section: [guides]
 excerpt: Learn what CNO, AGGT, DIV and the subject grades mean on a NECTA Form Four result page, and why a lower aggregate is better.
 image: assets/posts/how-to-read-csee-results-divisions-points.webp
 imageAlt: A row of school students holding up printed exam result sheets outdoors on a sunny day

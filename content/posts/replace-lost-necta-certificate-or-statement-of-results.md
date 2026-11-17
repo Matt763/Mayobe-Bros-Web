@@ -4,6 +4,7 @@ date: 2026-11-04
 author: Mclean Mbaga
 category: educational
 label: results
+section: [guides]
 excerpt: Lost or damaged your O-Level or A-Level certificate? Learn the difference between a replacement certificate and a statement of results, and where to apply.
 image: assets/posts/replace-lost-necta-certificate-or-statement-of-results.webp
 imageAlt: A stack of white ring binders and folders seen from the side on a plain white background

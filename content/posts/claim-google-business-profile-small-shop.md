@@ -4,7 +4,7 @@ date: 2026-11-04
 author: Mclean Mbaga
 category: business-ideas
 label: marketing
-excerpt: How to check if your shop is on Google Maps, claim or add a free Business Profile, verify it, fill it in honestly and add photos. No one can sell you a better rank.
+excerpt: How to check if your shop is on Google Maps, claim or add a Business Profile, verify it, fill it in honestly and add photos. No one can sell you a better rank.
 image: assets/posts/claim-google-business-profile-small-shop.webp
 imageAlt: A small roadside shop with a tin roof and a wooden counter in Karatu, Tanzania, with buckets of charcoal in front
 imageCredit: Photo: Michelle Maria, CC BY 3.0, via Wikimedia Commons

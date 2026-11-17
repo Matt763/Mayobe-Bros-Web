@@ -2,6 +2,7 @@
   "name": "Mayobe Bros",
   "short_name": "MayobeBros",
   "description": "Clear, honest guides on education, jobs, money and technology for readers in Tanzania.",
+  "id": "/",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -25,5 +26,17 @@
     "news",
     "education",
     "lifestyle"
+  ],
+  "shortcuts": [
+    {
+      "name": "Past papers",
+      "short_name": "Past papers",
+      "url": "/category/educational/examination-past-papers/"
+    },
+    {
+      "name": "Exam results",
+      "short_name": "Results",
+      "url": "/category/educational/results/"
+    }
   ]
 }

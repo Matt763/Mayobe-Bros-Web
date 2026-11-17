@@ -4,6 +4,7 @@ date: 2026-11-04
 author: Mclean Mbaga
 category: educational
 label: results
+section: [guides]
 excerpt: See how a university degree GPA is worked out, step by step, with a simple example, and which class each GPA band gives at the University of Dar es Salaam.
 image: assets/posts/university-gpa-classification-first-class-pass-tanzania.webp
 imageAlt: Graduates in black gowns with red trim walking away from the camera along a tree-lined campus path

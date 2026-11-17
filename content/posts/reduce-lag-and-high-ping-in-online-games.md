@@ -3,7 +3,7 @@ title: "How to Reduce Lag and High Ping in Online Games"
 date: 2026-11-04
 author: Mclean Mbaga
 category: video-games-updates
-excerpt: Learn what ping, packet loss and jitter mean, then follow an order of simple checks on your phone, laptop or Wi-Fi to cut lag, and know when it is not your fault.
+excerpt: Learn what ping, packet loss and jitter mean, then follow simple checks on your phone, laptop or Wi-Fi to cut lag, and know when it is not your fault.
 image: assets/posts/reduce-lag-and-high-ping-in-online-games.webp
 imageAlt: The back of a black Wi-Fi router showing four numbered network ports, a blue port and a WPS button
 imageCredit: Photo: Syced, CC0, via Wikimedia Commons

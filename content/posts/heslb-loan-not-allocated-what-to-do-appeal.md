@@ -4,6 +4,7 @@ date: 2026-11-04
 author: Mclean Mbaga
 category: educational
 label: results
+section: [guides]
 excerpt: Got no HESLB loan, or less than you need? See how results reach your SIPA account, how the appeal form works, and how to avoid people who sell loans.
 image: assets/posts/heslb-loan-not-allocated-what-to-do-appeal.webp
 imageAlt: Female university students sitting at wooden desks in a lecture room with open textbooks and notebooks

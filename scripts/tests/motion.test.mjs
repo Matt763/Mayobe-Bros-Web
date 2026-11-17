@@ -201,6 +201,23 @@ test('a wheel, touch, pointer press or key stops the glide where it is', async (
   }
 });
 
+test('keepOnKeys: typing does not stop a glide, a wheel, touch or pointer press still does', async () => {
+  const t = load({ scrollY: 0 });
+  const p = t.M.glide(600, { keepOnKeys: true });
+  assert.equal((t.winListeners.keydown || []).length, 0, 'no key listener for a glide that must survive typing');
+  for (const type of ['wheel', 'touchstart', 'pointerdown']) assert.equal((t.winListeners[type] || []).length, 1, 'still listens for ' + type);
+  t.frames(3);
+  t.fire('wheel');
+  assert.equal(await p, 'cancelled');
+  assert.equal(t.listeners(), 0, 'no listeners left');
+  const t2 = load({ scrollY: 0 });
+  const p2 = t2.M.glide(600, { keepOnKeys: true });
+  t2.fire('keydown');
+  t2.frames(60);
+  assert.equal(t2.calls[t2.calls.length - 1], 600);
+  assert.equal(await p2, 'done');
+});
+
 test('a new glide cancels the one in flight', async () => {
   const t = load({ scrollY: 0 });
   const p1 = t.M.glide(100);

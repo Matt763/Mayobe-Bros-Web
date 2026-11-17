@@ -1250,3 +1250,174 @@ test('image fields cost no subrequest: with subrequestLimit 20 the same number o
   assert.equal(withFields.reduce((a, b) => a + b, 0), 12);
   assert.ok(withFields[0] > 0);
 });
+
+// ---- NECTA results pages: one email for the whole batch, never one per page ----
+const resultsEntry = (exam, year, d) => entry(`necta-${exam}-results-${year}`, d, { u: `/post/educational/results/necta-${exam}-results-${year}/`, t: `NECTA ${exam.toUpperCase()} RESULTS ${year} | MAYOBE BROS` });
+const RESULT_PAGES = ['csee', 'acsee', 'psle'].flatMap((exam) => Array.from({ length: 10 }, (_, i) => resultsEntry(exam, 2016 + i, dayOf(-20 + i))));
+const digestMails = () => sent.filter((m) => m.body.subject.startsWith('New on Mayobe Bros:'));
+const resultsUrl = (exam, year) => `https://mayobebros.com/post/educational/results/necta-${exam}-results-${year}/`;
+
+test('a batch of results pages goes out as ONE email per subscriber that lists every page and links the Results section; no page is emailed alone', async () => {
+  await seeded();
+  sendOn();
+  const a = addSub('a@example.com');
+  const b = addSub('b@example.com');
+  addSub('pending@example.com', { status: 'pending' });
+  searchList = [...OLD_LIST, ...RESULT_PAGES];
+  const r = await run();
+  assert.equal(r.stopped, null);
+  assert.equal(postMails().length, 0, 'no per-page email');
+  assert.equal(sent.length, 2, 'one email each, nothing else');
+  assert.deepEqual(digestMails().map(to).sort(), ['a@example.com', 'b@example.com']);
+  const m = digestMails()[0].body;
+  assert.equal(m.subject, 'New on Mayobe Bros: NECTA results, 2016 to 2025');
+  for (const p of RESULT_PAGES) assert.ok(m.html.includes(resultsUrl(p.s.split('-')[1], p.s.slice(-4))) && m.text.includes(resultsUrl(p.s.split('-')[1], p.s.slice(-4))), p.s);
+  assert.ok(m.html.includes('https://mayobebros.com/category/educational/results/'), 'links the Results section');
+  assert.ok(m.text.includes('We added 30 NECTA results pages'));
+  assert.ok(/newsletter\/#u=[A-Za-z0-9_-]{32,64}/.test(m.html), 'the real unsubscribe link');
+  assert.equal(digestMails()[0].body.headers['List-Unsubscribe'].startsWith('<https://worker.test/v1/newsletter/one-click?t='), true);
+  assert.deepEqual(r.digest, { slug: r.posts[0].slug, posts: 30 });
+  assert.deepEqual(r.posts, [{ slug: r.digest.slug, recipients: 2, sent: 2, skipped: 0, failed: 0, posts: 30 }]);
+  const del = rows('SELECT slug, subscriber_id, status FROM newsletter_deliveries ORDER BY subscriber_id').map((x) => ({ ...x }));
+  assert.deepEqual(del, [{ slug: r.digest.slug, subscriber_id: a, status: 'sent' }, { slug: r.digest.slug, subscriber_id: b, status: 'sent' }]);
+  const pages = rows("SELECT sent_at, seeded FROM newsletter_sent WHERE slug LIKE 'necta-%'");
+  assert.equal(pages.length, 30);
+  assert.ok(pages.every((x) => x.sent_at > 0 && x.seeded === 0), 'every page is closed, none seeded');
+  await run();
+  assert.equal(sent.length, 2, 'a second run sends nothing');
+});
+
+test('an article and a results batch on the same day: one article email and one results email for each reader', async () => {
+  await seeded();
+  sendOn();
+  addSub('a@example.com');
+  searchList = [...OLD_LIST, entry('fresh-post', dayOf(0)), ...RESULT_PAGES.slice(0, 5)];
+  await run();
+  assert.deepEqual(postMails().map((m) => m.body.subject), ['New article: Title fresh-post']);
+  assert.equal(digestMails().length, 1);
+  assert.ok(digestMails()[0].body.text.includes('We added 5 NECTA results pages'));
+});
+
+test('results pages older than 60 days are recorded, never announced; seed records the others as handled', async () => {
+  await seeded();
+  sendOn();
+  addSub('a@example.com');
+  const ancient = resultsEntry('csee', 2003, dayOf(-61));
+  searchList = [...OLD_LIST, ancient];
+  const r = await run();
+  assert.deepEqual(r.tooOld, [ancient.s]);
+  assert.equal(sent.length, 0);
+  assert.equal(rows(`SELECT seeded FROM newsletter_sent WHERE slug = '${ancient.s}'`)[0].seeded, 1);
+  searchList = [...OLD_LIST, ancient, ...RESULT_PAGES];
+  const s = await run({ mode: 'seed' });
+  assert.equal(sent.length, 0);
+  assert.equal(s.seeded.length, 30);
+  await run();
+  assert.equal(sent.length, 0, 'seeded pages are never announced');
+});
+
+test('NEWSLETTER_SEND off: results pages are not queued and nothing is sent; switching it on later announces them once', async () => {
+  await seeded();
+  addSub('a@example.com');
+  env.NEWSLETTER_SEND = 'false';
+  searchList = [...OLD_LIST, ...RESULT_PAGES];
+  await run();
+  assert.equal(sent.length, 0);
+  assert.equal(rows("SELECT 1 FROM newsletter_sent WHERE slug LIKE 'necta-%'").length, 0);
+  sendOn();
+  await run();
+  assert.equal(digestMails().length, 1);
+});
+
+test('40 subscribers: the batch goes out over two days under one key; a page added meanwhile joins it; a page added after it is finished starts the next email', async () => {
+  await seeded();
+  sendOn();
+  env.MAIL_TEST_DAY = '2030-01-01';
+  for (let i = 1; i <= 40; i++) addSub(`s${i}@example.com`);
+  for (let i = 0; i < 3; i++) assert.equal(await takeBudget(env, 'news'), true);
+  searchList = [...OLD_LIST, ...RESULT_PAGES.slice(0, 20)];
+  const r1 = await runAll();
+  assert.equal(r1.stopped, 'budget');
+  assert.equal(digestMails().length, 22);
+  assert.equal(rows("SELECT COUNT(*) AS n FROM newsletter_sent WHERE slug LIKE 'necta-%' AND sent_at IS NULL")[0].n, 20, 'still open');
+  const key = r1.digest.slug;
+  searchList = [...OLD_LIST, ...RESULT_PAGES.slice(0, 25)]; // five more pages while the batch is going out
+  env.MAIL_TEST_DAY = '2030-01-02';
+  const r2 = await runAll();
+  assert.equal(r2.stopped, null);
+  assert.equal(r2.digest.slug, key, 'the same key, so nobody is mailed twice');
+  assert.equal(digestMails().length, 40);
+  assert.equal(new Set(digestMails().map(to)).size, 40, 'each reader once');
+  assert.ok(digestMails()[0].body.text.includes('We added 20 NECTA results pages'));
+  assert.ok(digestMails()[39].body.text.includes('We added 25 NECTA results pages'), 'readers served on day two see the added pages');
+  assert.equal(rows("SELECT COUNT(*) AS n FROM newsletter_sent WHERE slug LIKE 'necta-%' AND sent_at IS NULL")[0].n, 0);
+  searchList = [...OLD_LIST, ...RESULT_PAGES.slice(0, 25), resultsEntry('ftna', 2025, dayOf(0))];
+  env.MAIL_TEST_DAY = '2030-01-03';
+  const r3 = await runAll();
+  assert.notEqual(r3.digest.slug, key, 'a new batch is a new email');
+  assert.equal(r3.stopped, 'budget');
+  assert.equal(digestMails().length, 65, 'a day sends what is left of the 25 article units');
+  env.MAIL_TEST_DAY = '2030-01-04';
+  await runAll();
+  assert.equal(digestMails().length, 80);
+  assert.ok(digestMails()[79].body.text.includes('We added 1 NECTA results page,'));
+  assert.equal(new Set(digestMails().slice(40).map(to)).size, 40, 'each reader once for the second email too');
+});
+
+test('two runs started together send the results email once per reader', async () => {
+  await seeded();
+  sendOn();
+  for (let i = 1; i <= 4; i++) addSub(`s${i}@example.com`);
+  searchList = [...OLD_LIST, ...RESULT_PAGES];
+  const ctx = cronCtx();
+  await Promise.all([runNewsletter(env, ctx, { sleep: recSleep }), runNewsletter(env, ctx, { sleep: recSleep })]);
+  await flushMail();
+  assert.equal(digestMails().length, 4);
+  assert.equal(new Set(digestMails().map(to)).size, 4);
+});
+
+test('a results page that has left the list is not in the email; the others still go', async () => {
+  await seeded();
+  sendOn();
+  addSub('a@example.com');
+  searchList = [...OLD_LIST, ...RESULT_PAGES];
+  env.NEWSLETTER_SEND = 'false';
+  await run(); // nothing queued while paused
+  sendOn();
+  searchList = [...OLD_LIST, ...RESULT_PAGES.slice(1)];
+  await run();
+  assert.equal(digestMails().length, 1);
+  assert.equal(digestMails()[0].body.text.includes(resultsUrl('csee', 2016)), false);
+  assert.ok(digestMails()[0].body.text.includes('We added 29 NECTA results pages'));
+});
+
+test('a dry run reports the results email and its readers and changes no row; count shows the waiting batch as one line', async () => {
+  await seeded();
+  sendOn();
+  for (let i = 1; i <= 3; i++) addSub(`s${i}@example.com`);
+  searchList = [...OLD_LIST, ...RESULT_PAGES];
+  const before = JSON.stringify(rows('SELECT * FROM newsletter_sent'));
+  const d = (await admin('/v1/admin/newsletter/run', { method: 'POST', body: { mode: 'dry' } })).json;
+  assert.equal(d.digest.posts, 30);
+  assert.deepEqual(d.posts.map((p) => [p.recipients, p.posts]), [[3, 30]]);
+  assert.equal(JSON.stringify(rows('SELECT * FROM newsletter_sent')), before);
+  assert.equal(sent.length, 0);
+  await run({ subrequestLimit: 14 }); // a short run: some sent, not all
+  const n = digestMails().length;
+  assert.ok(n >= 1 && n < 3, `sent ${n}`);
+  const c = (await admin('/v1/admin/newsletter/count')).json;
+  assert.equal(c.queue.length, 1);
+  assert.match(c.queue[0].slug, /^results-digest-\d+$/);
+  assert.deepEqual({ posts: c.queue[0].posts, sent: c.queue[0].sent, left: c.queue[0].left }, { posts: 30, sent: n, left: 3 - n });
+});
+
+test('the first run ever seeds results pages with everything else and sends nothing', async () => {
+  addSub('a@example.com');
+  sendOn();
+  searchList = [...OLD_LIST, ...RESULT_PAGES];
+  const r = await run();
+  assert.equal(r.seeded.length, 32);
+  assert.equal(sent.length, 0);
+  await run();
+  assert.equal(sent.length, 0);
+});

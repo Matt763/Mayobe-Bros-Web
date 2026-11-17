@@ -4,7 +4,7 @@ date: 2026-11-04
 author: Mclean Mbaga
 category: business-ideas
 label: e-commerce
-excerpt: Learn one simple habit that protects your goods and your money: confirm payment in your own wallet, then hand over the item. Includes what to do if you were tricked.
+excerpt: One simple habit protects your goods and your money: confirm payment in your own wallet, then hand over the item. Includes what to do if you were tricked.
 image: assets/posts/fake-mobile-money-payment-messages-sellers-tanzania.webp
 imageAlt: A woman holding a smartphone above a table with a paper coffee cup
 imageCredit: Photo: CC0, via rawpixel

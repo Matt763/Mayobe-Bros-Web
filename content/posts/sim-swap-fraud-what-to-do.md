@@ -5,6 +5,9 @@ author: Mclean Mbaga
 category: technology-solutions
 label: cyber-security
 excerpt: Your phone loses network for no reason and codes stop arriving. Learn what SIM swap fraud is, the signs, and a first-hour plan to protect your accounts.
+image: assets/posts/sim-swap-fraud-what-to-do.webp
+imageAlt: Drawing of two SIM cards trading places with orange arrows, a phone with a crossed-out signal icon, and a message card with six code boxes and a red warning triangle
+imageCredit: Cover drawn by Mayobe Bros.
 tags: [scams, mobile money, online safety, smartphones]
 ---
 

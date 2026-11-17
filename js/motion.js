@@ -3,7 +3,8 @@
      - the math: easeInOutCubic, glideDuration (260 to 520 ms, longer for longer trips), planGlide;
      - glide(): a scroll that follows easeInOutCubic frame by frame instead of the browser's own smooth scroll, which has no
        duration or easing and can race across a long page. Only 0.8 of a screen is ever shown moving; when the caller says the
-       cards are hidden ("covered"), the rest of the trip is one jump. A wheel, touch, pointer press or key stops it where it is;
+       cards are hidden ("covered"), the rest of the trip is one jump. A wheel, touch, pointer press or key stops it where it is
+       (a key does not when the caller passes keepOnKeys: the reader is typing in a search field while the page follows the results);
      - three CSS states drawn by keyframes in css/style.css: mo-wait (slow load: dim), mo-leave (fade out), mo-enter (rise in,
        one after the other).
    With prefers-reduced-motion everything is instant: one jump, no classes. No storage, no network, no HTML written.
@@ -56,6 +57,8 @@
 
   function glide(to, opts) {
     var covered = !!(opts && opts.covered);
+    // keepOnKeys: the reader is typing in a search field while the page glides to the new results; a key press must not stop it
+    var events = opts && opts.keepOnKeys ? STOP_EVENTS.filter(function (n) { return n !== 'keydown'; }) : STOP_EVENTS;
     if (active) active.stop('cancelled');
     var from = window.scrollY || window.pageYOffset || 0;
     var viewportH = window.innerHeight || 0;
@@ -81,13 +84,13 @@
       settled = true;
       if (active === me) active = null;
       root.classList.remove('mo-gliding');
-      for (var i = 0; i < STOP_EVENTS.length; i++) window.removeEventListener(STOP_EVENTS[i], onInput, listenOpts);
+      for (var i = 0; i < events.length; i++) window.removeEventListener(events[i], onInput, listenOpts);
       resolveFn(result);
     }
 
     active = me;
     root.classList.add('mo-gliding');
-    for (var i = 0; i < STOP_EVENTS.length; i++) window.addEventListener(STOP_EVENTS[i], onInput, listenOpts);
+    for (var i = 0; i < events.length; i++) window.addEventListener(events[i], onInput, listenOpts);
     if (plan.jumpTo !== null) window.scrollTo(0, plan.jumpTo);
 
     // the clock advances at most MAX_STEP per frame: after a long frame (new cards being laid out, a slow phone) the glide

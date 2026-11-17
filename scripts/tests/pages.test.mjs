@@ -320,7 +320,7 @@ test('the privacy and newsletter pages say how email pictures load and that open
 
 // The mini sign-up in the article sidebar: same script and states as the footer form, ids that never repeat on the page.
 test('every article has a mini sign-up in its sidebar next to the footer form, with unique ids, after Read next and before More like this', () => {
-  const newestPost = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'search.json'), 'utf8'))[0].u;
+  const newestPost = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'search.json'), 'utf8')).find((x) => !/\/necta-[a-z]+-(results|past-papers)-\d{4}\/$/.test(x.u)).u; // the results search pages and the past papers pages are not articles
   const html = fs.readFileSync(path.join(ROOT, newestPost, 'index.html'), 'utf8');
   const rail = html.slice(html.indexOf('<aside class="post-rail"'), html.indexOf('</aside>', html.indexOf('<aside class="post-rail"')));
   assert.match(rail, /<section class="rail-mod rail-news" aria-labelledby="rnw-h">/);
@@ -343,7 +343,7 @@ const directive = (csp, name) => (csp.split('; ').find((d) => d.startsWith(`${na
 const inlineHashes = (html) => [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => `'sha256-${createHash('sha256').update(m[1], 'utf8').digest('base64')}'`);
 
 test('every page ships a policy that allows its one inline script by hash and never allows inline or eval script', () => {
-  const newestPost = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'search.json'), 'utf8'))[0].u;
+  const newestPost = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'search.json'), 'utf8')).find((x) => !/\/necta-[a-z]+-(results|past-papers)-\d{4}\/$/.test(x.u)).u; // the results search pages are not articles
   for (const file of ['index.html', `${newestPost.slice(1)}index.html`, 'post/index.html', 'search/index.html', 'contact/index.html', 'manage/index.html', 'newsletter/index.html', '404.html']) {
     const f = path.join(ROOT, file);
     if (!fs.existsSync(f)) continue;

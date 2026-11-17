@@ -9,7 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const FILES = ['js/engage.js', 'js/manage.js', 'js/newsletter.js', 'js/subscribe.js', 'js/contact.js', 'js/site.js', 'js/listen.js', 'js/notfound.js', 'js/notfound-posts.js', 'js/pager.js'];
+const FILES = ['js/engage.js', 'js/manage.js', 'js/newsletter.js', 'js/subscribe.js', 'js/contact.js', 'js/site.js', 'js/listen.js', 'js/copy-note.js', 'js/notfound.js', 'js/notfound-posts.js', 'js/pager.js', 'js/results-app.js', 'results-worker/src/render.js'];
 // not a message to the visitor: text put into the body of a mail the visitor sends, and the cookie notice
 const OK = [/message shortened/, /We use browser storage/];
 
