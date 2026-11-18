@@ -29,7 +29,7 @@ test('results app: every user-driven change of the list follows the results', ()
   assert.match(app, /followResults\(run, \{ top: R\.status, bar: R\.tools \}\)/, 'the school list follows its status line under the sticky bar');
   assert.match(app, /followResults\(run, \{ top: R\.cstatus, bar: R\.ctools \}\)/, 'the candidate table follows its status line under the sticky bar');
   // typing (both searches), A to Z, the tabs, Clear, division buttons
-  assert.match(app, /runExam = SSR \? null : debounce\(\(\) => \{[^}]*updateExam\(\{ follow: true \}\)/);
+  assert.match(app, /runExam = SSR \? null : debounce\(\(\) => \{[^}]*updateExam\(\{ follow: !sugOn\(\) \}\)/, 'typing follows the results, except while the live suggestions under the field show (js/results-suggest.js): then the page stays with the field');
   assert.match(app, /runCentre = debounce\(\(\) => \{[^}]*updateCentre\(\{ announceIt: true, follow: true \}\)/);
   assert.match(app, /S\.ex\.letter = b\.dataset\.l;\s*updateExam\(\{ follow: true \}\)/);
   assert.match(app, /S\.ce\.grade = b\.dataset\.g;\s*updateCentre\(\{ announceIt: true, follow: true \}\)/);

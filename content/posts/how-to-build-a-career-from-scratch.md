@@ -3,7 +3,7 @@ title: How to Start Building a Career From Zero in Tanzania
 date: 2026-04-12
 updated: 2026-11-03
 author: Mclean Mbaga
-aliases: [how-to-build-a-successful-career-from-scratch-a-step-by-step-guide]
+aliases: [how-to-build-a-successful-career-from-scratch-a-step-by-step-guide, how-to-build-a-successful-career-from-scratch]
 category: educational
 label: career-development
 excerpt: A practical, step-by-step plan for school leavers and career changers in Tanzania: choose a direction, build skills, find a first opportunity and keep going.

@@ -819,6 +819,7 @@ function start(root, opts = {}) {
       renderAz(letterCounts(nameBase), nameBase.length);
       renderList();
       renderCpanel();
+      if (sug) sug.update();
       if (writeUrl) replaceUrl();
       if (announceIt && anyFilter()) announce(result.length ? `${fmt(result.length)} ${result.length === 1 ? unit : units} found.` : `No ${units} found.`);
     };
@@ -1059,6 +1060,7 @@ function start(root, opts = {}) {
   function pickTab(t, focus) {
     if (S.view !== 'exam' || t === S.tab) { if (focus) { const b = tabEls.find((x) => x.dataset.rsTab === t); if (b) b.focus(); } return; }
     readInputs();
+    if (sug) sug.close();
     showTab(t, { rise: true });
     if (focus) { const b = tabEls.find((x) => x.dataset.rsTab === t); if (b) b.focus(); }
     S.ex.p = 1;
@@ -1085,7 +1087,7 @@ function start(root, opts = {}) {
     const no = ++routeNo;
     lastRoute = routeKey(location);
     const route = readRoute(location.search, cfg.kind);
-    if (route.view === 'centre') return showCentre(route, no, animate);
+    if (route.view === 'centre') { if (sug) sug.close(); return showCentre(route, no, animate); }
     // exam view
     adoptTab(route);
     const wasCentre = S.view === 'centre';
@@ -1532,13 +1534,49 @@ function start(root, opts = {}) {
     el.addEventListener('input', onChange);
     if (clear) clear.addEventListener('click', () => { el.value = ''; onChange(true); el.focus(); });
     el.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && el.value) { e.preventDefault(); el.value = ''; onChange(true); }
+      if (e.key === 'Escape' && el.value && !(sug && sug.isOpen())) { e.preventDefault(); el.value = ''; onChange(true); }
       else if (e.key === 'Enter') { e.preventDefault(); if (onEnter) onEnter(); }
     });
   }
   const debounce = (fn, ms) => { let t = 0; const d = (...a) => { unlater(t); t = later(() => fn(...a), ms); }; d.now = (...a) => { unlater(t); fn(...a); }; return d; };
 
-  const runExam = SSR ? null : debounce(() => { readInputs(); for (const el of Object.values(inputs)) syncClear(el); updateExam({ follow: true }); }, 110);
+  /* Live suggestions under the school and centre-number fields on phones and tablets (js/results-suggest.js, loaded only on a narrow screen):
+     the best matches appear right under the field being typed in. While they show, the page stays with the field instead of gliding down
+     to the list below. */
+  let sug = null;
+  const sugOn = () => !!sug && sug.active();
+  function loadSuggest() {
+    if (SSR || sug || dead || loadSuggest.asked) return;
+    loadSuggest.asked = true;
+    import('./results-suggest.js' + ver).then((m) => {
+      if (dead) return;
+      sug = m.createSuggest({
+        fields: [{ key: 'name', el: inputs.q }, { key: 'code', el: inputs.code }].filter((f) => f.el),
+        state: () => {
+          const f = filterNow();
+          return { ready: !!rows && S.view === 'exam' && S.tab === 'name', result, toks: tokens(f.q), codeQ: normCode(f.code) };
+        },
+        pick: (r) => {
+          if (root.dataset.pages) { // the centre has a page of its own: a normal link
+            const a = h('a', { href: `${root.dataset.pages.replace(/\/$/, '')}/${cfg.cat}/${r.c}/${cfg.year}/`, hidden: true });
+            root.append(a);
+            try { a.click(); } finally { a.remove(); }
+          } else openCentre(r.code);
+        },
+        all: () => { glideTo(R.status, stickyTop(R.tools)); },
+        h, icon, marked, fmt, unit, units, listen, later,
+      });
+      undo.push(() => sug && sug.destroy());
+      sug.update();
+    }).catch(() => { /* no suggestions: the list below still works */ });
+  }
+  if (!SSR && window.matchMedia) {
+    const narrow = window.matchMedia('(max-width: 899.98px)');
+    if (narrow.matches) loadSuggest();
+    else if (narrow.addEventListener) listen(narrow, 'change', () => { if (narrow.matches) loadSuggest(); });
+  }
+
+  const runExam = SSR ? null : debounce(() => { readInputs(); for (const el of Object.values(inputs)) syncClear(el); updateExam({ follow: !sugOn() }); }, 110);
   if (!SSR) for (const el of Object.values(inputs)) wireField(el, (immediate) => { for (const e2 of Object.values(inputs)) syncClear(e2); if (immediate === true) runExam.now(); else runExam(); }, () => {
     if (el === inputs.cand) runExam.now(); // a paste or an edit followed at once by Enter: settle the search first
     const a = $('a[data-open]', R.cpanel);

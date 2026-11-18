@@ -33,14 +33,22 @@ Its children (for checking that they were read; do NOT submit them one by one un
 
 Expected result: status "Success" (Google) or "Processed" (Bing, Yandex). Report the number of pages each engine discovered.
 
-## Stage 2: DO NOT submit yet
+## Stage 2: submit now (the school result pages are live)
 
-These two sitemap indexes belong to the school result pages (about 590,000 addresses):
+Since 2026-11-18 the Results Worker serves ready-made pages, so these two sitemap indexes work on the free Cloudflare plan. They hold about 590,000 school page addresses in 245 child files (children are named `sitemap-schools-<exam>-<year>-<n>.xml` and `sitemap-hubs-...xml`; they are found by themselves from the index):
 
-- https://mayobebros.com/results/sitemap-schools.xml
-- https://mayobebros.com/results/sitemap-hubs.xml
+- https://mayobebros.com/results/sitemap-schools.xml (137 child files)
+- https://mayobebros.com/results/sitemap-hubs.xml (108 child files)
 
-Do not submit them until the owner tells you that the Results Worker runs on the Cloudflare **Workers Paid** plan. First open both addresses in a browser tab: they must show XML (a list of `<sitemap>` entries), not the text "error code: 1102" or a 503 page. If either shows an error, stop and tell the owner. Do not submit `https://mayobebros.com/results/sitemap.xml` (it repeats both).
+Before submitting, open each address in a browser tab: it must show XML (a list of `<sitemap>` entries), not the text "error code: 1102" or a 503 page. If either shows an error, stop and tell me. Do not submit `https://mayobebros.com/results/sitemap.xml` (it repeats both). Submit the two as separate sitemaps in each search engine, so each gets its own report.
+
+Expected: Google may show "Couldn't fetch" for a minute on big indexes, then "Success"; report what it shows and do not resubmit more than once. Discovery of 590,000 addresses takes days: do not worry if "Discovered pages" starts low. Do NOT use "Request indexing" on school pages, and do not submit any individual school address. Yandex: if it refuses the size, submit only `sitemap-hubs.xml` and tell me.
+
+## Stage 3: look, then report (change nothing)
+
+- Google Search Console > Indexing > Pages: note the counts for "Indexed", "Crawled - currently not indexed" and "Discovered - currently not indexed", and the sample reasons listed.
+- Google Search Console > URL inspection: inspect `https://mayobebros.com/post/educational/results/necta-csee-results-2025/` and `https://mayobebros.com/results/csee/s0107/2025/`; report "URL is on Google" or not, the canonical Google chose, and whether "Crawl allowed" and "Indexing allowed" say Yes.
+- Bing Webmaster Tools > Sitemaps: report the status of all submitted sitemaps.
 
 ## Report
 

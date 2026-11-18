@@ -557,3 +557,41 @@ a.rs-chip.rs-page { justify-content: center; }
 }
 @media (hover: hover) and (max-width: 40rem) { .rs-hero .rs-years-more:hover { background: #2f55d4; border-color: #2f55d4; color: #fff; } }
 @media (prefers-reduced-motion: reduce) { .rs-years-more, .rs-years-more-ico { transition: none; } }
+
+/* ------------------------------------------------------------------ live suggestions under the search fields (2026-11-18, js/results-suggest.js)
+   Phones and tablets only: the panel exists only when the script made it, and the script loads only below 900px. It sits directly under the
+   field being typed in (an overlay, so nothing in the page moves), is as wide as the field, never taller than the room above the keyboard
+   (--rs-sug-room, set by the script from the visual viewport) and scrolls inside itself. The heading and the "See all" line stay in view. */
+.rs-field { position: relative; }
+.rs-sug { position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 6px); max-height: min(26rem, max(7rem, var(--rs-sug-room, 22rem))); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; background: var(--rs-card); color: var(--rs-ink); border: 1.5px solid var(--rs-ink); border-radius: 14px; box-shadow: 0 22px 44px -14px rgb(11 18 32 / 0.45), 0 3px 10px rgb(11 18 32 / 0.18); }
+:root.dark .rs-sug { border-color: var(--rs-line-strong); box-shadow: 0 22px 44px -10px rgb(0 0 0 / 0.8), 0 3px 10px rgb(0 0 0 / 0.5); }
+@media (prefers-color-scheme: dark) { :root:not(.light) .rs-sug { border-color: var(--rs-line-strong); box-shadow: 0 22px 44px -10px rgb(0 0 0 / 0.8), 0 3px 10px rgb(0 0 0 / 0.5); } }
+@keyframes rs-sug-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.rs-sug.is-in { animation: rs-sug-in 0.14s var(--rs-ease) both; }
+.rs-sug-head { position: sticky; top: 0; z-index: 1; margin: 0; padding: 0.5rem 0.9rem; background: var(--rs-tint2); border-bottom: 1px solid var(--rs-line); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; font-variant-numeric: tabular-nums; color: var(--rs-ink-soft); }
+.rs-sug-list { margin: 0; padding: 0; list-style: none; }
+.rs-sug-opt { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; column-gap: 0.8rem; min-height: 60px; padding: 0.5rem 0.9rem; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; transition: background 0.12s var(--rs-ease); }
+.rs-sug-opt + .rs-sug-opt { border-top: 1px solid var(--rs-line); }
+.rs-sug-opt[aria-selected="true"], .rs-sug-opt:active { background: var(--rs-tint2); box-shadow: inset 4px 0 0 var(--rs-fill); }
+@media (hover: hover) { .rs-sug-opt:hover { background: var(--rs-tint2); } }
+.rs-sug-ico { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: var(--rs-tint2); border: 1px solid color-mix(in srgb, #2f55d4 22%, var(--rs-line)); color: #2f55d4; }
+.rs-sug-ico .rs-ico { width: 19px; height: 19px; }
+:root.dark .rs-sug-ico { background: #15285a; border-color: #2d4580; color: #8ab6ff; }
+@media (prefers-color-scheme: dark) { :root:not(.light) .rs-sug-ico { background: #15285a; border-color: #2d4580; color: #8ab6ff; } }
+.rs-sug-body { display: grid; min-width: 0; }
+.rs-sug-code { font-size: 0.82rem; font-weight: 700; line-height: 1.4; color: var(--rs-link); overflow-wrap: anywhere; }
+.rs-sug-name { font-weight: 700; line-height: 1.3; font-size: 1rem; overflow-wrap: anywhere; }
+.rs-sug-meta { margin-top: 1px; font-size: 0.8rem; line-height: 1.3; font-weight: 500; color: var(--rs-ink-soft); overflow-wrap: anywhere; }
+.rs-sug-go { width: 18px; height: 18px; color: var(--rs-ink-faint); }
+.rs-sug-opt.is-muted { cursor: default; }
+.rs-sug-opt.is-muted .rs-sug-ico { background: transparent; border-style: dashed; border-color: var(--rs-line-strong); color: var(--rs-ink-faint); }
+.rs-sug-opt.is-muted .rs-sug-code, .rs-sug-opt.is-muted .rs-sug-name { color: var(--rs-ink-soft); font-weight: 600; }
+.rs-sug-opt.is-muted:active, .rs-sug-opt.is-muted:hover { background: transparent; box-shadow: none; }
+.rs-sug-all { position: sticky; bottom: 0; z-index: 1; grid-template-columns: minmax(0, 1fr) auto; min-height: 52px; background: var(--rs-card); border-top: 1px solid var(--rs-line-strong) !important; box-shadow: 0 -8px 12px -10px rgb(11 18 32 / 0.35); color: var(--rs-link); font-weight: 800; }
+.rs-sug-all[aria-selected="true"], .rs-sug-all:active { background: var(--rs-tint); }
+.rs-sug-all .rs-sug-go { color: var(--rs-link); }
+.rs-sug-empty { margin: 0; text-wrap: wrap; padding: 0.9rem; font-size: 0.95rem; line-height: 1.45; color: var(--rs-ink-soft); overflow-wrap: anywhere; }
+.rs-sug-empty strong { display: block; color: var(--rs-ink); font-size: 1rem; }
+@media (min-width: 900px) { .rs-sug { display: none !important; } }
+@media print { .rs-sug { display: none !important; } }
+@media (prefers-reduced-motion: reduce) { .rs-sug.is-in { animation: none; } .rs-sug-opt { transition: none; } }
