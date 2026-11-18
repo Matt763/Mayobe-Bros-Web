@@ -781,6 +781,14 @@
    "thumbBytes": 13388,
    "thumbQuality": 2
   },
+  "post:necta-acsee-results-2026": {
+   "hash": "52f222a230ade3720fca1ab848e633c0149582cd",
+   "source": "assets/posts/necta-acsee-results-2026.webp",
+   "bytes": 78880,
+   "quality": 3,
+   "thumbBytes": 10684,
+   "thumbQuality": 2
+  },
   "post:necta-csee-results-2003": {
    "hash": "cec24536d9d93b5cd205a5580d8676a895ac52cb",
    "source": "assets/posts/necta-csee-results-2003.webp",
@@ -1307,6 +1315,14 @@
    "bytes": 80023,
    "quality": 4,
    "thumbBytes": 15022,
+   "thumbQuality": 2
+  },
+  "post:necta-psle-results-2026": {
+   "hash": "f538c9b0b1e7077e35aac05ce7e94d5b600f3901",
+   "source": "assets/posts/necta-psle-results-2026.webp",
+   "bytes": 79550,
+   "quality": 3,
+   "thumbBytes": 11148,
    "thumbQuality": 2
   },
   "post:necta-qt-results-2015": {

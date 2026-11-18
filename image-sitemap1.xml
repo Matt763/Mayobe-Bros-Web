@@ -2,6 +2,9 @@
 <?xml-stylesheet type="text/xsl" href="/sitemap.xsl"?>
 <!-- mb-sitemap type=image part=1 of=2 start=1 next=/image-sitemap2.xml -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url><loc>https://mayobebros.com/post/educational/results/necta-acsee-results-2026/</loc><lastmod>2026-11-17</lastmod>
+    <image:image><image:loc>https://mayobebros.com/assets/posts/necta-acsee-results-2026.webp</image:loc><image:title>Deep aubergine-purple cover with gold lettering: the round NECTA logo and the words at the left and a waving Tanzanian flag inside a thin gilded arch at the right NECTA ACSEE Results 2026</image:title></image:image>
+  </url>
   <url><loc>https://mayobebros.com/post/educational/results/necta-dpee-results-2026/</loc><lastmod>2026-11-10</lastmod>
     <image:image><image:loc>https://mayobebros.com/assets/posts/necta-dpee-results-2026.webp</image:loc><image:title>Deep indigo cover with amber-gold lettering: a thin double gold frame, a waving Tanzanian flag on a silver pole at the right and, centred on the left, the round NECTA logo above the words NECTA DPEE R</image:title></image:image>
   </url>
@@ -19,6 +22,9 @@
   </url>
   <url><loc>https://mayobebros.com/post/educational/results/necta-ftna-results-2025/</loc><lastmod>2026-11-10</lastmod>
     <image:image><image:loc>https://mayobebros.com/assets/posts/necta-ftna-results-2025.webp</image:loc><image:title>Deep mulberry cover with silver lettering: a waving Tanzanian flag inside a thin arch at the left, with the round NECTA logo above the words at the right NECTA FTNA Results 2025</image:title></image:image>
+  </url>
+  <url><loc>https://mayobebros.com/post/educational/results/necta-psle-results-2026/</loc><lastmod>2026-11-18</lastmod>
+    <image:image><image:loc>https://mayobebros.com/assets/posts/necta-psle-results-2026.webp</image:loc><image:title>Deep sapphire-blue cover with silver lettering: the round NECTA logo and the words at the left and a waving Tanzanian flag inside a thin gilded arch at the right NECTA PSLE Results 2026</image:title></image:image>
   </url>
   <url><loc>https://mayobebros.com/post/educational/results/necta-acsee-results-2025/</loc><lastmod>2026-11-10</lastmod>
     <image:image><image:loc>https://mayobebros.com/assets/posts/necta-acsee-results-2025.webp</image:loc><image:title>Purple and gold sunburst design with the NECTA logo, the words NECTA ACSEE Results 2025, and a waving Tanzanian flag on a tall pole</image:title></image:image>
@@ -595,11 +601,5 @@
   </url>
   <url><loc>https://mayobebros.com/post/educational/results/necta-acsee-results-2012/</loc><lastmod>2026-11-10</lastmod>
     <image:image><image:loc>https://mayobebros.com/assets/posts/necta-acsee-results-2012.webp</image:loc><image:title>Dark burgundy cover with rose-gold lettering, the round NECTA logo at the top centre, a large waving Tanzanian flag at the bottom right, and the words NECTA ACSEE Results 2012 in thin large numerals</image:title></image:image>
-  </url>
-  <url><loc>https://mayobebros.com/post/educational/results/necta-csee-results-2012/</loc><lastmod>2026-11-11</lastmod>
-    <image:image><image:loc>https://mayobebros.com/assets/posts/necta-csee-results-2012.webp</image:loc><image:title>Natural-colour photo of a secondary school with long white buildings and a sports field below misty hills, with a charcoal band along the bottom holding a waving Tanzanian flag, the round NECTA logo, </image:title></image:image>
-  </url>
-  <url><loc>https://mayobebros.com/post/educational/results/necta-acsee-results-2011/</loc><lastmod>2026-11-10</lastmod>
-    <image:image><image:loc>https://mayobebros.com/assets/posts/necta-acsee-results-2011.webp</image:loc><image:title>A small cream-coloured school building with a wooden door and a ramp inside an arch frame on a burgundy background, with the round NECTA logo, the words NECTA ACSEE Results 2011 in rose-gold and a wav</image:title></image:image>
   </url>
 </urlset>

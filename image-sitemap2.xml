@@ -2,6 +2,12 @@
 <?xml-stylesheet type="text/xsl" href="/sitemap.xsl"?>
 <!-- mb-sitemap type=image part=2 of=2 start=201 prev=/image-sitemap1.xml -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url><loc>https://mayobebros.com/post/educational/results/necta-csee-results-2012/</loc><lastmod>2026-11-11</lastmod>
+    <image:image><image:loc>https://mayobebros.com/assets/posts/necta-csee-results-2012.webp</image:loc><image:title>Natural-colour photo of a secondary school with long white buildings and a sports field below misty hills, with a charcoal band along the bottom holding a waving Tanzanian flag, the round NECTA logo, </image:title></image:image>
+  </url>
+  <url><loc>https://mayobebros.com/post/educational/results/necta-acsee-results-2011/</loc><lastmod>2026-11-10</lastmod>
+    <image:image><image:loc>https://mayobebros.com/assets/posts/necta-acsee-results-2011.webp</image:loc><image:title>A small cream-coloured school building with a wooden door and a ramp inside an arch frame on a burgundy background, with the round NECTA logo, the words NECTA ACSEE Results 2011 in rose-gold and a wav</image:title></image:image>
+  </url>
   <url><loc>https://mayobebros.com/post/educational/results/necta-csee-results-2011/</loc><lastmod>2026-11-11</lastmod>
     <image:image><image:loc>https://mayobebros.com/assets/posts/necta-csee-results-2011.webp</image:loc><image:title>Deep olive-green cover with bronze lettering, a large waving Tanzanian flag on the left, the round NECTA logo at the top and a big hairline bronze year along the bottom, with the words NECTA CSEE Resu</image:title></image:image>
   </url>

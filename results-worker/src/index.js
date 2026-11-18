@@ -106,6 +106,24 @@ export async function handle(request, env, ctx) {
   if (!route.file && url.pathname !== route.canonical) return redirect(route.canonical);
   if (route.file && route.type !== 'data' && url.pathname !== route.canonical) return redirect(route.canonical);
 
+  // Pages made ahead of time (scripts/tools/results-prerender.mjs, objects pages/...): no registry, no data and no building, so the work per
+  // request is small enough for the free plan's 10 ms. A stored page is served as it is; only a page that is not stored is built here.
+  const stored = await fromStore(env, route);
+  if (stored) {
+    if (stored.kind === 'file') {
+      if (mode === 'off') return textResponse('Not found', 'text/plain; charset=utf-8', 404, CACHE_404, 'noindex, nofollow');
+      return notModified(request, textResponse(stored.body, 'application/xml; charset=utf-8', 200, CACHE_STORED, 'noindex', stored.modified));
+    }
+    const shell = await getShell(env);
+    if (!shell) return textResponse('This page is not available right now. Try again in a minute.', 'text/plain; charset=utf-8', 503, 'no-store', 'noindex');
+    const cache = typeof caches !== 'undefined' && caches.default ? caches.default : null;
+    const key = new Request(`${origin}${route.canonical}?__rp=${hash(`${CODE_V}|${shell.v}|${mode}|${from}`)}`);
+    if (cache) { const hit = await cache.match(key); if (hit) return notModified(request, hit); }
+    const res = pageResponse(env, shell, route, stored.page, mode, from, origin, CACHE_STORED);
+    if (cache && request.method === 'GET') { const put = cache.put(key, res.clone()); if (ctx && ctx.waitUntil) ctx.waitUntil(put); else await put; }
+    return notModified(request, res);
+  }
+
   const [shell, reg] = await Promise.all([getShell(env), getRegistry(env)]);
   const tag = hash(`${CODE_V}|${shell ? shell.v : 'x'}|${reg.dv}|${mode}|${from}`);
   const cache = typeof caches !== 'undefined' && caches.default ? caches.default : null;
@@ -121,15 +139,46 @@ export async function handle(request, env, ctx) {
     if (!shell) return textResponse('This page is not available right now. Try again in a minute.', 'text/plain; charset=utf-8', 503, 'no-store', 'noindex');
     const page = await build(env, reg, route, origin);
     if (!page) return notFound(env, mode, origin, ctx, shell);
-    const robots = robotsFor(mode, page.kind, page.ok && !(page.year < from));
-    const html = fillShell(shell, { ...page, titleFull: page.titleFull || (page.title.length + 14 <= 62 ? `${page.title} | Mayobe Bros` : page.title), robots, path: page.path, image: shareImageOf(route, page, origin), imageAlt: shareAltOf(route, page) });
-    res = textResponse(html, 'text/html; charset=utf-8', 200, CACHE_OK, robots.startsWith('index') ? '' : robots, page.modified);
+    res = pageResponse(env, shell, route, page, mode, from, origin, CACHE_OK);
   }
   if (cache && res.status === 200 && request.method === 'GET') {
     const put = cache.put(key, res.clone());
     if (ctx && ctx.waitUntil) ctx.waitUntil(put); else await put;
   }
   return notModified(request, res);
+}
+
+/** The finished response of a page object (what build() returns) inside the shell. Shared by the page built here and the stored one. */
+function pageResponse(env, shell, route, page, mode, from, origin, cacheControl) {
+  const robots = robotsFor(mode, page.kind, page.ok && !(page.year < from));
+  const html = fillShell(shell, { ...page, titleFull: page.titleFull || (page.title.length + 14 <= 62 ? `${page.title} | Mayobe Bros` : page.title), robots, path: page.path, image: shareImageOf(route, page, origin), imageAlt: shareAltOf(route, page) });
+  return textResponse(html, 'text/html; charset=utf-8', 200, cacheControl, robots.startsWith('index') ? '' : robots, page.modified);
+}
+
+// A stored page is a gzip JSON file: { page } (the object build() returns) or { xml, modified } for a sitemap. Missing, unreadable or without
+// gzip support in the stand-in bucket (tests): null, and the page is built the usual way.
+const CACHE_STORED = 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400';
+export const storedKey = (canonical) => `pages${canonical}${canonical.endsWith('/') ? 'index' : ''}.json.gz`;
+async function fromStore(env, route) {
+  if (route.type === 'home' || route.type === 'data' || !env.RESULTS || typeof env.RESULTS.get !== 'function') return null;
+  try {
+    const o = await env.RESULTS.get(storedKey(route.canonical));
+    if (!o || typeof o.arrayBuffer !== 'function') return null;
+    const text = await new Response(new Blob([await o.arrayBuffer()]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+    const j = JSON.parse(text);
+    if (j && j.xml) return { kind: 'file', body: j.xml, modified: j.modified };
+    return j && j.page && typeof j.page.main === 'string' ? { kind: 'page', page: j.page } : null;
+  } catch { return null; }
+}
+
+/** The page object of an address (what is stored ahead of time), or null. Used by scripts/tools/results-prerender.mjs. */
+export async function buildPage(env, pathname) {
+  const route = parse(pathname);
+  if (!route || route.file || route.type === 'home' || pathname !== route.canonical) return null;
+  const reg = await getRegistry(env);
+  const origin = String(env.ORIGIN || 'https://mayobebros.com').replace(/\/$/, '');
+  const page = await build(env, reg, route, origin);
+  return page ? { route, page } : null;
 }
 
 /** The link-preview picture of a page: the cover card of its exam-year's post (WhatsApp, Facebook, X), or null for the site card. */

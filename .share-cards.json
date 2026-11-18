@@ -156,6 +156,11 @@
    "bytes": 183233,
    "quality": 2
   },
+  "post-necta-acsee-results-2026": {
+   "hash": "5659248f17b2138bb5f0093b05f3acb8322a66e3",
+   "bytes": 106958,
+   "quality": 2
+  },
   "post-necta-dpee-results-2026": {
    "hash": "2d9b071789c3933dfd6c086bff1eab289cfbca8d",
    "bytes": 121679,
@@ -184,6 +189,11 @@
   "post-necta-ftna-results-2025": {
    "hash": "048bc27f6095cf2bb045deb5154f95333fb7fd65",
    "bytes": 106204,
+   "quality": 2
+  },
+  "post-necta-psle-results-2026": {
+   "hash": "2b9d009db786df98d774a0a6a6eeff68483335d3",
+   "bytes": 107416,
    "quality": 2
   },
   "post-necta-sfna-results-2025": {

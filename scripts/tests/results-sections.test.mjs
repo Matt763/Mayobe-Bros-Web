@@ -96,7 +96,7 @@ test('ALL lists every article labelled Results; Results Guides lists the guides;
 });
 
 // the years that have a post (2025 down): a year with no data online has no post, its files wait in ../my-site-archive/pending-results-posts
-const yearsOf = (s) => Array.from({ length: 23 }, (_, i) => String(2025 - i)).filter((y) => fs.existsSync(path.join(ROOT, `content/posts/necta-${s}-results-${y}.md`)));
+const yearsOf = (s) => Array.from({ length: 24 }, (_, i) => String(2026 - i)).filter((y) => fs.existsSync(path.join(ROOT, `content/posts/necta-${s}-results-${y}.md`)));
 test('each exam page lists all its NECTA results posts (newest first, 15 on the first page), no portal card, and each post has its own picture', () => {
   const covers = new Set();
   for (const s of EXAMS) {

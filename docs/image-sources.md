@@ -245,3 +245,7 @@ Section heroes of Examination Past Papers, `assets/img/heroes/papers-csee.webp`,
 | `keeping-children-safe-online-parents-guide.webp` | keeping-children-safe-online-parents-guide.md | Drawn in code by Mayobe Bros (phone with shield and heart, chat cards, grown-up and child). Own work. |
 | `sell-on-jiji-tanzania-rules-safe-deals-ad-limits.webp` | sell-on-jiji-tanzania-rules-safe-deals-ad-limits.md | Drawn in code by Mayobe Bros (listing card, price tag, coins, map pin, shield with tick). Own work. |
 | `sim-swap-fraud-what-to-do.webp` | sim-swap-fraud-what-to-do.md | Drawn in code by Mayobe Bros (two SIM cards trading places, phone without signal, code message with warning). Own work. |
+
+<!-- covers added by scripts/tools/make-results-posts.mjs, 2026-11-17: drawn in code, NECTA logo (owner's exception) -->
+| acsee 2026 | luxe salon | aubergine-gold (2026-11-10) |
+| psle 2026 | luxe salon | sapphire-silver (2026-11-10) |
