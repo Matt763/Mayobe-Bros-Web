@@ -125,3 +125,32 @@ test('raw script, iframe and event attributes in a post are neutralised; harmles
   assert.doesNotMatch(markdown('<svg onload=alert(1)>'), /<svg/i);
   assert.match(markdown('Press <kbd>Ctrl</kbd> and <b>bold</b><br>text'), /<kbd>Ctrl<\/kbd>.*<b>bold<\/b><br>/);
 });
+
+test('carousel of tables: every #### starts a slide, each table keeps its sideways-scroll box, and a plain stack is the fallback', () => {
+  const html = markdown([
+    ':::carousel[Jobs by group]',
+    '#### First group',
+    '',
+    '| No. | Job |',
+    '|---|---|',
+    '| 1 | Nurse |',
+    '',
+    '#### Second group & more',
+    '',
+    '| No. | Job |',
+    '|---|---|',
+    '| 2 | Engineer |',
+    ':::',
+    '',
+    'After.',
+  ].join('\n'));
+  assert.match(html, /<section class="tbl-carousel" id="tbl-carousel-1" aria-roledescription="carousel" aria-label="Jobs by group" data-tbl-carousel>/);
+  assert.equal((html.match(/class="tbl-slide"/g) || []).length, 2);
+  assert.match(html, /aria-label="1 of 2: First group"/);
+  assert.match(html, /aria-label="2 of 2: Second group &amp; more"/);
+  assert.equal((html.match(/class="table-wrapper" role="region" aria-label="[^"]+: table" tabindex="0"/g) || []).length, 2, 'each table box is named after its group and can be focused to scroll');
+  assert.match(html, /<h4 class="tbl-slide-title">First group<\/h4>/, 'h4: never in the contents list');
+  assert.match(html, /<\/section>\n<p>After\.<\/p>/);
+  // no #### inside: nothing to slide, so the content is left as it is
+  assert.doesNotMatch(markdown(':::carousel[x]\nplain text\n:::'), /tbl-carousel/);
+});

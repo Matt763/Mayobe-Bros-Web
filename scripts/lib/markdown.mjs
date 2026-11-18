@@ -144,8 +144,37 @@ function renderMedia(m) {
 </figure>`;
 }
 
+// Carousel of tables:   :::carousel[What the whole set shows]
+//                        #### First group title
+//                        | table |
+//                        #### Second group title
+//                        | table |
+//                        :::
+// Every "####" starts a slide (a title and what follows it). Without script, and below 64rem, the slides are simply stacked and each table scrolls
+// sideways in its own box; js/tables.js turns the stack into a carousel (one group at a time, buttons and chips) on large screens.
+const CAROUSEL_RE = /^\s{0,3}:::carousel\[([^\]]*)\]\s*$/;
+const CAROUSEL_END_RE = /^\s{0,3}:::\s*$/;
+const SLIDE_RE = /^\s{0,3}####\s+(.+?)\s*#*\s*$/;
+let carouselCount = 0;
+
+function renderCarousel(label, lines) {
+  const slides = [];
+  let cur = null;
+  for (const l of lines) {
+    const m = l.match(SLIDE_RE);
+    if (m) { cur = { title: m[1], lines: [] }; slides.push(cur); } else if (cur) cur.lines.push(l);
+  }
+  if (!slides.length) return blocks(lines);
+  const id = `tbl-carousel-${++carouselCount}`;
+  const items = slides.map((sl, i) => {
+    const inner = blocks(sl.lines).replace(/aria-label="Table"/g, `aria-label="${attr(`${sl.title}: table`)}"`);
+    return `<div class="tbl-slide" id="${id}-s${i + 1}" role="group" aria-roledescription="slide" aria-label="${i + 1} of ${slides.length}: ${attr(sl.title)}" data-title="${attr(sl.title)}">\n<h4 class="tbl-slide-title">${inline(sl.title)}</h4>\n${inner}\n</div>`;
+  });
+  return `<section class="tbl-carousel" id="${id}" aria-roledescription="carousel" aria-label="${attr(label.trim() || 'Tables')}" data-tbl-carousel>\n${items.join('\n')}\n</section>`;
+}
+
 function startsBlock(line, next) {
-  if (MEDIA_RE.test(line)) return true;
+  if (MEDIA_RE.test(line) || CAROUSEL_RE.test(line)) return true;
   if (FENCE_RE.test(line) || HEADING_RE.test(line) || HR_RE.test(line) || /^\s{0,3}>/.test(line)) return true;
   if (/^\s{0,3}(?:[-*+]|1[.)])\s+\S/.test(line)) return true;
   if (HTML_BLOCK_RE.test(line)) return true;
@@ -241,6 +270,14 @@ export function blocks(lines) {
       out.push(`<pre><code${lang ? ` class="language-${escapeHtml(lang)}"` : ''}>${escapeHtml(buf.join('\n'))}</code></pre>`);
       continue;
     }
+    if ((m = line.match(CAROUSEL_RE))) {
+      const buf = [];
+      i++;
+      while (i < lines.length && !CAROUSEL_END_RE.test(lines[i])) buf.push(lines[i++]);
+      i++;
+      out.push(renderCarousel(m[1], buf));
+      continue;
+    }
     if ((m = line.match(MEDIA_RE))) {
       out.push(renderMedia(m));
       i++;
@@ -312,6 +349,7 @@ export function blocks(lines) {
 
 export function markdown(src) {
   videoCount = 0;
+  carouselCount = 0;
   return neutralise(blocks(String(src).replace(/\r\n?/g, '\n').replace(/\t/g, '    ').split('\n')));
 }
 

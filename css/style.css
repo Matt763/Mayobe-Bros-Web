@@ -2045,3 +2045,43 @@ html.mo-gliding { scroll-behavior: auto !important; overflow-anchor: none; }
 .copy-note:empty { display: none; }
 .copy-note.is-on { opacity: 1; transform: translate(-50%, 0); }
 @media (prefers-reduced-motion: reduce) { .copy-note, .copy-note.is-on { transition: none; transform: translate(-50%, 0); } }
+
+/* ===== Tables in articles: the sideways hint and the carousel of tables (2026-11-18, js/tables.js, ":::carousel" in scripts/lib/markdown.mjs) ===== */
+/* A table wider than the screen scrolls inside its own box (.table-wrapper above); the hint tells a reader so, and shows only while it overflows. */
+.article-content .table-hint { margin: 1.25rem 0 -1.25rem; font-size: 0.9rem; font-weight: 600; color: var(--text-3); }
+.article-content .table-hint::before { content: "\2194\00a0"; }
+/* The carousel: below 64rem (and without script) every group is shown one under the other. */
+.article-content .tbl-carousel { margin: 2rem 0; }
+.article-content .tbl-slide-title { margin: 2rem 0 0; font-size: 1.15rem; font-weight: 800; line-height: 1.3; }
+.article-content .tbl-slide:first-child .tbl-slide-title { margin-top: 0; }
+.article-content .tbl-carousel .table-wrapper { margin-top: 0.75rem; }
+.article-content .tbl-carousel .table-hint { margin: 0.6rem 0 -0.35rem; }
+.article-content .tbl-carousel td:first-child, .article-content .tbl-carousel th:first-child { width: 3.5rem; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--text-3); }
+.article-content .tbl-carousel td:nth-child(2) { font-weight: 700; }
+.article-content .tbl-carousel table { font-size: 1rem; }
+.article-content .tbl-carousel th, .article-content .tbl-carousel td { padding: 0.65rem 0.8rem; }
+@keyframes tbl-slide-in { from { opacity: 0; } to { opacity: 1; } }
+@media (min-width: 64rem) {
+  /* Large screens, once the script has run (.is-on): one group at a time. Chips on top, Previous / Next below. */
+  html.js .article-content .tbl-carousel.is-on { padding: 1rem; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
+  html.js .article-content .tbl-carousel.is-on .tbl-slide { display: none; }
+  html.js .article-content .tbl-carousel.is-on .tbl-slide.is-active { display: block; }
+  html.js .article-content .tbl-carousel.is-on .tbl-slide.is-in { animation: tbl-slide-in 0.22s ease-out both; }
+  html.js .article-content .tbl-carousel.is-on .tbl-slide-title { margin-top: 1rem; font-size: 1.3rem; }
+  html.js .article-content .tbl-carousel.is-on .table-wrapper { background: var(--bg); }
+  /* one row that slides sideways (the article column is narrow beside the contents list and the sidebar), the chosen chip is kept in view */
+  .tbl-chips { position: relative; display: flex; flex-wrap: nowrap; gap: 0.5rem; overflow-x: auto; padding: 4px 2px 8px; margin: 0 -2px; scrollbar-width: thin; overscroll-behavior-x: contain; }
+  .tbl-chip { flex: none; min-height: 2.75rem; padding: 0.4rem 0.95rem; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); color: var(--text); font: inherit; font-size: 0.95rem; font-weight: 700; cursor: pointer; transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease; }
+  .tbl-chip:hover { border-color: var(--btn-bg); color: var(--link, var(--btn-bg)); }
+  .tbl-chip[aria-current="true"] { background: var(--btn-bg); border-color: var(--btn-bg); color: var(--btn-text, #fff); }
+  .tbl-chip:focus-visible, .tbl-btn:focus-visible { outline: 3px solid var(--btn-bg); outline-offset: 2px; }
+  .tbl-nav { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 1rem; }
+  .tbl-btn { display: inline-flex; align-items: center; min-height: 2.75rem; max-width: 45%; padding: 0.4rem 1.1rem; border: 1px solid var(--btn-bg); border-radius: 999px; background: var(--btn-bg); color: var(--btn-text, #fff); font: inherit; font-size: 0.95rem; font-weight: 700; text-align: left; cursor: pointer; transition: opacity 0.15s ease; }
+  .tbl-btn:hover:not(:disabled) { opacity: 0.9; }
+  .tbl-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .tbl-next { text-align: right; margin-left: auto; }
+  .tbl-count { font-size: 0.95rem; font-weight: 700; color: var(--text-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+}
+@media (max-width: 63.99rem) { .tbl-chips, .tbl-nav { display: none; } }
+@media (prefers-reduced-motion: reduce) { .tbl-slide.is-in { animation: none !important; } .tbl-chip, .tbl-btn { transition: none; } }
+@media print { .tbl-chips, .tbl-nav, .table-hint { display: none !important; } .tbl-slide { display: block !important; } }
