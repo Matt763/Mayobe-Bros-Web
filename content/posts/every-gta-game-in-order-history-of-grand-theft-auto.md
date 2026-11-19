@@ -13,7 +13,7 @@ tags: [video games, gta, grand theft auto, game history]
 
 Grand Theft Auto started as a small idea at a studio in Dundee, Scotland, and it is now one of the best-known names in video games. This post lists the main games in the order they came out, with the year, the setting, the platforms and a short note on why each one mattered. These are michezo ya video made for adults, so we keep the descriptions plain and non-graphic.
 
-As checked on 19 November 2026, Rockstar's own page for Grand Theft Auto VI shows "Coming November 19, 2026" for PlayStation 5 and Xbox Series X|S. Today is that date, so this is a good moment to look back at how the series grew.
+As checked on 19 November 2026, Rockstar's own page for Grand Theft Auto VI lists PlayStation 5 and Xbox Series X|S, with release on 19 November 2026. That day has arrived, and the page now says "Out Now", so this is a good moment to look back at how the series grew.
 
 ## The short answer
 

@@ -11,7 +11,7 @@ imageSource: https://www.rockstargames.com/VI
 tags: [gta 6, video games, release date, playstation]
 ---
 
-Grand Theft Auto VI, the new Rockstar Games mchezo that people have waited for since 2023, has a release date of 19 November 2026. That is today. This page lists what Rockstar and the platform stores have confirmed, what has changed over time, and what has not been announced.
+Grand Theft Auto VI, the new Rockstar Games mchezo that people have waited for since 2023, has a release date of 19 November 2026, and that day has now arrived. This page lists what Rockstar and the platform stores have confirmed, what has changed over time, and what has not been announced.
 
 Everything below was checked on 19 November 2026. We could not confirm from official pages whether the game is already playable where you are, so check your own store before you plan your day.
 
@@ -102,7 +102,7 @@ Waiting years can make anyone want to rush. A few calm checks save money.
 
 ### Is GTA 6 out today?
 
-The date on Rockstar's store page and the PlayStation Store is 19 November 2026. We could not confirm from those pages that the game is playable right now, since the stores show launch details, not live status. Look in your own store.
+The date on Rockstar's store page and the PlayStation Store is 19 November 2026. When we checked Rockstar's page again on 19 November 2026, its buttons had changed from pre-order to "Buy Now" and the page said "Out Now". We could not confirm from the stores that the game is playable on your console yet, since a store shows launch details, not your download status. Look in your own store.
 
 ### Is GTA 6 coming to PC?
 

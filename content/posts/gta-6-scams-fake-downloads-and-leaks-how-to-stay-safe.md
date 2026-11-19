@@ -11,7 +11,7 @@ imageSource: https://www.rockstargames.com/VI
 tags: [video games, gta 6, online safety, scams]
 ---
 
-When a big mchezo is about to come out, scammers get busy. They know millions of people are searching for it, and they know many of those people are young, excited and in a hurry. GTA 6 is exactly that kind of game.
+When a big mchezo is about to come out, or has just come out, scammers get busy. They know millions of people are searching for it, and they know many of those people are young, excited and in a hurry. GTA 6 is exactly that kind of game.
 
 Think of this post as an older sibling looking out for you. You don't need to be scared. You only need a few simple checks, and you can do them in two minutes. We also cover what to do if you already tapped something you should not have. As checked on 19 November 2026, the facts below match the official pages we opened.
 
@@ -25,7 +25,7 @@ Think of this post as an older sibling looking out for you. You don't need to be
 
 ## What Rockstar actually says
 
-Rockstar's page for the game is at rockstargames.com/VI. When we opened it on 19 November 2026, it showed the release date as 19 November 2026 and the platforms as PlayStation 5 and Xbox Series X|S. It also had pre-order buttons and links to Rockstar's newswire and store.
+Rockstar's page for the game is at rockstargames.com/VI. When we opened it on 19 November 2026, it showed the release date as 19 November 2026 and the platforms as PlayStation 5 and Xbox Series X|S. Its buttons had changed to "Buy Now" and it said "Out Now", with links to Rockstar's newswire and store.
 
 The page text we could read did not mention Android, iPhone or a phone version. We could not read every part of the page, so we say it carefully: we found no phone version announced. If that changes, Rockstar will say so on its own pages first, and the news will be everywhere. You will not learn it from a stranger in a comment section.
 

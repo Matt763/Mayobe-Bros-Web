@@ -23,7 +23,7 @@ GTA 6 is a game for adults. It carries a Mature 17+ rating, which we explain fur
 - Rockstar's one-line story: an easy score goes wrong, and they end up in a criminal conspiracy across the state of **Leonida**.
 - Leonida is a fictional state. **Vice City** is its best-known city. Rockstar calls it "the darkest side of the sunniest place in America".
 - Rockstar has not published the full plot, the ending or a full character list in its trailers.
-- As checked on 19 November 2026, Rockstar's game page lists the release as 19 November 2026 for PlayStation 5 and Xbox Series X|S. Check the page for the latest.
+- As checked on 19 November 2026, Rockstar's game page lists the release as 19 November 2026 for PlayStation 5 and Xbox Series X|S. By the evening of that day the page said "Out Now". Check the page for the latest.
 
 ## What Rockstar says the story is
 

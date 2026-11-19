@@ -25,7 +25,7 @@ This guide is for anyone who owns a PS5, an Xbox Series X or Series S, or is sav
 
 ## What is confirmed about the game size
 
-As checked on 19 November 2026, Rockstar's own GTA VI page says the game is "Coming November 19, 2026" for PlayStation 5 and Xbox Series X|S. The page we opened does not state a storage size.
+As checked on 19 November 2026, Rockstar's own GTA VI page lists the game for PlayStation 5 and Xbox Series X|S with release on 19 November 2026, and by the end of that day the page said "Out Now". The page we opened does not state a storage size.
 
 TechRadar, quoting a Rockstar blog post, reported the pre-load file as "up to 212 GB depending on your device". The same report said pre-loading began on 10 November. We could not confirm a separate, final install size from an official page, and a pre-load size and the space the game uses after install can differ. Treat 212 GB as a minimum to plan for, and leave extra room for updates.
 
