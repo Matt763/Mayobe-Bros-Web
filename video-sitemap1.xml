@@ -2,6 +2,12 @@
 <?xml-stylesheet type="text/xsl" href="/sitemap.xsl"?>
 <!-- mb-sitemap type=video part=1 of=1 start=1 -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
+  <url><loc>https://mayobebros.com/post/video-games-updates/gta-6-pc-release-date-what-pc-players-know-so-far/</loc><lastmod>2026-11-20</lastmod>
+    <video:video><video:thumbnail_loc>https://mayobebros.com/assets/posts/gta-6-pc-release-date-what-pc-players-know-so-far-trailer1-poster.webp</video:thumbnail_loc><video:title>Grand Theft Auto VI Trailer 1, published by Rockstar Games on its official YouTube channel</video:title><video:description>Grand Theft Auto VI Trailer 1, published by Rockstar Games on its official YouTube channel</video:description><video:player_loc>https://www.youtube.com/embed/QdBZY2fkU-0</video:player_loc></video:video>
+  </url>
+  <url><loc>https://mayobebros.com/post/video-games-updates/gta-6-pc-release-date-what-pc-players-know-so-far/</loc><lastmod>2026-11-20</lastmod>
+    <video:video><video:thumbnail_loc>https://mayobebros.com/assets/posts/gta-6-pc-release-date-what-pc-players-know-so-far.webp</video:thumbnail_loc><video:title>Grand Theft Auto VI Trailer 2, published by Rockstar Games on its official YouTube channel</video:title><video:description>Grand Theft Auto VI Trailer 2, published by Rockstar Games on its official YouTube channel</video:description><video:player_loc>https://www.youtube.com/embed/VQRLujxTm3c</video:player_loc></video:video>
+  </url>
   <url><loc>https://mayobebros.com/post/video-games-updates/gta-6-story-lucia-jason-and-leonida-what-the-trailers-show/</loc><lastmod>2026-11-19</lastmod>
     <video:video><video:thumbnail_loc>https://mayobebros.com/assets/posts/gta-6-story-lucia-jason-and-leonida-what-the-trailers-show.webp</video:thumbnail_loc><video:title>Grand Theft Auto VI Trailer 2, published by Rockstar Games on its official YouTube channel</video:title><video:description>Grand Theft Auto VI Trailer 2, published by Rockstar Games on its official YouTube channel</video:description><video:player_loc>https://www.youtube.com/embed/VQRLujxTm3c</video:player_loc></video:video>
   </url>

@@ -249,11 +249,49 @@ Section heroes of Examination Past Papers, `assets/img/heroes/papers-csee.webp`,
 <!-- covers added by scripts/tools/make-results-posts.mjs, 2026-11-17: drawn in code, NECTA logo (owner's exception) -->
 | acsee 2026 | luxe salon | aubergine-gold (2026-11-10) |
 | psle 2026 | luxe salon | sapphire-silver (2026-11-10) |
+
 | `gta-6-release-date-platforms-and-editions-what-is-confirmed.webp` | gta-6-release-date-platforms-and-editions-what-is-confirmed.md | Image: Rockstar Games, https://www.rockstargames.com/VI. Official publisher artwork used at the owner's request with credit; copyright stays with the publisher. |
+
 | `gta-6-story-lucia-jason-and-leonida-what-the-trailers-show.webp` | gta-6-story-lucia-jason-and-leonida-what-the-trailers-show.md | Image: Rockstar Games, https://www.rockstargames.com/VI. Official publisher artwork used at the owner's request with credit; copyright stays with the publisher. |
+
 | `gta-6-scams-fake-downloads-and-leaks-how-to-stay-safe.webp` | gta-6-scams-fake-downloads-and-leaks-how-to-stay-safe.md | Image: Rockstar Games, https://www.rockstargames.com/VI. Official publisher artwork used at the owner's request with credit; copyright stays with the publisher. |
+
 | `every-gta-game-in-order-history-of-grand-theft-auto.webp` | every-gta-game-in-order-history-of-grand-theft-auto.md | Image: Rockstar Games, https://www.rockstargames.com/VI. Official publisher artwork used at the owner's request with credit; copyright stays with the publisher. |
+
 | `get-your-console-ready-for-gta-6-storage-internet-and-budget.webp` | get-your-console-ready-for-gta-6-storage-internet-and-budget.md | Image: Rockstar Games, https://www.rockstargames.com/VI. Official publisher artwork used at the owner's request with credit; copyright stays with the publisher. |
+
 | `minecraft-for-beginners-java-bedrock-and-what-to-buy.webp` | minecraft-for-beginners-java-bedrock-and-what-to-buy.md | Image: Mojang Studios / Microsoft, from minecraft.net, https://www.minecraft.net/en-us/download. Official publisher artwork used at the owner's request with credit; copyright stays with the publisher. |
+
 | `efootball-vs-ea-sports-fc-which-football-game-to-play.webp` | efootball-vs-ea-sports-fc-which-football-game-to-play.md | Images: Konami (eFootball) and Electronic Arts (EA SPORTS FC 27), https://www.konami.com/efootball/en/. Official publisher artwork used at the owner's request with credit; copyright stays with the publisher. |
+
 | `roblox-explained-for-adults-what-it-is-and-how-to-play-safely.webp` | roblox-explained-for-adults-what-it-is-and-how-to-play-safely.md | Image: Roblox Corporation, https://about.roblox.com/. Official publisher artwork used at the owner's request with credit; copyright stays with the publisher. |
+
+<!-- added 2026-11-20: GTA 6 cheats and PC posts, 15 Tanzania News posts (Wikimedia Commons, credited) -->
+| `gta-6-pc-release-date-what-pc-players-know-so-far.webp` | gta-6-pc-release-date-what-pc-players-know-so-far.md | Image: Rockstar Games, https://www.rockstargames.com/VI (official "An Extended Look" artwork). Official publisher artwork used at the owner's request with credit; copyright stays with the publisher. |
+| `gta-6-pc-release-date-what-pc-players-know-so-far-2.webp` | gta-6-pc-release-date-what-pc-players-know-so-far.md | Image: Rockstar Games, https://www.rockstargames.com/VI (official screenshot strip). Same terms. |
+| `gta-6-pc-release-date-what-pc-players-know-so-far-trailer1-poster.webp` | gta-6-pc-release-date-what-pc-players-know-so-far.md | Image: Rockstar Games, https://www.rockstargames.com/VI (Trailer 1 key art, cropped to 16:9, video poster). Same terms. |
+
+| `bank-of-tanzania-interest-rate-6-25-percent-explained.webp` | bank-of-tanzania-interest-rate-6-25-percent-explained.md | Photo: Chen Hualin, CC BY-SA 3.0, https://commons.wikimedia.org/wiki/File:The_waterfront_of_Dar_es_Salaam.JPG . Free licence, credited. Cropped to 16:9. |
+| `mandatory-electronic-payments-tanzania-order-2026.webp` | mandatory-electronic-payments-tanzania-order-2026.md | Photo: Development Planning Unit, University College London, CC BY 2.0, https://commons.wikimedia.org/wiki/File:Items_for_sale_at_Kariakoo_Market_2012.jpg . Free licence, credited. |
+| `finance-act-2026-tanzania-what-changed-for-you.webp` | finance-act-2026-tanzania-what-changed-for-you.md | Photo: Erasmus Kamugisha, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Traffic_in_Dar_es_Salaa_City.jpg . Free licence, credited. Cropped to 16:9. |
+
+| `tanzania-el-nino-rains-floods-what-to-do.webp` | tanzania-el-nino-rains-floods-what-to-do.md | Photo: Mamatimo, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Morogoro_road_B129_flooded_(1)_01.jpg (flooded Morogoro road, January 2023; cropped). Free licence, credited. |
+| `tanzania-fertiliser-subsidy-how-it-works.webp` | tanzania-fertiliser-subsidy-how-it-works.md | Photo: Ramadhani Mushi, CC BY 4.0, https://commons.wikimedia.org/wiki/File:Maize_Farm_Landscape_in_Moshi,_Tanzania.jpg. Free licence, credited. |
+| `tanzania-clean-cooking-strategy-lpg-charcoal.webp` | tanzania-clean-cooking-strategy-lpg-charcoal.md | Photo: Alesia Ofori Dedaa, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Young_men_selling_bags_of_Charcoal_in_Tanzania.jpg (cropped to the sacks only, people removed). Free licence, credited. |
+
+| `universal-health-insurance-tanzania-fahari-afya-explained.webp` | universal-health-insurance-tanzania-fahari-afya-explained.md | Photo: Mangapwani, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Kigamboni_District_Hospital_in_Somangila_ward.jpg. Free licence, credited. |
+| `tanzania-ten-years-compulsory-education-what-changes.webp` | tanzania-ten-years-compulsory-education-what-changes.md | Photo: Picsgenius, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Patandi_Maalum_Sec._School_-_Classroom_buildings.jpg. Free licence, credited. |
+| `nida-national-id-new-card-2026-how-to-get-yours.webp` | nida-national-id-new-card-2026-how-to-get-yours.md | Photo: Mangapwani, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Scene_at_Nyerere_Square,_Dodoma_City.jpg. Free licence, credited. |
+
+| `sgr-train-tanzania.webp` | sgr-train-tanzania-dar-es-salaam-dodoma-fares-tickets.md | Photo: Robert E Mawere, CC BY 4.0, https://commons.wikimedia.org/wiki/File:EMU_Train_of_Tanzania.jpg. Free licence, credited. |
+| `nyerere-dam-tanzania-electricity.webp` | nyerere-dam-tanzania-electricity-surplus-why-power-cuts-continue.md | Photo: Awinch1001, CC0, https://commons.wikimedia.org/wiki/File:Rufiji_River_Selous_Game_Reserve.jpg. Free licence, credited. |
+| `dar-es-salaam-port-cargo.webp` | dar-es-salaam-port-record-cargo-kwala-dry-port-sgr.md | Photo: Sarvesh Lutchmun, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Dar_Es_Salaam_port_activities_in_Tanzania.jpg. Free licence, credited. |
+
+| `afcon-2027-tanzania-what-is-confirmed.webp` | afcon-2027-tanzania-what-is-confirmed.md | Photo: Mxcarter, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:UwanjaWaTaifaTanzania.jpg. Free licence, credited. |
+| `alphonce-simbu-world-marathon-champion-tanzania.webp` | alphonce-simbu-world-marathon-champion-tanzania.md | Photo: Margot Murphy (Massachusetts Governor's Press Office), public domain, https://commons.wikimedia.org/wiki/File:Alphonce_Simbu_and_Cybrian_Kotut_finish_at_the_129th-boston-marathon_54475889944.jpg. Free licence, credited. |
+| `alphonce-simbu-london-2017.webp` | alphonce-simbu-world-marathon-champion-tanzania.md | Photo: Katie Chan, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:2017_London_Marathon_-_Alphonce_Simbu.jpg. Free licence, credited. |
+| `tanzania-world-heritage-sites-explained.webp` | tanzania-world-heritage-sites-explained.md | Photo: Ray in Manila, CC BY 2.0, https://commons.wikimedia.org/wiki/File:Kibo_Summit,_Mount_Kilimanjaro,_Tanzania_(30819102678).jpg. Free licence, credited. |
+| `tanzania-world-heritage-sites-explained-2.webp` | tanzania-world-heritage-sites-explained.md | Photo: Diego Delso, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Fuerte_Viejo,_Stone_Town,_Zanz%C3%ADbar,_Tanzania,_2024-05-31,_DD_32.jpg. Free licence, credited. |
+
+| `gta-6-cheat-codes-list-ps5-xbox.webp` | gta-6-cheat-codes-list-ps5-xbox.md | Drawn in code by Mayobe Bros (sunset, sun, palms, grid; also the cover of the PDF). Own work. |
+| `gta-6-cheat-codes-guide-cover.webp` | gta-6-cheat-codes-list-ps5-xbox.md | Cover page of the PDF, drawn in code by Mayobe Bros. Own work. |

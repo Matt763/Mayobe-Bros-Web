@@ -1684,6 +1684,8 @@ ${listenPlayer()}
         article: { published, modified, section: p.category.name, author: p.author, authorUrl: author ? abs(`/author/${author.slug}/`) : '', tags: p.tags },
         bodyClass: 'page-post',
         listen: true,
+        // a post with a ::pdf line gets the card's look, its script and the reader's WebAssembly allowance, and no other post does
+        ...(p.html.includes('data-pdf-embed') ? { pdfjs: true, extraCss: ['css/pdf-embed.css'], moduleScripts: ['js/pdf-embed.js'] } : {}),
         jsonLd: [
           {
             '@context': 'https://schema.org',

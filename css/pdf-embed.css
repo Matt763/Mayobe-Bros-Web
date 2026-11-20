@@ -1,0 +1,35 @@
+/* The card for a ::pdf line in a post (see renderPdf() in scripts/lib/markdown.mjs, js/pdf-embed.js). Loaded only on posts that have one.
+   Colours come from the site's own variables, so light and dark follow the page. No animation except opacity and transform on hover. */
+.pdf-figure { margin: 2rem 0; }
+.pdf-card {
+  display: grid; grid-template-columns: minmax(0, 11.5rem) minmax(0, 1fr); gap: clamp(1rem, 3vw, 1.75rem); align-items: center;
+  padding: clamp(1rem, 3vw, 1.5rem); border: 1px solid var(--line); border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--surface) 0%, var(--bg-alt) 100%); box-shadow: var(--shadow-md);
+}
+.pdf-card:not(:has(.pdf-cover)) { grid-template-columns: minmax(0, 1fr); }
+.pdf-cover { display: block; width: 100%; height: auto; aspect-ratio: 210 / 297; object-fit: cover; border-radius: 6px; box-shadow: 0 14px 28px -10px rgba(11, 18, 32, 0.45), 0 0 0 1px rgba(11, 18, 32, 0.12); background: var(--surface-2); }
+.pdf-body { min-width: 0; }
+.pdf-body p { margin: 0; }
+.pdf-kicker { display: inline-block; padding: 0.15rem 0.65rem; border-radius: 999px; background: var(--soft); color: var(--soft-text); font-size: 0.8125rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.pdf-title { margin-top: 0.6rem !important; font-size: clamp(1.25rem, 1.05rem + 0.9vw, 1.6rem); font-weight: 800; line-height: 1.2; color: var(--text); }
+.pdf-facts { margin-top: 0.4rem !important; color: var(--text-3); font-size: 0.9375rem; }
+.pdf-actions { display: flex; flex-wrap: wrap; gap: 0.65rem; margin-top: 1.1rem !important; }
+.pdf-actions a {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; padding: 0.6rem 1.3rem; border-radius: 999px; border: 2px solid var(--btn-bg);
+  font-size: 1rem; font-weight: 700; line-height: 1.2; text-decoration: none; transition: background-color 0.2s, color 0.2s, transform 0.25s var(--ease);
+}
+.pdf-actions a:hover { transform: translateY(-2px); }
+.pdf-read { background: var(--btn-bg); color: var(--btn-text); }
+.pdf-read:hover { background: var(--btn-bg-hover); border-color: var(--btn-bg-hover); }
+.pdf-read.is-busy { opacity: 0.7; cursor: progress; }
+.pdf-download { background: transparent; color: var(--text); border-color: var(--text-3) !important; }
+.pdf-download:hover { background: var(--text); color: var(--bg); }
+.pdf-actions a:focus-visible { outline: 3px solid var(--text); outline-offset: 3px; }
+.pdf-figure figcaption { margin-top: 0.6rem; color: var(--text-3); font-size: 0.9375rem; }
+@media (max-width: 34rem) {
+  .pdf-card { grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center; }
+  .pdf-cover { max-width: 12rem; }
+  .pdf-actions { justify-content: center; }
+  .pdf-actions a { flex: 1 1 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .pdf-actions a { transition: none; } .pdf-actions a:hover { transform: none; } }

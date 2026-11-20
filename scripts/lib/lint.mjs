@@ -44,7 +44,7 @@ export function lintPost(p, md = '') {
   if (external < 1) w.push('no external source links; factual posts should cite real sources');
   if (/mayobebros\.com\/post\//i.test(p.html)) w.push('absolute links to mayobebros.com posts; use site-relative links like /post/...');
   // the poster inside a video's play button is decorative on purpose (alt=""): the button has its own aria-label and the figure a caption
-  const imgs = [...p.html.replace(/<button class="video-load"[\s\S]*?<\/button>/gi, '').matchAll(/<img\b[^>]*>/gi)].map((m) => m[0]);
+  const imgs = [...p.html.replace(/<button class="video-load"[\s\S]*?<\/button>/gi, '').replace(/<img class="pdf-cover"[^>]*>/gi, '').matchAll(/<img\b[^>]*>/gi)].map((m) => m[0]);
   imgs.forEach((t) => {
     const alt = (t.match(/\salt="([^"]*)"/) || [])[1];
     if (!alt || alt.length < 8) w.push(`image with missing/short alt text: ${(t.match(/src="([^"]+)"/) || [])[1]}`);

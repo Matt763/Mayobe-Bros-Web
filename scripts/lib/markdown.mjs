@@ -121,6 +121,29 @@ const absPath = (u) => (/^(https?:)?\/\//i.test(u) || u.startsWith('/') ? u : `/
 
 let videoCount = 0; // numbers the video figures of one document (id="video-1", ...): emails link to /post/.../#video-1
 
+// PDF line:   ::pdf[Caption that says what is inside](assets/pdf/guide.pdf){title="Name of the PDF" pages=8 size="0.4 MB" poster=assets/posts/guide.webp}
+// A card with a cover, a "Read in the page" link (js/pdf-embed.js opens it in the site's own reader, which can also download and print it) and a plain
+// Download link that works without script. Only files under assets/pdf/ on this site are accepted: no other host, no other folder.
+const PDF_RE = /^\s{0,3}::pdf\[([^\]]*)\]\(([^)\s]+)\)(?:\{([^}]*)\})?\s*$/;
+let pdfCount = 0;
+function renderPdf(m) {
+  const [, caption, src, optText = ''] = m;
+  const opts = {};
+  for (const mm of optText.matchAll(/([a-z]+)=("[^"]*"|\S+)/gi)) opts[mm[1].toLowerCase()] = mm[2].replace(/^"|"$/g, '');
+  const file = src.replace(/^\//, '');
+  if (!/^assets\/pdf\/[A-Za-z0-9][A-Za-z0-9._-]*\.pdf$/.test(file)) return `<p><em>[PDF link not understood: ${escapeHtml(src)}]</em></p>`;
+  const url = `/${file}`;
+  const cap = caption.trim();
+  const title = (opts.title || cap || 'PDF document').trim();
+  const poster = opts.poster ? absPath(opts.poster) : '';
+  const facts = [opts.pages ? `${opts.pages.replace(/[^0-9]/g, '')} pages` : '', 'PDF', opts.size || ''].filter(Boolean).join(' · ');
+  const n = ++pdfCount;
+  const figcap = cap ? `\n<figcaption>${inline(cap)}</figcaption>` : '';
+  return `<figure class="pdf-figure" id="pdf-${n}" data-pdf-embed data-pdf-url="${attr(url)}" data-title="${attr(title)}">
+<div class="pdf-card">${poster ? `<img class="pdf-cover" src="${attr(poster)}" alt="" loading="lazy" decoding="async">` : ''}<div class="pdf-body"><p class="pdf-kicker">Free PDF</p><p class="pdf-title">${inline(title)}</p><p class="pdf-facts">${escapeHtml(facts)}</p><p class="pdf-actions"><a class="pdf-read" href="${attr(url)}" target="_blank" rel="noopener" data-pdf-open aria-label="Read in the page: ${attr(title)}">Read in the page</a><a class="pdf-download" href="${attr(url)}" download aria-label="Download PDF: ${attr(title)}">Download PDF</a></p></div></div>${figcap}
+</figure>`;
+}
+
 function renderMedia(m) {
   const [, kind, caption, src, optText = ''] = m;
   const opts = {};
@@ -174,7 +197,7 @@ function renderCarousel(label, lines) {
 }
 
 function startsBlock(line, next) {
-  if (MEDIA_RE.test(line) || CAROUSEL_RE.test(line)) return true;
+  if (MEDIA_RE.test(line) || PDF_RE.test(line) || CAROUSEL_RE.test(line)) return true;
   if (FENCE_RE.test(line) || HEADING_RE.test(line) || HR_RE.test(line) || /^\s{0,3}>/.test(line)) return true;
   if (/^\s{0,3}(?:[-*+]|1[.)])\s+\S/.test(line)) return true;
   if (HTML_BLOCK_RE.test(line)) return true;
@@ -283,6 +306,11 @@ export function blocks(lines) {
       i++;
       continue;
     }
+    if ((m = line.match(PDF_RE))) {
+      out.push(renderPdf(m));
+      i++;
+      continue;
+    }
     if ((m = line.match(HEADING_RE))) {
       out.push(`<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`);
       i++;
@@ -349,6 +377,7 @@ export function blocks(lines) {
 
 export function markdown(src) {
   videoCount = 0;
+  pdfCount = 0;
   carouselCount = 0;
   return neutralise(blocks(String(src).replace(/\r\n?/g, '\n').replace(/\t/g, '    ').split('\n')));
 }

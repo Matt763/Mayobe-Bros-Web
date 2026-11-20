@@ -1,0 +1,947 @@
+{
+ "title": "GTA VI Cheat Codes",
+ "checked": "2026-11-20",
+ "entry": "shoulder-pair",
+ "rowsPerPage": 10,
+ "pageUrl": "https://mayobebros.com/",
+ "description": "GTA VI cheat list for PS5 and Xbox Series X|S with the inputs reported so far.",
+ "cover": {
+  "kicker": "Unofficial player's guide",
+  "line": "Cheat Codes",
+  "tagline": "Every cheat named in the game, with the button inputs reported so far for PS5 and Xbox."
+ },
+ "start": {
+  "heading": "How to use this guide",
+  "paragraphs": [
+   "GTA VI came out on 19 November 2026. Rockstar has not published a cheat list, so every input here comes from outlets that tested the game in its first days. We show only what they report, and we say plainly what is not confirmed.",
+   "Reported by those outlets: cheats unlock only after you finish the story, and each one also has its own task. To enter one, press Up on the D-pad to open the phone, hold L1 (PS5) or LB (Xbox), press R1 or RB, then press the D-pad sequence. All inputs are D-pad only, so PS5 and Xbox differ just in the shoulder buttons."
+  ],
+  "cards": [
+   {
+    "title": "Trophies and saving",
+    "text": "Outlets report that using a cheat turns off trophies and achievements and stops saving for that play session. Save first."
+   },
+   {
+    "title": "One wrong press",
+    "text": "Several codes differ by one or two presses. A slip can start a different cheat, so enter each one slowly."
+   }
+  ],
+  "checked": "Checked on 20 November 2026 against PowerPyx, GamesRadar+, VICE, Red Bull, Insider Gaming and Dexerto. Most of these lists trace back to the same first source, and none showed independent proof, so no code is marked verified."
+ },
+ "table": {
+  "heading": "Cheat codes for PS5 and Xbox",
+  "note": "Enter after the phone: hold L1 or LB, press R1 or RB, then the arrows. Cheats with no input yet are named in the game but have no reliable code."
+ },
+ "closing": {
+  "heading": "Staying safe",
+  "cards": [
+   {
+    "title": "No downloads",
+    "text": "A real GTA VI cheat is typed on the controller. Any cheat download, trainer or generator is a scam."
+   },
+   {
+    "title": "Lists change",
+    "text": "Inputs are still being checked. Look at the guide page on mayobebros.com for updates."
+   }
+  ]
+ },
+ "unconfirmed": [],
+ "cheats": [
+  {
+   "name": "$250,000",
+   "effect": "Gives $250,000 at once",
+   "unlock": "Finish the story",
+   "status": "Reported",
+   "ps5": [
+    "L1",
+    "R1",
+    "Up",
+    "Right",
+    "Down",
+    "Left",
+    "Up",
+    "Left",
+    "Down",
+    "Right"
+   ],
+   "xbox": [
+    "LB",
+    "RB",
+    "Up",
+    "Right",
+    "Down",
+    "Left",
+    "Up",
+    "Left",
+    "Down",
+    "Right"
+   ]
+  },
+  {
+   "name": "Raise Heat Level",
+   "effect": "Raises your level of heat across the map",
+   "unlock": "Lose a 3-star wanted level 25 times",
+   "status": "Reported",
+   "ps5": [
+    "L1",
+    "R1",
+    "Left",
+    "Down",
+    "Right",
+    "Down",
+    "Up",
+    "Down",
+    "Up"
+   ],
+   "xbox": [
+    "LB",
+    "RB",
+    "Left",
+    "Down",
+    "Right",
+    "Down",
+    "Up",
+    "Down",
+    "Up"
+   ]
+  },
+  {
+   "name": "Unlimited Focus",
+   "effect": "Focus never runs out",
+   "unlock": "Finish the story",
+   "status": "Reported",
+   "ps5": [
+    "L1",
+    "R1",
+    "Down",
+    "Up",
+    "Up",
+    "Down",
+    "Up",
+    "Down",
+    "Up",
+    "Down",
+    "Up",
+    "Right"
+   ],
+   "xbox": [
+    "LB",
+    "RB",
+    "Down",
+    "Up",
+    "Up",
+    "Down",
+    "Up",
+    "Down",
+    "Up",
+    "Down",
+    "Up",
+    "Right"
+   ]
+  },
+  {
+   "name": "Body Armor",
+   "effect": "Adds body armor to your loadout",
+   "unlock": "Complete 100 workouts",
+   "status": "Reported",
+   "ps5": [
+    "L1",
+    "R1",
+    "Down",
+    "Up",
+    "Left",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Down",
+    "Down"
+   ],
+   "xbox": [
+    "LB",
+    "RB",
+    "Down",
+    "Up",
+    "Left",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Up",
+    "Down",
+    "Down"
+   ]
+  },
+  {
+   "name": "Max Ammo",
+   "effect": "Fills all ammo to maximum",
+   "unlock": "Win 25 bronze medals or better at shooting ranges",
+   "status": "Reported",
+   "ps5": [
+    "L1",
+    "R1",
+    "Down",
+    "Up",
+    "Right",
+    "Down",
+    "Left",
+    "Left",
+    "Up",
+    "Up",
+    "Down",
+    "Left"
+   ],
+   "xbox": [
+    "LB",
+    "RB",
+    "Down",
+    "Up",
+    "Right",
+    "Down",
+    "Left",
+    "Left",
+    "Up",
+    "Up",
+    "Down",
+    "Left"
+   ]
+  },
+  {
+   "name": "Infinite Ammo",
+   "effect": "Ammo never runs out",
+   "unlock": "Win 25 silver medals or better at shooting ranges",
+   "status": "Reported",
+   "ps5": [
+    "L1",
+    "R1",
+    "Down",
+    "Up",
+    "Right",
+    "Down",
+    "Left",
+    "Left",
+    "Up",
+    "Down",
+    "Down",
+    "Down"
+   ],
+   "xbox": [
+    "LB",
+    "RB",
+    "Down",
+    "Up",
+    "Right",
+    "Down",
+    "Left",
+    "Left",
+    "Up",
+    "Down",
+    "Down",
+    "Down"
+   ]
+  },
+  {
+   "name": "No Reload",
+   "effect": "Ammo never runs out and no reloading",
+   "unlock": "Win 25 gold medals at shooting ranges",
+   "status": "Reported",
+   "ps5": [
+    "L1",
+    "R1",
+    "Down",
+    "Up",
+    "Right",
+    "Down",
+    "Left",
+    "Left",
+    "Up",
+    "Down",
+    "Down",
+    "Up"
+   ],
+   "xbox": [
+    "LB",
+    "RB",
+    "Down",
+    "Up",
+    "Right",
+    "Down",
+    "Left",
+    "Left",
+    "Up",
+    "Down",
+    "Down",
+    "Up"
+   ]
+  },
+  {
+   "name": "Attack Force",
+   "effect": "Bullets and melee attacks launch targets on impact",
+   "unlock": "Finish the story",
+   "status": "Reported",
+   "ps5": [
+    "L1",
+    "R1",
+    "Down",
+    "Up",
+    "Left",
+    "Left",
+    "Right",
+    "Down",
+    "Down",
+    "Up",
+    "Down"
+   ],
+   "xbox": [
+    "LB",
+    "RB",
+    "Down",
+    "Up",
+    "Left",
+    "Left",
+    "Right",
+    "Down",
+    "Down",
+    "Up",
+    "Down"
+   ]
+  },
+  {
+   "name": "Exploding Balls",
+   "effect": "Sports balls explode on impact",
+   "unlock": "Hit 20 enemies with explosive damage",
+   "status": "Reported",
+   "ps5": [
+    "L1",
+    "R1",
+    "Down",
+    "Up",
+    "Left",
+    "Left",
+    "Right",
+    "Down",
+    "Down",
+    "Up",
+    "Right"
+   ],
+   "xbox": [
+    "LB",
+    "RB",
+    "Down",
+    "Up",
+    "Left",
+    "Left",
+    "Right",
+    "Down",
+    "Down",
+    "Up",
+    "Right"
+   ]
+  },
+  {
+   "name": "Vehicle Force",
+   "effect": "Vehicle collisions launch targets",
+   "unlock": "Kill 25 enemies with a vehicle",
+   "status": "Reported",
+   "ps5": [
+    "L1",
+    "R1",
+    "Down",
+    "Up",
+    "Left",
+    "Left",
+    "Right",
+    "Down",
+    "Left",
+    "Up",
+    "Down"
+   ],
+   "xbox": [
+    "LB",
+    "RB",
+    "Down",
+    "Up",
+    "Left",
+    "Left",
+    "Right",
+    "Down",
+    "Left",
+    "Up",
+    "Down"
+   ]
+  },
+  {
+   "name": "Maibatsu Boomazoom",
+   "effect": "Spawns a Maibatsu Boomazoom",
+   "unlock": "Complete 5 shopping challenges",
+   "status": "Reported",
+   "ps5": [
+    "L1",
+    "R1",
+    "Left",
+    "Up",
+    "Right",
+    "Down",
+    "Left",
+    "Left",
+    "Up",
+    "Left"
+   ],
+   "xbox": [
+    "LB",
+    "RB",
+    "Left",
+    "Up",
+    "Right",
+    "Down",
+    "Left",
+    "Left",
+    "Up",
+    "Left"
+   ]
+  },
+  {
+   "name": "MTL Pumper",
+   "effect": "Spawns an MTL Pumper (fire truck)",
+   "unlock": "Discover it in the Progress menu",
+   "status": "Reported",
+   "ps5": [
+    "L1",
+    "R1",
+    "Left",
+    "Up",
+    "Right",
+    "Down",
+    "Left",
+    "Right",
+    "Right",
+    "Up"
+   ],
+   "xbox": [
+    "LB",
+    "RB",
+    "Left",
+    "Up",
+    "Right",
+    "Down",
+    "Left",
+    "Right",
+    "Right",
+    "Up"
+   ]
+  },
+  {
+   "name": "HVY Bulldozer",
+   "effect": "Spawns an HVY Bulldozer",
+   "unlock": "Discover it in the Progress menu",
+   "status": "Reported",
+   "ps5": [
+    "L1",
+    "R1",
+    "Left",
+    "Up",
+    "Right",
+    "Down",
+    "Left",
+    "Right",
+    "Right",
+    "Down"
+   ],
+   "xbox": [
+    "LB",
+    "RB",
+    "Left",
+    "Up",
+    "Right",
+    "Down",
+    "Left",
+    "Right",
+    "Right",
+    "Down"
+   ]
+  },
+  {
+   "name": "Cycle Weather",
+   "effect": "Changes the weather",
+   "unlock": "Finish the story",
+   "status": "Reported",
+   "ps5": [
+    "L1",
+    "R1",
+    "Down",
+    "Right",
+    "Up",
+    "Down",
+    "Right",
+    "Up",
+    "Right"
+   ],
+   "xbox": [
+    "LB",
+    "RB",
+    "Down",
+    "Right",
+    "Up",
+    "Down",
+    "Right",
+    "Up",
+    "Right"
+   ]
+  },
+  {
+   "name": "Cataclysm",
+   "effect": "Fills the world with murky smoke",
+   "unlock": "Discover Martha's Vamos in the Progress menu",
+   "status": "Reported",
+   "ps5": [
+    "L1",
+    "R1",
+    "Down",
+    "Down",
+    "Up",
+    "Right",
+    "Right",
+    "Up",
+    "Left",
+    "Left",
+    "Right",
+    "Right"
+   ],
+   "xbox": [
+    "LB",
+    "RB",
+    "Down",
+    "Down",
+    "Up",
+    "Right",
+    "Right",
+    "Up",
+    "Left",
+    "Left",
+    "Right",
+    "Right"
+   ]
+  },
+  {
+   "name": "Dollhouse",
+   "effect": "Vivid filter with a narrow aspect ratio",
+   "unlock": "Spend 8 hours with your partner",
+   "status": "Reported",
+   "ps5": [
+    "L1",
+    "R1",
+    "Down",
+    "Down",
+    "Up",
+    "Right",
+    "Right",
+    "Up",
+    "Left",
+    "Left",
+    "Down",
+    "Right"
+   ],
+   "xbox": [
+    "LB",
+    "RB",
+    "Down",
+    "Down",
+    "Up",
+    "Right",
+    "Right",
+    "Up",
+    "Left",
+    "Left",
+    "Down",
+    "Right"
+   ]
+  },
+  {
+   "name": "Faded Glory",
+   "effect": "Colour CRT TV filter",
+   "unlock": "Rob 50 stores with your partner",
+   "status": "Reported",
+   "ps5": [
+    "L1",
+    "R1",
+    "Down",
+    "Down",
+    "Up",
+    "Right",
+    "Right",
+    "Up",
+    "Left",
+    "Left",
+    "Left",
+    "Right"
+   ],
+   "xbox": [
+    "LB",
+    "RB",
+    "Down",
+    "Down",
+    "Up",
+    "Right",
+    "Right",
+    "Up",
+    "Left",
+    "Left",
+    "Left",
+    "Right"
+   ]
+  },
+  {
+   "name": "Drunk",
+   "effect": "Makes you and your partner drunk",
+   "unlock": "Spend $2,500 on alcohol",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Raise Wanted Level",
+   "effect": "Raises your wanted level across the map",
+   "unlock": "Lose a 3-star wanted level 50 times",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "No Fall Damage",
+   "effect": "Immune to fall damage",
+   "unlock": "Survive a freefall from 40 feet 20 times",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Parachute",
+   "effect": "Adds a parachute to your loadout",
+   "unlock": "Complete 50 skydives or base jumps from 300 feet or higher",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Repair Vehicle",
+   "effect": "Fully repairs your current vehicle",
+   "unlock": "First place in 10 races at Gellhorn Raceway, Thrillbilly Mud Club and Boone Speedway",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Unlimited Nitrous",
+   "effect": "Nitrous and fuel never run out",
+   "unlock": "Complete 50 stunt jumps",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "All Explosive Weapons",
+   "effect": "Adds all explosive weapons with full ammo",
+   "unlock": "Throw 100 grenades",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Incendiary Ammo",
+   "effect": "All ammo is incendiary",
+   "unlock": "Burn 100 enemies with fire damage",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Exploding Bottles",
+   "effect": "All bottles explode when damaged",
+   "unlock": "Throw 100 Molotovs",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Explosive Shotgun",
+   "effect": "Adds a Mason & Keen Shortstraw firing explosive shells",
+   "unlock": "Hit 100 enemies with explosive damage",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Hauners H-AT",
+   "effect": "Adds a Hauners H-AT",
+   "unlock": "Blow up 100 vehicles",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Interstate Ambulance",
+   "effect": "Spawns it",
+   "unlock": "Discover it in the Progress menu",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Airboat 09",
+   "effect": "Spawns it",
+   "unlock": "Complete 5 survival challenges",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Bravado Banshee",
+   "effect": "Spawns it",
+   "unlock": "Complete all combat challenges",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Tuff BMX",
+   "effect": "Spawns it",
+   "unlock": "Complete 5 fitness challenges",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Nagasaki Carbon RS",
+   "effect": "Spawns it",
+   "unlock": "Complete all exploration challenges",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "'65 Vapid Dominator",
+   "effect": "Spawns it",
+   "unlock": "Complete all fitness challenges",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Progen Emerus",
+   "effect": "Spawns it",
+   "unlock": "Complete all vehicle challenges",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Inflatable Flamingo",
+   "effect": "Spawns it",
+   "unlock": "Destroy 50 cocaine flamingos",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Vapid Stanier G2 Taxi",
+   "effect": "Spawns it",
+   "unlock": "Complete 5 sports challenges",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Hauners P-996 Lazer",
+   "effect": "Spawns it",
+   "unlock": "Complete all challenges",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Lapwing Mallard",
+   "effect": "Spawns it",
+   "unlock": "Complete 5 vehicle challenges",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Brimstone Golfer",
+   "effect": "Spawns it",
+   "unlock": "Complete all sports challenges",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Hauners Rhino Tank",
+   "effect": "Spawns it",
+   "unlock": "Complete all survival challenges",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Maibatsu Sanchez",
+   "effect": "Spawns it",
+   "unlock": "Complete 5 criminal challenges",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Nagasaki Sea Sparrow",
+   "effect": "Spawns it",
+   "unlock": "Complete 5 exploration challenges",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Speeder 700 GT",
+   "effect": "Spawns it",
+   "unlock": "Complete 5 combat challenges",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Truffade Thrax",
+   "effect": "Spawns it",
+   "unlock": "Complete all shopping challenges",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Western Zombie Bobber",
+   "effect": "Spawns it",
+   "unlock": "Complete all criminal challenges",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Move Time Forward",
+   "effect": "Moves the time of day forward",
+   "unlock": "Find 10 collectible watches",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Pause Time of Day",
+   "effect": "Pauses the time of day",
+   "unlock": "Find 20 collectible watches",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Golden Hour",
+   "effect": "Golden filter, widescreen",
+   "unlock": "Spend 4 hours holding hands",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Powdered Sugar",
+   "effect": "White world with sparkles",
+   "unlock": "Scan all space debris with WAiNK",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Pinhole",
+   "effect": "Pinhole camera filter",
+   "unlock": "Clear 25 gang operations with your partner",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Neon Jungle",
+   "effect": "Neon highlights",
+   "unlock": "Discover all 16 Girlypop vehicles",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Yesteryear",
+   "effect": "Black and white CRT TV filter",
+   "unlock": "Discover the Ridgeway",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Videotape",
+   "effect": "Videotape-style filter",
+   "unlock": "Complete 50 activities with your partner",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Dark Mirror",
+   "effect": "Upside-down black world",
+   "unlock": "Make $500,000 selling vehicles",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Migraine",
+   "effect": "Blurred, distorted filter",
+   "unlock": "Survive 6 minutes with a 6-star wanted level",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Bubblegum",
+   "effect": "Purple and yellow world with sparkles",
+   "unlock": "Find all 24 Vice City Flamingos cards",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Fast Forward",
+   "effect": "Motion blur, faster clouds",
+   "unlock": "Complete 50 meditations",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Fisheye",
+   "effect": "Fisheye filter",
+   "unlock": "Catch 100 fish",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Pixel Art",
+   "effect": "Pixelated filter",
+   "unlock": "Make $250,000 selling collectibles",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  },
+  {
+   "name": "Hellscape",
+   "effect": "Red and orange world with heat haze",
+   "unlock": "Steal 100 cop vehicles",
+   "status": "Not confirmed",
+   "ps5": [],
+   "xbox": []
+  }
+ ]
+}
