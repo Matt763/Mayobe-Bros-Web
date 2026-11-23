@@ -2219,3 +2219,7 @@ html.mo-gliding { scroll-behavior: auto !important; overflow-anchor: none; }
 }
 @media (prefers-reduced-motion: reduce) { .obp, .obp.is-open { transform: none; transition: opacity 0.15s, visibility 0s linear 0.15s; } .obp.is-open { transition-delay: 0s; } }
 @media print { .obp { display: none !important; } }
+
+/* Picture credit in an article (2026-11-23): an italic-only line right after a picture is a small caption, not body text (the combination guides credit every photograph this way) */
+.article-content p:has(> img:only-child) + p:has(> em:only-child) { margin-top: -0.6rem; font-size: 0.875rem; line-height: 1.5; color: var(--text-3); }
+.article-content p:has(> img:only-child) + p:has(> em:only-child) > em { font-style: normal; }

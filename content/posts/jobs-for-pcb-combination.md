@@ -1,7 +1,7 @@
 ---
 title: Jobs and Degrees You Can Study With the PCB Combination
 date: 2026-04-24
-updated: 2026-11-03
+updated: 2026-11-23
 author: Mclean Mbaga
 category: educational
 label: study-tips
@@ -107,6 +107,17 @@ Starting early helps more than any trick.
 - **Form Five, later terms:** track your marks in each PCB subject. If one is far behind, ask for extra practice or a study group.
 - **Form Six, before NECTA:** do past papers under timed conditions, including practical work.
 - **After results:** check the TCU dates for applications in the current almanac, and apply only through the university websites. Nobody can sell you a place, and anyone who says they can is a risk to your money.
+
+## Compare PCB with other combinations
+
+If PCB does not feel right, these guides show where the other combinations lead:
+
+- [PCM](/post/educational/study-tips/jobs-for-pcm-combination/) for engineering, architecture and computing.
+- [CBG](/post/educational/study-tips/jobs-for-cbg-combination/) for agriculture, forestry and environment.
+- [CBN](/post/educational/study-tips/jobs-for-cbn-combination/) for nutrition, nursing and food science.
+- [PGM](/post/educational/study-tips/jobs-for-pgm-combination/) for surveying, land and planning.
+- [EGM](/post/educational/study-tips/jobs-for-egm-combination/) and [ECA](/post/educational/study-tips/jobs-for-eca-combination/) for economics, accounting and business.
+- Arts combinations: [HGL](/post/educational/study-tips/jobs-for-hgl-combination/), [HKL](/post/educational/study-tips/jobs-for-hkl-combination/), [HGK](/post/educational/study-tips/jobs-for-hgk-combination/) and [HGE](/post/educational/study-tips/jobs-for-hge-combination/).
 
 ## Choosing your combination well
 

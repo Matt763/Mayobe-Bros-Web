@@ -389,6 +389,14 @@
    "thumbBytes": 18847,
    "thumbQuality": 2
   },
+  "post:heslb-2026-27-loan-allocation-latest-news": {
+   "hash": "434db8d7e4b1b160837a57ebb01f93817146319a",
+   "source": "assets/posts/heslb-2026-27-loan-allocation-latest-news.webp",
+   "bytes": 77017,
+   "quality": 4,
+   "thumbBytes": 13015,
+   "thumbQuality": 2
+  },
   "post:heslb-loan-not-allocated-what-to-do-appeal": {
    "hash": "a590548d1ae928b7a9c392b4ddd9122d9f834e13",
    "source": "assets/posts/heslb-loan-not-allocated-what-to-do-appeal.webp",
@@ -581,12 +589,92 @@
    "thumbBytes": 8687,
    "thumbQuality": 2
   },
+  "post:jobs-for-cbg-combination": {
+   "hash": "62bd2729a780ce810bb0e7a0297edf2ceeba6713",
+   "source": "assets/posts/jobs-for-cbg-combination.webp",
+   "bytes": 83549,
+   "quality": 7,
+   "thumbBytes": 15458,
+   "thumbQuality": 2
+  },
+  "post:jobs-for-cbn-combination": {
+   "hash": "7b5e830f3c3c271fe0357556a6e918a0764ec1c4",
+   "source": "assets/posts/jobs-for-cbn-combination.webp",
+   "bytes": 87256,
+   "quality": 9,
+   "thumbBytes": 16648,
+   "thumbQuality": 2
+  },
+  "post:jobs-for-eca-combination": {
+   "hash": "a4fdcfe35f4c1cac16d8614efe250f9d0c87bd86",
+   "source": "assets/posts/jobs-for-eca-combination.webp",
+   "bytes": 88546,
+   "quality": 6,
+   "thumbBytes": 18224,
+   "thumbQuality": 2
+  },
+  "post:jobs-for-egm-combination": {
+   "hash": "e0485f8b04e6965b825a8252dbb7bb627d206a26",
+   "source": "assets/posts/jobs-for-egm-combination.webp",
+   "bytes": 91084,
+   "quality": 3,
+   "thumbBytes": 13751,
+   "thumbQuality": 2
+  },
+  "post:jobs-for-hge-combination": {
+   "hash": "26bf3f77e64b4badd20f09b40793b50e11d0905f",
+   "source": "assets/posts/jobs-for-hge-combination.webp",
+   "bytes": 80585,
+   "quality": 3,
+   "thumbBytes": 11738,
+   "thumbQuality": 2
+  },
+  "post:jobs-for-hgk-combination": {
+   "hash": "ac3fce6254445cee59f69fa02d2d0b5970f7758a",
+   "source": "assets/posts/jobs-for-hgk-combination.webp",
+   "bytes": 90179,
+   "quality": 6,
+   "thumbBytes": 15104,
+   "thumbQuality": 2
+  },
+  "post:jobs-for-hgl-combination": {
+   "hash": "2aa877033e8fe50aa74a15aef1e93dff1a24d13e",
+   "source": "assets/posts/jobs-for-hgl-combination.webp",
+   "bytes": 81251,
+   "quality": 5,
+   "thumbBytes": 12743,
+   "thumbQuality": 2
+  },
+  "post:jobs-for-hkl-combination": {
+   "hash": "ef88ef42dfe35baaf0e7c486bbd746c35f0e280f",
+   "source": "assets/posts/jobs-for-hkl-combination.webp",
+   "bytes": 79016,
+   "quality": 2,
+   "thumbBytes": 10479,
+   "thumbQuality": 2
+  },
   "post:jobs-for-pcb-combination": {
    "hash": "302fc35b4dd8862dfa39e288bd1d025efa5e4f5a",
    "source": "assets/posts/2fcbec2c95af.webp",
    "bytes": 87368,
    "quality": 3,
    "thumbBytes": 15261,
+   "thumbQuality": 2
+  },
+  "post:jobs-for-pcm-combination": {
+   "hash": "0f66e4e9e3f0873e2d932ec1d18e6b095025a5fc",
+   "source": "assets/posts/jobs-for-pcm-combination.webp",
+   "bytes": 90885,
+   "quality": 6,
+   "thumbBytes": 16460,
+   "thumbQuality": 2
+  },
+  "post:jobs-for-pgm-combination": {
+   "hash": "c4bedc369edd70b5b8d4bd890d2277d197737c34",
+   "source": "assets/posts/jobs-for-pgm-combination.webp",
+   "bytes": 91318,
+   "quality": 3,
+   "thumbBytes": 12114,
    "thumbQuality": 2
   },
   "post:julius-nyerere-ujamaa-explained": {
@@ -2110,6 +2198,66 @@
    "source": "assets/posts/how-to-find-an-internship-in-tanzania-real-or-fake.webp",
    "bytes": 57127,
    "quality": 2
+  },
+  "video:jobs-for-cbg-combination": {
+   "hash": "c6396ff28df0e107088858a471d3d2cc27fc9768",
+   "source": "assets/posts/jobs-for-cbg-combination.webp",
+   "bytes": 89656,
+   "quality": 5
+  },
+  "video:jobs-for-cbn-combination": {
+   "hash": "6322e0bd986f93e9f4c2376373badff0550886f9",
+   "source": "assets/posts/jobs-for-cbn-combination.webp",
+   "bytes": 86820,
+   "quality": 7
+  },
+  "video:jobs-for-eca-combination": {
+   "hash": "62dd70b176cf9355cab56f486de760b8ec1cbb26",
+   "source": "assets/posts/jobs-for-eca-combination.webp",
+   "bytes": 84280,
+   "quality": 5
+  },
+  "video:jobs-for-egm-combination": {
+   "hash": "ea153eef5b0b46e8c62e95f69e7b0c8910f6c36e",
+   "source": "assets/posts/jobs-for-egm-combination.webp",
+   "bytes": 77659,
+   "quality": 3
+  },
+  "video:jobs-for-hge-combination": {
+   "hash": "4552c5b96cdc07fa2e0e49c7ea2cf7ce336258cf",
+   "source": "assets/posts/jobs-for-hge-combination.webp",
+   "bytes": 90208,
+   "quality": 2
+  },
+  "video:jobs-for-hgk-combination": {
+   "hash": "f8878ecb0b556af2c5f1cc2296b452ad5b44910f",
+   "source": "assets/posts/jobs-for-hgk-combination.webp",
+   "bytes": 85137,
+   "quality": 5
+  },
+  "video:jobs-for-hgl-combination": {
+   "hash": "642c889fac8e6db410c39bb87c72d539c5e98209",
+   "source": "assets/posts/jobs-for-hgl-combination.webp",
+   "bytes": 78707,
+   "quality": 4
+  },
+  "video:jobs-for-hkl-combination": {
+   "hash": "90cf168bc06ef9b909a9b6cb45711e9b3df7d7fd",
+   "source": "assets/posts/jobs-for-hkl-combination.webp",
+   "bytes": 70130,
+   "quality": 2
+  },
+  "video:jobs-for-pcm-combination": {
+   "hash": "880423b41deaa40ebe1c8c78c069d0bf92801950",
+   "source": "assets/posts/jobs-for-pcm-combination.webp",
+   "bytes": 86014,
+   "quality": 5
+  },
+  "video:jobs-for-pgm-combination": {
+   "hash": "4fdd6a18c210afc0f7ff286fbbcbd7abfe4f2aed",
+   "source": "assets/posts/jobs-for-pgm-combination.webp",
+   "bytes": 75704,
+   "quality": 3
   }
  }
 }

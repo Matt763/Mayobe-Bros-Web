@@ -1,6 +1,11 @@
 {
  "note": "Hashes of what each assets/share/*.jpg was drawn from. Written by scripts/build.mjs. Do not edit.",
  "cards": {
+  "site": {
+   "hash": "af26339eb6839f79045c59271b40559de64b2244",
+   "bytes": 71491,
+   "quality": 2
+  },
   "category-educational": {
    "hash": "231a7705af83634de36b0968c4e66e53cee1d402",
    "bytes": 154166,
@@ -1456,9 +1461,59 @@
    "bytes": 126669,
    "quality": 2
   },
-  "site": {
-   "hash": "af26339eb6839f79045c59271b40559de64b2244",
-   "bytes": 71491,
+  "post-jobs-for-cbg-combination": {
+   "hash": "be3a0b703b1e554474cb69666149ca59e5a02c37",
+   "bytes": 156504,
+   "quality": 2
+  },
+  "post-jobs-for-cbn-combination": {
+   "hash": "6bbccaa0eea36d27f8f4178222aa3abd97835d07",
+   "bytes": 161855,
+   "quality": 3
+  },
+  "post-jobs-for-eca-combination": {
+   "hash": "9973fabe838378ab6cc408714f4326d228dfd9a5",
+   "bytes": 160218,
+   "quality": 2
+  },
+  "post-jobs-for-egm-combination": {
+   "hash": "f6c8eecb0f98846df4c2118a3e835d4bf7ab812b",
+   "bytes": 111618,
+   "quality": 2
+  },
+  "post-heslb-2026-27-loan-allocation-latest-news": {
+   "hash": "4263190336f166e7174dfd005b4f28736f543ad1",
+   "bytes": 112179,
+   "quality": 2
+  },
+  "post-jobs-for-hgk-combination": {
+   "hash": "f60d1b95164bfe2496edb62c753f06270bff557b",
+   "bytes": 158085,
+   "quality": 2
+  },
+  "post-jobs-for-hgl-combination": {
+   "hash": "d535eebcdef406103a936043cbf021a81407818f",
+   "bytes": 126809,
+   "quality": 2
+  },
+  "post-jobs-for-hkl-combination": {
+   "hash": "f531d804a975e6278b4693c5e38f4af1700a6112",
+   "bytes": 87360,
+   "quality": 2
+  },
+  "post-jobs-for-pcm-combination": {
+   "hash": "ba3b5136a0718cb6373dda60e9eeab88d42b2f7b",
+   "bytes": 162572,
+   "quality": 2
+  },
+  "post-jobs-for-pgm-combination": {
+   "hash": "928a869bc87944931c6eee0455e6ee07e492897c",
+   "bytes": 116484,
+   "quality": 2
+  },
+  "post-jobs-for-hge-combination": {
+   "hash": "79e54ddb35fb84dc2fc8799bf9021c06647c0720",
+   "bytes": 110991,
    "quality": 2
   }
  }

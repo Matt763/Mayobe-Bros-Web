@@ -301,6 +301,13 @@ for (const file of postFiles) {
   } else if (excerpt.length > 190) warn(where, `excerpt is ${excerpt.length} characters; search engines cut it near 160`);
   if (!data.image) warn(where, 'no "image"; the category picture is shown instead');
   else if (/^\/?assets\//.test(String(data.image)) && !fs.existsSync(path.join(ROOT, String(data.image).replace(/^\//, '')))) fail(where, `image file not found: ${data.image}`);
+  // heroImage: a different picture for the article's own hero (the cover in `image` stays what cards, search, link previews and emails use);
+  // used by the combination guides, whose cover carries a badge that would sit under the title in the hero. A local file like image:
+  if (data.heroImage) {
+    if (!/^\/?assets\//.test(String(data.heroImage))) fail(where, `heroImage must be a picture in assets/ (got ${data.heroImage})`);
+    else if (!fs.existsSync(path.join(ROOT, String(data.heroImage).replace(/^\//, '')))) fail(where, `heroImage file not found: ${data.heroImage}`);
+    if (!data.heroImageAlt) warn(where, 'heroImage has no "heroImageAlt"; the hero picture is shown without a description');
+  }
   // emailImage: only when the cover cannot be used in email (for example it shows real company logos); a local file like image:
   if (data.emailImage) {
     if (!/^\/?assets\//.test(String(data.emailImage))) fail(where, `emailImage must be a picture in assets/ (got ${data.emailImage})`);
@@ -349,6 +356,8 @@ for (const file of postFiles) {
     date, updated, category: cat, label, sections: sectionSlugs, excerpt,
     image: data.image ? String(data.image) : '',
     imageAlt: data.imageAlt ? String(data.imageAlt) : '',
+    heroImage: data.heroImage ? String(data.heroImage) : '',
+    heroImageAlt: data.heroImage && data.heroImageAlt ? String(data.heroImageAlt) : '',
     emailImage: data.emailImage ? String(data.emailImage) : '',
     emailImageAlt: data.emailImage && data.emailImageAlt ? String(data.emailImageAlt) : '',
     imageCredit: data.imageCredit ? String(data.imageCredit) : '',

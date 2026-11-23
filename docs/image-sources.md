@@ -298,3 +298,47 @@ Section heroes of Examination Past Papers, `assets/img/heroes/papers-csee.webp`,
 
 ## Home hero video and picture (2026-11-22)
 `assets/video/home/mayobebros-*` and `assets/img/hero*.webp` (frame 1 of the video): a giraffe standing on a hill above farmland and a mountain, 1920x1080, 25 fps, 29 s, from the owner's download `5214219-hd_1920_1080_25fps.mp4`. The file name follows Pexels' scheme (video 5214219, Pexels licence: free for commercial use, credit not required). **Still to add here: the Pexels page link and the film-maker's name** (Pexels blocked an automatic lookup). Made with `scripts/tools/make-hero-video.mjs`.
+
+## A-Level combination guides (2026-11-23): real photographs from Wikimedia Commons, credited, with designs added
+Each picture is a real, openly licensed photograph from Wikimedia Commons (licence read on the file page by the writing agents; the author and licence are shown under every picture in the article and in the post's `imageCredit`). **Mayobe Bros adds a design to each one**, drawn in code by `scripts/tools/combo-cover-art.html` and made by `node scripts/tools/make-combo-covers.mjs`: (1) the **cover** `jobs-for-<code>-combination.webp` (1400 x 788; cards, search, link previews, e-mail, and the first picture in the article): a badge with the combination's letters, its three subjects and one icon each; (2) the **hero** `jobs-for-<code>-combination-hero.webp` (1800 x 900; `heroImage:`, behind the title; no text): a navy grade, thin rings and one icon disc per subject; (3) the **inline** pictures `-2`, `-3`: a small label saying what the photograph shows. No logo, no promise, nothing that changes what the photograph shows. The untouched photographs (cropped to 16:9 where needed, never upscaled) are the tool's inputs in `scripts/tools/data/combo-photos/<code>.webp`, `<code>-2.webp`, `<code>-3.webp`; they are not in `assets/`. Because each picture is an adaptation, its credit says "Cropped, with designs added by Mayobe Bros" and, for CC BY-SA photographs (4.0 and 2.0), "shared under the same licence". Public-domain photographs (author release) need no credit, which is given anyway. Contrast of every text zone was measured on the rendered pixels (`~/design-tools/contrast-qa.cjs`): lowest 6.2:1.
+
+| File in `assets/posts/` | Used by (post `jobs-for-<code>-combination`) | Source and licence |
+| --- | --- | --- |
+| `jobs-for-pcm-combination.webp` | pcm (cover, badge, blueprint grid and Engineering route tag added) | Erasmus Kamugisha, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:TRC_train_from_Moshi_to_Dar_es_Salaam,_19-02-2020.jpg |
+| `jobs-for-pcm-combination-hero.webp` | pcm (hero, design added) | Erasmus Kamugisha, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:TRC_train_from_Moshi_to_Dar_es_Salaam,_19-02-2020.jpg |
+| `jobs-for-pcm-combination-2.webp` | pcm | Mangapwani, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Tanzanite_Bridge,_Ilala_MC,_Dar_es_Salaam.jpg |
+| `jobs-for-pcm-combination-3.webp` | pcm (label added) | Checamj04, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Labpractice.jpg |
+| `jobs-for-pgm-combination.webp` | pgm (cover, badge, blueprint grid and mining tag added) | Gordon Greenall, CC BY-SA 2.0, https://commons.wikimedia.org/wiki/File:Geita_open_pit_gold_mine.jpg |
+| `jobs-for-pgm-combination-hero.webp` | pgm (hero, design added) | Gordon Greenall, CC BY-SA 2.0, https://commons.wikimedia.org/wiki/File:Geita_open_pit_gold_mine.jpg |
+| `jobs-for-pgm-combination-2.webp` | pgm (label added) | Petty Officer 3rd Class Timothy Schumaker, US Navy, public domain, https://commons.wikimedia.org/wiki/File:USS_Ronald_Reagan_aircraft_maintenance_140728-N-UK306-049.jpg |
+| `jobs-for-pgm-combination-3.webp` | pgm | AlhadjiKitti, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Civil_engineering_students_at_work.jpg |
+| `jobs-for-cbg-combination.webp` | cbg (cover, badge added) | Mkanza Benson Tanu, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Uluguru_mountains.jpg |
+| `jobs-for-cbg-combination-hero.webp` | cbg (hero, design added) | Mkanza Benson Tanu, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Uluguru_mountains.jpg |
+| `jobs-for-cbg-combination-2.webp` | cbg | ILRI, CC BY 2.0, https://commons.wikimedia.org/wiki/File:On-station_demonstration_of_at_Sokoine_University_of_Agriculture_(Tanzania).jpg |
+| `jobs-for-cbg-combination-3.webp` | cbg | Josefito123, CC BY 4.0, https://commons.wikimedia.org/wiki/File:Parinari_Forest,_Dabaga,_Kilolo_District,_Tanzania_20251205_105908.jpg |
+| `jobs-for-cbn-combination.webp` | cbn (cover, badge added) | Agness Abubakar Saidi, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Fresh_fruits_and_vegetables_at_a_local_market_in_Kilimanjaro_Region,_Tanzania.jpg |
+| `jobs-for-cbn-combination-hero.webp` | cbn (hero, design added) | Agness Abubakar Saidi, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Fresh_fruits_and_vegetables_at_a_local_market_in_Kilimanjaro_Region,_Tanzania.jpg |
+| `jobs-for-cbn-combination-2.webp` | cbn | Rwebogora, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Cooking_cassava_porridge.jpg |
+| `jobs-for-egm-combination.webp` | egm (cover, badge added) | Isingo Raphael, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:A_view_of_container_ships_at_coco_beach.jpg |
+| `jobs-for-egm-combination-hero.webp` | egm (hero, design added) | Isingo Raphael, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:A_view_of_container_ships_at_coco_beach.jpg |
+| `jobs-for-egm-combination-2.webp` | egm | Moongateclimber, public domain (author release), https://commons.wikimedia.org/wiki/File:Kariakoo_market_dar_es_salaam.jpg |
+| `jobs-for-eca-combination.webp` | eca (cover, badge added) | Erasmus Kamugisha, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Darajani_market_fruit_sellers.jpg |
+| `jobs-for-eca-combination-hero.webp` | eca (hero, design added) | Erasmus Kamugisha, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Darajani_market_fruit_sellers.jpg |
+| `jobs-for-eca-combination-2.webp` | eca | Moongateclimber, public domain (author release), https://commons.wikimedia.org/wiki/File:Kariakoo_market_dar_es_salaam_2.jpg |
+| `jobs-for-hgl-combination.webp` | hgl (cover, badge added) | Ronyyz, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:High_Court_of_Zanzibar.jpg |
+| `jobs-for-hgl-combination-hero.webp` | hgl (hero, design added) | Ronyyz, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:High_Court_of_Zanzibar.jpg |
+| `jobs-for-hgl-combination-2.webp` | hgl | Michael Nowlan, CC BY 2.0, https://commons.wikimedia.org/wiki/File:Saint_Augustine_University_of_Tanzania_-_Library.jpg |
+| `jobs-for-hkl-combination.webp` | hkl (cover, badge added) | Seemannaufland, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Students_in_classroom_Tanzania.JPG |
+| `jobs-for-hkl-combination-hero.webp` | hkl (hero, design added) | Seemannaufland, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Students_in_classroom_Tanzania.JPG |
+| `jobs-for-hgk-combination.webp` | hgk (cover, badge added) | Adam Jones, CC BY-SA 2.0, https://commons.wikimedia.org/wiki/File:Detail_of_Carved_Wooden_Door_-_Stone_Town_-_Zanzibar_-_Tanzania_(8841700340).jpg |
+| `jobs-for-hgk-combination-hero.webp` | hgk (hero, design added) | Adam Jones, CC BY-SA 2.0, https://commons.wikimedia.org/wiki/File:Detail_of_Carved_Wooden_Door_-_Stone_Town_-_Zanzibar_-_Tanzania_(8841700340).jpg |
+| `jobs-for-hgk-combination-2.webp` | hgk | Diego Delso, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Fuerte_Viejo,_Stone_Town,_Zanz%C3%ADbar,_Tanzania,_2024-05-31,_DD_32.jpg |
+| `jobs-for-hge-combination.webp` | hge (cover, badge added) | David Stanley, CC BY 2.0, https://commons.wikimedia.org/wiki/File:Dar_Es_Salaam_Skyline_(34011488084).jpg |
+| `jobs-for-hge-combination-hero.webp` | hge (hero, design added) | David Stanley, CC BY 2.0, https://commons.wikimedia.org/wiki/File:Dar_Es_Salaam_Skyline_(34011488084).jpg |
+| `jobs-for-hge-combination-2.webp` | hge | Diego Delso, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Puerto_de_Stone_Town,_Zanz%C3%ADbar,_Tanzania,_2024-05-31,_DD_01.jpg |
+
+
+## HESLB 2026/27 news post (2026-11-23)
+| File in `assets/posts/` | Used by | Source and licence |
+| --- | --- | --- |
+| `heslb-2026-27-loan-allocation-latest-news.webp` | heslb-2026-27-loan-allocation-latest-news.md | University of Dodoma main building, Job de Graaf, CC BY 2.0, https://commons.wikimedia.org/wiki/File:University_of_Dodoma.jpg (cropped 16:9, converted to WebP) |

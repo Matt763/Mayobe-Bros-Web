@@ -1,6 +1,7 @@
 ---
 title: No HESLB Loan Allocated? How the Appeal Works
 date: 2026-11-04
+updated: 2026-11-23
 author: Mclean Mbaga
 category: educational
 label: results
@@ -117,3 +118,5 @@ A loan result is one answer on one day. Keep going step by step, and ask for hel
 - [Issuance of Loans to Bachelor's Degree Students for Academic Year 2025/2026, HESLB](https://www.heslb.go.tz/images/storage/downloads/1761641337_bachelors-degree-students-for-2025-2026.pdf)
 - [News and public notices, HESLB](https://www.heslb.go.tz/news)
 - [HESLB home page with OLAMS link and 2026/27 guidelines, HESLB](https://www.heslb.go.tz)
+
+Latest news: see the newest HESLB allocation lists in [HESLB 2026/27 loans: 46,435 more students allocated](/post/tanzania-news/heslb-2026-27-loan-allocation-latest-news/).

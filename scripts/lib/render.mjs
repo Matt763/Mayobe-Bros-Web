@@ -1648,8 +1648,8 @@ ${withIds.html}
     const body = `<article class="post">
   ${hero({
     kind: 'post',
-    image: resolveImage(p.image || p.category.image || config.heroImage),
-    alt: p.imageAlt || '',
+    image: resolveImage(p.heroImage || p.image || p.category.image || config.heroImage),
+    alt: (p.heroImage ? p.heroImageAlt : p.imageAlt) || '',
     title: e(p.title),
     sub: p.excerpt,
     extra: `<div class="post-chips">
@@ -1710,7 +1710,7 @@ ${newsletter ? oldBlogPrompt() : ''}
         imageAlt: p.imageAlt,
         type: 'article',
         adKind: 'post',
-        preload: resolveImage(p.image || p.category.image || config.heroImage),
+        preload: resolveImage(p.heroImage || p.image || p.category.image || config.heroImage),
         article: { published, modified, section: p.category.name, author: p.author, authorUrl: author ? abs(`/author/${author.slug}/`) : '', tags: p.tags },
         bodyClass: 'page-post',
         listen: true,

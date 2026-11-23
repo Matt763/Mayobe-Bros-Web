@@ -1,7 +1,7 @@
 ---
 title: HESLB Student Loans in Tanzania: How to Apply and Repay
 date: 2026-04-23
-updated: 2026-11-03
+updated: 2026-11-23
 author: Mclean Mbaga
 category: educational
 label: study-tips
@@ -124,3 +124,5 @@ For more help with your studies once the money is sorted, see our post on [study
 - [HESLB official website (home page, application status, contacts)](https://www.heslb.go.tz)
 - [Application guidelines page, HESLB](https://www.heslb.go.tz/loanapplication/application-guideline)
 - [How 15pc deductions helped HESLB double loan recovery, The Citizen (2017, updated 2021)](https://www.thecitizen.co.tz/tanzania/news/national/how-15pc-deductions-helped-heslb-double-loan-recovery-2588942)
+
+Latest news: see the newest HESLB allocation lists in [HESLB 2026/27 loans: 46,435 more students allocated](/post/tanzania-news/heslb-2026-27-loan-allocation-latest-news/).

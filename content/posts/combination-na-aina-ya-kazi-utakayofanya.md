@@ -1,7 +1,7 @@
 ---
 title: How Your A-Level Combination Affects Your Career in Tanzania
 date: 2026-04-10
-updated: 2026-11-18
+updated: 2026-11-23
 author: Mclean Mbaga
 category: educational
 excerpt: How a Form Five combination such as PCM, PCB, CBG or EGM relates to university programmes and work in Tanzania, using the 2026/27 TCU guidebook.
@@ -52,27 +52,60 @@ Two things stand out. First, health programmes are narrow, because they depend o
 
 ## Common combinations and where they lead
 
-Schools in Tanzania use short names such as PCM or PCB. The meaning depends on your school's list, so ask the headmaster or academic master (the teacher in charge of subjects and exams). The ones below are widely used.
+Schools in Tanzania use short names such as PCM or PCB. The meaning depends on your school's list, so ask the headmaster or academic master (the teacher in charge of subjects and exams). The Form Five selection list published by TAMISEMI, the office that places students, calls these choices "tahasusi" and spells out the subjects behind each code. The ones below are widely used. For each one we wrote a full guide with its own degree table, so use the short notes here to find your group, then open the guide.
 
 ### PCM: Physics, Chemistry, Mathematics
 
-PCM is the usual science route into engineering and architecture-related degrees, and also into many science and computing programmes. Civil engineering in the guidebook asks for Advanced Mathematics and Physics, which PCM provides. PCM does not meet the three-subject rule for medicine, which asks for Biology.
+PCM is the usual science route into engineering and architecture-related degrees, and also into many science and computing programmes. Civil engineering in the guidebook asks for Advanced Mathematics and Physics, which PCM provides. PCM does not meet the three-subject rule for medicine, which asks for Biology. Read the full guide: [PCM combination degrees and jobs](/post/educational/study-tips/jobs-for-pcm-combination/).
 
 ### PCB: Physics, Chemistry, Biology
 
 PCB is the standard route for medicine, dentistry, pharmacy and medical laboratory sciences. We wrote a separate guide on [jobs and degrees for the PCB combination](/post/educational/study-tips/jobs-for-pcb-combination/).
 
+### PGM: Physics, Geography, Mathematics
+
+PGM mixes numbers with the study of land and place. It points to surveying, mapping, land and planning degrees, and some science teaching. It does not meet entries that ask for Chemistry, such as the geology degree at one university. See [PGM jobs and degrees in land, maps and planning](/post/educational/study-tips/jobs-for-pgm-combination/).
+
 ### CBG: Chemistry, Biology, Geography
 
-CBG is a science and environment combination. It can lead to degrees in agriculture, environmental subjects, food science and science teaching. It does not satisfy the Physics, Chemistry, Biology rule for medicine, so check before you pick it if you want a health degree. Some nursing and environmental health entries accept Chemistry and Biology with another subject, so look at each one.
+CBG is a science and environment combination. It can lead to degrees in agriculture, environmental subjects, food science and science teaching. It does not satisfy the Physics, Chemistry, Biology rule for medicine, so check before you pick it if you want a health degree. Some nursing and environmental health entries accept Chemistry and Biology with another subject, so look at each one. Our guide: [CBG degrees, jobs and limits](/post/educational/study-tips/jobs-for-cbg-combination/).
+
+### CBN: Chemistry, Biology, Nutrition
+
+CBN keeps the health door partly open through nursing, nutrition, environmental health and food science, though some universities ask for Physics. The guide explains which entries fit: [CBN nutrition, nursing and food science degrees](/post/educational/study-tips/jobs-for-cbn-combination/).
 
 ### EGM: Economics, Geography, Mathematics
 
-EGM suits economics, statistics, planning, and many business and social science degrees. Mathematics gives you an advantage in subjects such as statistics, where the guidebook lists a mathematics requirement.
+EGM suits economics, statistics, planning, and many business and social science degrees. Mathematics gives you an advantage in subjects such as statistics, where the guidebook lists a mathematics requirement. Read [EGM degrees and jobs](/post/educational/study-tips/jobs-for-egm-combination/).
+
+### ECA: Economics, Commerce, Accountancy
+
+ECA is built for accounting, finance, business and tax careers. See [ECA accounting, finance and business careers](/post/educational/study-tips/jobs-for-eca-combination/) for the degrees and the professional accountancy path.
 
 ### Arts combinations
 
-Combinations built on History, Geography, Kiswahili, English or Literature lead to teaching (BA with Education), law, journalism, public administration and language degrees. The guidebook lists these subjects for arts teaching degrees, and the minimum for such degrees is 4.0 points from two subjects at several universities.
+Combinations built on History, Geography, Kiswahili, English or Literature lead to teaching (BA with Education), law, journalism, public administration and language degrees. The guidebook lists these subjects for arts teaching degrees, and the minimum for such degrees is 4.0 points from two subjects at several universities. We wrote a guide for each of the four most common ones:
+
+- **HGL** (History, Geography, English Language): [HGL degrees, law and jobs](/post/educational/study-tips/jobs-for-hgl-combination/)
+- **HKL** (History, Kiswahili, English Language): [is HKL a good combination?](/post/educational/study-tips/jobs-for-hkl-combination/)
+- **HGK** (History, Geography, Kiswahili): [HGK teaching, law, Kiswahili and public service paths](/post/educational/study-tips/jobs-for-hgk-combination/)
+- **HGE** (History, Geography, Economics): [HGE economics, planning, law and teaching degrees](/post/educational/study-tips/jobs-for-hge-combination/)
+
+### Quick finder: which guide should you read?
+
+| If you want to work in | Start with |
+|---|---|
+| Medicine, pharmacy, dentistry, laboratory work | [PCB](/post/educational/study-tips/jobs-for-pcb-combination/) |
+| Engineering, architecture, computing | [PCM](/post/educational/study-tips/jobs-for-pcm-combination/) |
+| Surveying, land, mapping, planning | [PGM](/post/educational/study-tips/jobs-for-pgm-combination/) |
+| Farming, forestry, environment, wildlife | [CBG](/post/educational/study-tips/jobs-for-cbg-combination/) |
+| Nutrition, nursing, food science | [CBN](/post/educational/study-tips/jobs-for-cbn-combination/) |
+| Economics, statistics, development | [EGM](/post/educational/study-tips/jobs-for-egm-combination/) or [HGE](/post/educational/study-tips/jobs-for-hge-combination/) |
+| Accounting, finance, business | [ECA](/post/educational/study-tips/jobs-for-eca-combination/) |
+| Law, journalism, tourism | [HGL](/post/educational/study-tips/jobs-for-hgl-combination/) or [HKL](/post/educational/study-tips/jobs-for-hkl-combination/) |
+| Teaching arts subjects, Kiswahili, public service | [HGK](/post/educational/study-tips/jobs-for-hgk-combination/) |
+
+This table is a starting point, not a rule. Many degrees accept more than one combination, so always read the entry for your exact programme.
 
 ## Jobs and faculties with their usual subject combinations
 
@@ -378,9 +411,10 @@ If you did not get the combination you wanted, ask the school what is possible, 
 2. **Find each career's degree.** Search the TCU guidebook for the programme name.
 3. **Write down the required subjects and points.** Note differences between universities.
 4. **Compare with your Form Four results.** If you are weak in a subject, ask whether you can improve it before registration.
-5. **Ask your school.** Not every school offers every combination. Ask which ones your school runs and how many students they take.
-6. **Talk to people who do the work.** A nurse, an accountant or a teacher can tell you what a normal week looks like.
-7. **Pick a backup.** Choose a second degree that your combination also allows.
+5. **Open your combination's guide.** The [quick finder above](#quick-finder-which-guide-should-you-read) sends you to the right one.
+6. **Ask your school.** Not every school offers every combination. Ask which ones your school runs and how many students they take.
+7. **Talk to people who do the work.** A nurse, an accountant or a teacher can tell you what a normal week looks like.
+8. **Pick a backup.** Choose a second degree that your combination also allows.
 
 ## Three hypothetical examples
 
@@ -432,6 +466,7 @@ For most degrees the general minimum is 4.0 points from two subjects. Health deg
 ## Sources and further reading
 
 - [Admission Guidebook for Holders of Secondary School Qualifications 2026/27, Tanzania Commission for Universities](https://tcu.go.tz/sites/default/files/public_notices/2026-07/Admission%20Guidebook%20for%20Holders%20of%20Secondary%20School%20Qualifications_2026_2027.pdf)
+- [Tahasusi (combinations) list, TAMISEMI Form Five selection](https://selform.tamisemi.go.tz/tahasusi/)
 - [Vocational Education and Training Authority (VETA)](https://www.veta.go.tz)
 
 Entry requirements were read in the 2026/27 guidebook in November 2026. They change every year, and individual universities add their own rules.
