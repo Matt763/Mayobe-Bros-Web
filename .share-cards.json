@@ -1,11 +1,6 @@
 {
  "note": "Hashes of what each assets/share/*.jpg was drawn from. Written by scripts/build.mjs. Do not edit.",
  "cards": {
-  "site": {
-   "hash": "8379f246cd50c6d50991a6a7105ada781a915c4e",
-   "bytes": 97963,
-   "quality": 2
-  },
   "category-educational": {
    "hash": "231a7705af83634de36b0968c4e66e53cee1d402",
    "bytes": 154166,
@@ -154,6 +149,91 @@
   "category-tanzania-news": {
    "hash": "cdf24bac5b627cb1fea511b4885af837f09448cd",
    "bytes": 183233,
+   "quality": 2
+  },
+  "post-afcon-2027-tanzania-what-is-confirmed": {
+   "hash": "3bf7a7655107b1ed932ff8bf31e613ac5d9fce8e",
+   "bytes": 190380,
+   "quality": 3
+  },
+  "post-alphonce-simbu-world-marathon-champion-tanzania": {
+   "hash": "ba318755bfdd963610d9341ea44a113a7b489309",
+   "bytes": 151034,
+   "quality": 2
+  },
+  "post-bank-of-tanzania-interest-rate-6-25-percent-explained": {
+   "hash": "ac94fe98603311afe677a1dc0a7168c48faddb86",
+   "bytes": 96507,
+   "quality": 2
+  },
+  "post-dar-es-salaam-port-record-cargo-kwala-dry-port-sgr": {
+   "hash": "c46339feb0d2440985de6401032ac7a3799728b6",
+   "bytes": 161189,
+   "quality": 2
+  },
+  "post-finance-act-2026-tanzania-what-changed-for-you": {
+   "hash": "2e8aa6fbe89c81d352fde0658143f9d47fdf512f",
+   "bytes": 180064,
+   "quality": 3
+  },
+  "post-gta-6-cheat-codes-list-ps5-xbox": {
+   "hash": "e5517c361cfd75a1affcfef2d7998bbe286cae9d",
+   "bytes": 103338,
+   "quality": 2
+  },
+  "post-gta-6-pc-release-date-what-pc-players-know-so-far": {
+   "hash": "8ad2f7b79d5f27810069f13fad01f98140302b42",
+   "bytes": 133836,
+   "quality": 2
+  },
+  "post-nida-national-id-new-card-2026-how-to-get-yours": {
+   "hash": "3ccdbce805f50d8617994aca78e40ed3c251c4de",
+   "bytes": 174008,
+   "quality": 4
+  },
+  "post-nyerere-dam-tanzania-electricity-surplus-why-power-cuts-continue": {
+   "hash": "d1f9c81fc0acf8966ebcf24e8615c991fc9aceb8",
+   "bytes": 62243,
+   "quality": 2
+  },
+  "post-sgr-train-tanzania-dar-es-salaam-dodoma-fares-tickets": {
+   "hash": "bde1aa5df0d1e9af3eae067809ad46d4bb5bf6ce",
+   "bytes": 191934,
+   "quality": 2
+  },
+  "post-tanzania-clean-cooking-strategy-lpg-charcoal": {
+   "hash": "c0a72671c648cee2776665f2f687fa4bdf22e72d",
+   "bytes": 162179,
+   "quality": 2
+  },
+  "post-tanzania-el-nino-rains-floods-what-to-do": {
+   "hash": "1fa834c3d73aba3f2e164939cc67b9448ea06c5c",
+   "bytes": 124686,
+   "quality": 2
+  },
+  "post-tanzania-fertiliser-subsidy-how-it-works": {
+   "hash": "b5c18ce9861acbe3e55911bd1b82816bc169ff4d",
+   "bytes": 180443,
+   "quality": 5
+  },
+  "post-mandatory-electronic-payments-tanzania-order-2026": {
+   "hash": "8f1a71784fae2ef944ae9e417f45a58423055919",
+   "bytes": 175501,
+   "quality": 2
+  },
+  "post-tanzania-world-heritage-sites-explained": {
+   "hash": "5a9cb270a49bff44278f88c8440949775be6c42a",
+   "bytes": 115171,
+   "quality": 2
+  },
+  "post-tanzania-ten-years-compulsory-education-what-changes": {
+   "hash": "36d2ac2680d26c8f9167d20549b31f06f38675e0",
+   "bytes": 163771,
+   "quality": 2
+  },
+  "post-universal-health-insurance-tanzania-fahari-afya-explained": {
+   "hash": "29afc8f6bb3db04621309200099bc9be408452f2",
+   "bytes": 153339,
    "quality": 2
   },
   "post-efootball-vs-ea-sports-fc-which-football-game-to-play": {
@@ -1376,89 +1456,9 @@
    "bytes": 126669,
    "quality": 2
   },
-  "post-afcon-2027-tanzania-what-is-confirmed": {
-   "hash": "3bf7a7655107b1ed932ff8bf31e613ac5d9fce8e",
-   "bytes": 190380,
-   "quality": 3
-  },
-  "post-alphonce-simbu-world-marathon-champion-tanzania": {
-   "hash": "ba318755bfdd963610d9341ea44a113a7b489309",
-   "bytes": 151034,
-   "quality": 2
-  },
-  "post-bank-of-tanzania-interest-rate-6-25-percent-explained": {
-   "hash": "ac94fe98603311afe677a1dc0a7168c48faddb86",
-   "bytes": 96507,
-   "quality": 2
-  },
-  "post-dar-es-salaam-port-record-cargo-kwala-dry-port-sgr": {
-   "hash": "c46339feb0d2440985de6401032ac7a3799728b6",
-   "bytes": 161189,
-   "quality": 2
-  },
-  "post-finance-act-2026-tanzania-what-changed-for-you": {
-   "hash": "2e8aa6fbe89c81d352fde0658143f9d47fdf512f",
-   "bytes": 180064,
-   "quality": 3
-  },
-  "post-gta-6-cheat-codes-list-ps5-xbox": {
-   "hash": "e5517c361cfd75a1affcfef2d7998bbe286cae9d",
-   "bytes": 103338,
-   "quality": 2
-  },
-  "post-gta-6-pc-release-date-what-pc-players-know-so-far": {
-   "hash": "8ad2f7b79d5f27810069f13fad01f98140302b42",
-   "bytes": 133836,
-   "quality": 2
-  },
-  "post-nida-national-id-new-card-2026-how-to-get-yours": {
-   "hash": "3ccdbce805f50d8617994aca78e40ed3c251c4de",
-   "bytes": 174008,
-   "quality": 4
-  },
-  "post-nyerere-dam-tanzania-electricity-surplus-why-power-cuts-continue": {
-   "hash": "d1f9c81fc0acf8966ebcf24e8615c991fc9aceb8",
-   "bytes": 62243,
-   "quality": 2
-  },
-  "post-sgr-train-tanzania-dar-es-salaam-dodoma-fares-tickets": {
-   "hash": "bde1aa5df0d1e9af3eae067809ad46d4bb5bf6ce",
-   "bytes": 191934,
-   "quality": 2
-  },
-  "post-tanzania-clean-cooking-strategy-lpg-charcoal": {
-   "hash": "c0a72671c648cee2776665f2f687fa4bdf22e72d",
-   "bytes": 162179,
-   "quality": 2
-  },
-  "post-tanzania-el-nino-rains-floods-what-to-do": {
-   "hash": "1fa834c3d73aba3f2e164939cc67b9448ea06c5c",
-   "bytes": 124686,
-   "quality": 2
-  },
-  "post-tanzania-fertiliser-subsidy-how-it-works": {
-   "hash": "b5c18ce9861acbe3e55911bd1b82816bc169ff4d",
-   "bytes": 180443,
-   "quality": 5
-  },
-  "post-mandatory-electronic-payments-tanzania-order-2026": {
-   "hash": "8f1a71784fae2ef944ae9e417f45a58423055919",
-   "bytes": 175501,
-   "quality": 2
-  },
-  "post-tanzania-world-heritage-sites-explained": {
-   "hash": "5a9cb270a49bff44278f88c8440949775be6c42a",
-   "bytes": 115171,
-   "quality": 2
-  },
-  "post-tanzania-ten-years-compulsory-education-what-changes": {
-   "hash": "36d2ac2680d26c8f9167d20549b31f06f38675e0",
-   "bytes": 163771,
-   "quality": 2
-  },
-  "post-universal-health-insurance-tanzania-fahari-afya-explained": {
-   "hash": "29afc8f6bb3db04621309200099bc9be408452f2",
-   "bytes": 153339,
+  "site": {
+   "hash": "af26339eb6839f79045c59271b40559de64b2244",
+   "bytes": 71491,
    "quality": 2
   }
  }

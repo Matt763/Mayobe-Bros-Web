@@ -3,7 +3,9 @@
 // How it works, and why it cannot get stuck (see "Loading skeleton" in CLAUDE.md):
 //  - The page's stylesheet link is the first thing in <body>, right after the skeleton markup (not in <head>). A stylesheet in the body
 //    only holds back the content after it, so the browser can paint the skeleton while the stylesheet downloads. Browsers that do not
-//    paint early simply behave as before (nothing until the stylesheet arrives); no unstyled content is ever shown.
+//    paint early simply behave as before (nothing until the stylesheet arrives); no unstyled content is ever shown. Browsers that paint body content
+//    before a body stylesheet (the page would show as bare, unstyled "raw HTML" on a slow line) are covered too: html.sk-wait hides the real page
+//    until the stylesheet has loaded or failed.
 //  - The skeleton's own CSS is inline (small), so it needs nothing from the network. It is shown only under html.js (set by the first
 //    inline script), so a visitor without JavaScript never sees it.
 //  - It fades in only after 150 ms (a page that loads faster never shows it) and fades out a moment after the stylesheet has loaded or failed,
@@ -24,6 +26,10 @@ html.dark .sk{--sk-bg:#070b14;--sk-bar:#18233d;--sk-line:#1d2845;--sk-glint:rgba
 html.js .sk{display:flex;flex-direction:column;position:fixed;inset:0;z-index:999;overflow:hidden;pointer-events:none;background:var(--sk-bg);opacity:0;visibility:hidden;transition:opacity .35s ease,visibility 0s linear .35s}
 html.js.sk-on .sk{opacity:1;visibility:visible;transition:opacity .3s ease}
 html.sk-shown body{animation:none}
+/* Until the stylesheet has arrived the real page is hidden (not removed): a browser that paints body content before a body stylesheet
+   (some do) would otherwise show the bare, unstyled page for a moment, which looks like raw HTML. Removed by the script below the instant the
+   stylesheet loads or fails, and by every other exit, so nothing can stay hidden. */
+html.sk-wait body>*:not(.sk):not(script):not(style):not(link):not(noscript){visibility:hidden}
 .sk-top{position:relative;overflow:hidden;flex:none;border-bottom:1px solid var(--sk-line)}
 .sk-head{display:flex;align-items:center;justify-content:space-between;height:4.2rem;padding-inline:2.5%}
 .sk-logo{display:block;width:9.5rem;height:2.1rem;border-radius:.5rem;background:var(--sk-bar)}
@@ -57,7 +63,7 @@ export const skeletonCss = CSS.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').map(
 
 // Plain ES5. One inline script, hashed into the page's Content-Security-Policy by the builder like the theme script before it.
 // `href` is the stylesheet's address (with its version); it is written into <head> only for visitors who arrive from a page of this site.
-export const skeletonScript = (href) => `(function(){try{var d=document,h=d.documentElement,t=0,done=0,n=0,inside=false;try{inside=!!d.referrer&&d.referrer.indexOf(location.origin+'/')===0&&history.length>1}catch(e){}if(inside)d.write('<link rel="stylesheet" href='+JSON.stringify(${JSON.stringify(href)})+'>');function leave(){if(done)return;done=1;clearTimeout(t);h.classList.remove('sk-on');setTimeout(function(){var s=d.querySelector('.sk');if(s&&s.parentNode)s.parentNode.removeChild(s)},700)}function sheet(e){var x=e.target;if(x&&x.tagName==='LINK'&&x.rel==='stylesheet'&&!(x.hasAttribute&&x.hasAttribute('data-extra')))setTimeout(leave,150)}function watch(){setTimeout(function(){if(done)return;var on=false;try{on=getComputedStyle(d.body).marginTop==='0px'}catch(e){}if(on||d.readyState==='complete'||++n>17)leave();else watch()},5000)}if(!inside)t=setTimeout(function(){if(!done)h.classList.add('sk-on','sk-shown')},150);d.addEventListener('load',sheet,true);d.addEventListener('error',sheet,true);d.addEventListener('DOMContentLoaded',leave);addEventListener('load',leave);addEventListener('pageshow',function(e){if(e.persisted)leave()});watch()}catch(e){}})();`;
+export const skeletonScript = (href) => `(function(){try{var d=document,h=d.documentElement,t=0,done=0,n=0,inside=false;try{inside=!!d.referrer&&d.referrer.indexOf(location.origin+'/')===0&&history.length>1}catch(e){}if(inside)d.write('<link rel="stylesheet" href='+JSON.stringify(${JSON.stringify(href)})+'>');function reveal(){h.classList.remove('sk-wait')}function leave(){reveal();if(done)return;done=1;clearTimeout(t);h.classList.remove('sk-on');setTimeout(function(){var s=d.querySelector('.sk');if(s&&s.parentNode)s.parentNode.removeChild(s)},700)}function sheet(e){var x=e.target;if(x&&x.tagName==='LINK'&&x.rel==='stylesheet'&&!(x.hasAttribute&&x.hasAttribute('data-extra'))){reveal();setTimeout(leave,150)}}function watch(){setTimeout(function(){if(done)return;var on=false;try{on=getComputedStyle(d.body).marginTop==='0px'}catch(e){}if(on||d.readyState==='complete'||++n>17)leave();else watch()},5000)}if(!inside){h.classList.add('sk-wait');t=setTimeout(function(){if(!done)h.classList.add('sk-on','sk-shown')},150)}d.addEventListener('load',sheet,true);d.addEventListener('error',sheet,true);d.addEventListener('DOMContentLoaded',leave);addEventListener('load',leave);addEventListener('pageshow',function(e){if(e.persisted)leave()});watch()}catch(e){}})();`;
 
 // aria-hidden, no text at all. The shapes follow the real first screen: header (logo, three buttons; the menu row on wide screens) and the dark hero
 // (text centred on every page, except an article's hero, which sits bottom-left: `left`).

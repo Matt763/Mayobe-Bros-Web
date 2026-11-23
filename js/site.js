@@ -452,7 +452,9 @@
     pageInput.form.addEventListener('submit', function (e) {
       e.preventDefault();
       var q = pageInput.value.trim();
-      history.replaceState(null, '', BASE + '/search/' + (q ? '?q=' + encodeURIComponent(q) : ''));
+      var url = BASE + '/search/' + (q ? '?q=' + encodeURIComponent(q) : '');
+      if (window.MBMotion && window.MBMotion.replaceQuiet) window.MBMotion.replaceQuiet(null, '', url); // not a new page for analytics
+      else history.replaceState(null, '', url);
       runPage();
     });
   }
@@ -535,6 +537,11 @@
     if (!id || store(CONSENT) !== 'accepted' || window.__mbGtm) return;
     window.__mbGtm = true;
     window.dataLayer = window.dataLayer || [];
+    // Google consent mode (basic), in the order Google documents: default (denied), then update (granted, the reader pressed Accept), then the container.
+    // Nothing is requested from Google before this point, so the denied default only states the starting position for the tags.
+    function gtag() { window.dataLayer.push(arguments); }
+    gtag('consent', 'default', { ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied', analytics_storage: 'denied' });
+    gtag('consent', 'update', { analytics_storage: 'granted' });
     window.dataLayer.push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' });
     var s = el('script'); s.async = true;
     s.src = 'https://www.googletagmanager.com/gtm.js?id=' + encodeURIComponent(id);
@@ -612,6 +619,27 @@
   $$('[data-cookie-settings]').forEach(function (b) { b.addEventListener('click', function () { store(CONSENT, null); showCookieNotice(true); }); });
   loadAds();
   loadTags();
+
+  /* ------------------------------------------ readers who arrive from the old blog
+     The old Blogger blog (mbagamc.blogspot.com) sends its readers here with links tagged utm_source=oldblog; the blog's address as
+     referrer (origin only) is the backup for a link without the tag. Those readers are offered the email sign-up once, after they finish
+     an article (js/oldblog-prompt.js, loaded only for them and only on an article page that carries the template). The note is kept in
+     session storage, so it is gone when the tab closes and it follows the reader from the first page to the article. Nothing is sent. */
+  (function () {
+    var KEY = 'mayobebros-from-oldblog'; // '1' = came from the old blog; 'shown' = the box was already shown during this visit
+    var came = false;
+    try {
+      if (/[?&]utm_source=oldblog(&|#|$)/.test(location.search)) came = true;
+      else if (doc.referrer) came = /^mbagamc\.blogspot\.(com|(co|com)\.[a-z]{2}|[a-z]{2})$/i.test(new URL(doc.referrer).hostname); // blogspot.com, or a country address such as .co.uk or .de
+    } catch (e) { came = false; }
+    var note = null;
+    try { note = sessionStorage.getItem(KEY); } catch (e) { note = null; }
+    if (came && !note) { note = '1'; try { sessionStorage.setItem(KEY, '1'); } catch (e) { /* storage may be blocked: the note lasts for this page only */ } }
+    var tpl = $('template[data-oldblog-prompt]');
+    if (!note || note === 'shown' || !tpl || !tpl.getAttribute('data-src')) return;
+    var s = el('script'); s.async = true; s.src = tpl.getAttribute('data-src');
+    doc.head.appendChild(s);
+  })();
 
   /* ---------------------------------------------------------------- share */
   $$('[data-share]').forEach(function (box) {
@@ -696,6 +724,16 @@
   var plyrLoad = null;
   function loadPlyr() {
     if (plyrLoad) return plyrLoad;
+    // the extras (subtitles button, quality, shortcuts, touch gestures, the player's colours) load next to Plyr; a player without them still works
+    var extras = new Promise(function (done) {
+      var xcss = doc.createElement('link');
+      xcss.rel = 'stylesheet'; xcss.href = BASE + '/css/video-extras.css?v=1';
+      doc.head.appendChild(xcss);
+      var xjs = doc.createElement('script');
+      xjs.src = BASE + '/js/video-extras.js?v=1'; xjs.async = true;
+      xjs.onload = xjs.onerror = function () { done(); };
+      doc.head.appendChild(xjs);
+    });
     plyrLoad = new Promise(function (resolve, reject) {
       var dir = BASE + '/vendor/plyr/', v = '?v=3.8.5';
       var css = doc.createElement('link');
@@ -706,7 +744,7 @@
       js.onload = function () { resolve(window.Plyr); };
       js.onerror = function () { plyrLoad = null; reject(new Error('Plyr did not load')); };
       doc.head.appendChild(js);
-    });
+    }).then(function (Plyr) { return extras.then(function () { return Plyr; }); });
     return plyrLoad;
   }
   function plyrOptions(extra) {
@@ -714,12 +752,17 @@
       iconUrl: BASE + '/vendor/plyr/plyr.svg',
       blankVideo: '',
       controls: ['play-large', 'play', 'progress', 'current-time', 'duration', 'mute', 'volume', 'captions', 'settings', 'pip', 'airplay', 'fullscreen'],
-      settings: ['captions', 'quality', 'speed'],
-      speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] },
+      settings: ['captions', 'quality', 'speed', 'loop'], // a file of our own: subtitles, quality (several sources), speed, loop. A YouTube video only gets speed here (see below)
+      speed: { selected: 1, options: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] }, // YouTube's own list; a video that cannot go that slow or fast only shows the speeds it allows
       keyboard: { focused: true, global: false },
+      i18n: { captions: 'Subtitles', enableCaptions: 'Show subtitles', disableCaptions: 'Hide subtitles' }, // one word for the same thing everywhere
       tooltips: { controls: true, seek: true },
       resetOnEnd: true,
-      youtube: { noCookie: true, rel: 0, showinfo: 0, iv_load_policy: 3, modestbranding: 1 }
+      youtube: { noCookie: true, rel: 0, showinfo: 0, iv_load_policy: 3, modestbranding: 1 },
+      // Plyr asks a third party (noembed.com) for the video's title and shape as soon as the YouTube player is ready. The page's security policy
+      // refuses that request, and Plyr answers a refused request by THROWING an error ("Uncaught Error: 0" in the console, every time) and never
+      // finishing its set-up. This same-site file says "16:9" and nothing else, so no third party is contacted and nothing throws.
+      urls: { youtube: { sdk: 'https://www.youtube.com/iframe_api', api: BASE + '/vendor/plyr/youtube-oembed.json?v={0}' } }
     };
     for (var k in extra) if (Object.prototype.hasOwnProperty.call(extra, k)) o[k] = extra[k];
     return o;
@@ -794,7 +837,7 @@
     tool('Switch between a small and a large video', MINI_ICONS.size, function () { toggleSize(); }, 'video-mini-size');
     tool('Move the video to the next corner', MINI_ICONS.toCorner, function () { nextCorner(); }, 'video-mini-corner');
     tool('Back to the video in the article', MINI_ICONS.back, function () { box.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' }); });
-    tool('Close the mini player and pause', MINI_ICONS.close, function () { player.pause(); dismissed = true; set(false); });
+    tool('Close the mini player and pause', MINI_ICONS.close, function () { try { player.pause(); } catch (err) { /* a YouTube player that is not ready yet has nothing to pause */ } dismissed = true; set(false); });
     /* Native Picture-in-Picture (own video files only): the browser or the system draws the video in its own always-on-top window, so it
        keeps playing when the reader switches tab or app. A page cannot do that itself, and a YouTube embed cannot be popped out. */
     var vid = player.isHTML5 && player.media && player.media.tagName === 'VIDEO' ? player.media : null;
@@ -1029,14 +1072,92 @@
     player.on('enterfullscreen', function () { full = true; set(false); });
     player.on('exitfullscreen', function () { full = false; io.unobserve(box); io.observe(box); }); // look at the position again
   }
+  /* YouTube captions (subtitles / CC) for an embedded video. YouTube's documented player API has no caption controls; its player does have a "captions"
+     module whose track list can be read and switched with getOption / setOption (what its own menu uses). That part is not documented, so everything here is
+     best effort: nothing is requested until the reader presses the CC button, a video with no tracks says so, and any failure leaves the player as it was.
+     Quality is not offered on purpose: YouTube retired setPlaybackQuality for embedded players (2019, a no-op since 2023), so a "Quality" choice would do nothing. */
+  var CC_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect width="18" height="14" x="3" y="5" rx="2"/><path d="M7 15h4M15 15h2M7 11h2M13 11h4"/></svg>';
+  function youtubeCaptions(player) { // OLD, no longer called: js/video-extras.js (captions()) replaced it. Safe to delete.
+    var yt = player.embed, shell = player.elements && player.elements.container;
+    var bar = shell && shell.querySelector('.plyr__controls');
+    if (!yt || !bar || typeof yt.loadModule !== 'function' || bar.querySelector('.video-cc')) return;
+    var tracks = null, chosen = '', loading = false, btn = el('button', 'plyr__controls__item plyr__control video-cc'), menu = el('div', 'video-cc-menu');
+    btn.type = 'button'; btn.setAttribute('aria-haspopup', 'menu'); btn.setAttribute('aria-expanded', 'false'); btn.setAttribute('aria-label', 'Subtitles (CC)');
+    btn.innerHTML = CC_ICON + '<span class="plyr__sr-only">Subtitles (CC)</span>';
+    menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', 'Subtitles (CC)'); menu.hidden = true;
+    var anchor = bar.querySelector('.plyr__menu');
+    bar.insertBefore(btn, anchor || null);
+    shell.appendChild(menu);
+    function safe(fn) { try { return fn(); } catch (err) { return undefined; } }
+    function open(on) {
+      menu.hidden = !on; btn.setAttribute('aria-expanded', on ? 'true' : 'false');
+      if (on) { draw(); if (tracks === null) fetchTracks(); var first = menu.querySelector('button'); if (first) first.focus({ preventScroll: true }); }
+    }
+    function item(label, code, checked) {
+      var b = el('button', 'video-cc-item', label);
+      b.type = 'button'; b.setAttribute('role', 'menuitemradio'); b.setAttribute('aria-checked', checked ? 'true' : 'false');
+      b.addEventListener('click', function () { choose(code); });
+      return b;
+    }
+    function draw() {
+      menu.textContent = '';
+      if (loading || tracks === null) { menu.appendChild(el('p', 'video-cc-note', 'Loading...')); return; }
+      if (!tracks.length) { menu.appendChild(el('p', 'video-cc-note', 'No subtitles for this video.')); return; }
+      menu.appendChild(item('Off', '', chosen === ''));
+      tracks.forEach(function (t) { menu.appendChild(item(t.displayName || t.languageName || t.languageCode, t.languageCode, chosen === t.languageCode)); });
+    }
+    function fetchTracks() {
+      loading = true; draw();
+      safe(function () { yt.loadModule('captions'); });
+      var n = 0;
+      (function poll() {
+        var list = safe(function () { return yt.getOption('captions', 'tracklist'); });
+        if (list && list.length) {
+          tracks = list.filter(function (t) { return t && t.languageCode; });
+          var cur = safe(function () { return yt.getOption('captions', 'track'); });
+          chosen = cur && cur.languageCode ? cur.languageCode : '';
+          safe(function () { yt.unloadModule('captions'); }); chosen = ''; // loading the module turns captions on: they stay off until the reader chooses
+          loading = false; draw(); return;
+        }
+        if (++n < 10) { setTimeout(poll, 400); return; }
+        tracks = []; loading = false; safe(function () { yt.unloadModule('captions'); }); draw();
+      })();
+    }
+    function choose(code) {
+      chosen = code;
+      if (!code) { safe(function () { yt.unloadModule('captions'); }); }
+      else {
+        safe(function () { yt.loadModule('captions'); });
+        setTimeout(function () { safe(function () { yt.setOption('captions', 'track', { languageCode: code }); }); }, 350);
+      }
+      btn.classList.toggle('is-on', !!code);
+      btn.setAttribute('aria-pressed', code ? 'true' : 'false');
+      draw(); open(false); btn.focus({ preventScroll: true });
+    }
+    btn.addEventListener('click', function (e) { e.stopPropagation(); open(menu.hidden); });
+    menu.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { e.stopPropagation(); open(false); btn.focus({ preventScroll: true }); return; }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        var items = Array.prototype.slice.call(menu.querySelectorAll('button')); var i = items.indexOf(doc.activeElement);
+        if (items.length) { items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus({ preventScroll: true }); e.preventDefault(); }
+      }
+    });
+    doc.addEventListener('click', function (e) { if (!menu.hidden && !menu.contains(e.target) && e.target !== btn && !btn.contains(e.target)) open(false); });
+    player.on('controlshidden', function () { if (!menu.hidden) open(false); });
+  }
   var plain = $$('video').filter(function (v) { return !v.closest('.plyr') && !v.hasAttribute('data-no-plyr'); });
   var embeds = $$('[data-video-embed]');
   if (plain.length || embeds.length) {
     loadPlyr().then(function (Plyr) {
       plain.forEach(function (v) {
         v.removeAttribute('width'); v.removeAttribute('height');
-        var pl = new Plyr(v, plyrOptions({ ratio: '16:9', fullscreen: { enabled: true, fallback: true, iosNative: true } })); // iosNative: on iPhone the system player can pop the video out when the reader leaves
+        var opts = { ratio: '16:9', fullscreen: { enabled: true, fallback: true, iosNative: true } }; // iosNative: on iPhone the system player can pop the video out when the reader leaves
+        // several files (<source size="720">) give Plyr's own Quality row; the first file starts
+        var sizes = $$('source[size]', v).map(function (n) { return Number(n.getAttribute('size')); }).filter(Boolean);
+        if (sizes.length > 1) opts.quality = { default: sizes[0], options: [4320, 2880, 2160, 1440, 1080, 900, 720, 640, 576, 540, 480, 432, 360, 270, 240, 144] };
+        var pl = new Plyr(v, plyrOptions(opts));
         miniPlayer(v.closest('.video-figure'), pl);
+        if (window.MBVideo) window.MBVideo.enhance(pl, v.closest('.video-figure'), 'file');
       });
       embeds.forEach(function (box) {
         var go = box.querySelector('.video-load');
@@ -1045,10 +1166,57 @@
           var holder = el('div', 'plyr__video-embed');
           holder.setAttribute('data-plyr-provider', box.getAttribute('data-provider') || 'youtube');
           holder.setAttribute('data-plyr-embed-id', box.getAttribute('data-embed-id'));
+          var title = box.getAttribute('data-title') || '';
+          var posterImg = go.querySelector('img');
           go.replaceWith(holder);
-          var player = new Plyr(holder, plyrOptions({ title: box.getAttribute('data-title') || '' }));
+          // YouTube's player cannot be driven for Plyr's own "Captions" and "Quality" rows (the first would do nothing, the second printed "undefined"):
+          // speed stays in the settings, subtitles have their own CC button (youtubeCaptions), and quality is YouTube's own automatic choice.
+          var player = new Plyr(holder, plyrOptions({ title: title, settings: ['speed'], controls: ['play-large', 'play', 'progress', 'current-time', 'duration', 'mute', 'volume', 'settings', 'fullscreen'] }));
+          // Loading style: the disc of the poster button stays where it was, its triangle folds away and waves spread out from it until the first
+          // moving frame (or, when the browser did not allow autoplay, a moment after "ready", when the big button springs back). Then the disc swells and fades.
+          var shell = player.elements && player.elements.container;
+          var startTimer = 0, waves = null;
+          var endStart = function () {
+            clearTimeout(startTimer);
+            if (!shell || !shell.classList.contains('is-starting')) return;
+            shell.classList.remove('is-starting');
+            var still = shell.querySelector('.video-start-still');
+            if (still) { still.classList.add('is-done'); setTimeout(function () { if (still.parentNode) still.parentNode.removeChild(still); }, 600); }
+            if (waves) { var w = waves; waves = null; w.classList.add('is-done'); setTimeout(function () { if (w.parentNode) w.parentNode.removeChild(w); }, 500); }
+          };
+          if (shell) {
+            shell.classList.add('is-starting');
+            if (posterImg) { posterImg.className = 'video-start-still'; shell.insertBefore(posterImg, shell.firstChild); } // the very picture of the button (already loaded and decoded) stays under the waves until the first moving frame
+            waves = el('span', 'video-waves'); waves.setAttribute('aria-hidden', 'true');
+            waves.innerHTML = '<i></i><i></i><i></i><b></b>'; // fixed markup, no text from anywhere
+            shell.appendChild(waves);
+            startTimer = setTimeout(endStart, 15000);
+            player.on('playing', endStart); player.on('error', endStart);
+            player.once('ready', function () { clearTimeout(startTimer); startTimer = setTimeout(endStart, 2500); });
+          }
           miniPlayer(box, player);
-          player.once('ready', function () { player.play(); });
+          // the same-site file above carries no title, and Plyr writes "Player for" + nothing into the frame once it has read it: keep the caption there
+          var keepTitle = function () { var f = box.querySelector('iframe'); if (f && title && f.getAttribute('title') !== title) f.setAttribute('title', title); };
+          if (window.MutationObserver && title) new MutationObserver(keepTitle).observe(box, { subtree: true, childList: true, attributes: true, attributeFilter: ['title'] });
+          player.once('ready', function () { keepTitle(); if (window.MBVideo) window.MBVideo.enhance(player, box, 'youtube'); player.play(); });
+          // YouTube can refuse a video (removed, private, not allowed in other sites' pages), or its player may never arrive (a blocked or very poor connection):
+          // say so and offer the YouTube page, never a dead player
+          var isReady = false;
+          var showNote = function () {
+            if (isReady || box.querySelector('.video-error')) return;
+            var note = el('p', 'video-error');
+            note.setAttribute('role', 'status');
+            note.appendChild(doc.createTextNode('This video could not be played here. '));
+            var a = el('a', '', 'Watch it on YouTube');
+            a.href = 'https://www.youtube.com/watch?v=' + encodeURIComponent(box.getAttribute('data-embed-id') || '');
+            a.target = '_blank'; a.rel = 'noopener noreferrer';
+            note.appendChild(a);
+            var cap = box.querySelector('figcaption');
+            box.insertBefore(note, cap || null);
+          };
+          player.on('error', showNote);
+          player.once('ready', function () { isReady = true; var n = box.querySelector('.video-error'); if (n && n.parentNode) n.parentNode.removeChild(n); });
+          if (shell) setTimeout(function () { if (!isReady) { endStart(); showNote(); } }, 20000);
         });
       });
     })['catch'](function () { /* the browser's own controls stay in place */ });

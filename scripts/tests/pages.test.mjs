@@ -328,7 +328,9 @@ test('every article has a mini sign-up in its sidebar next to the footer form, w
   assert.match(rail, /<input id="rail-email" type="email"[^>]*aria-describedby="rail-status rail-note"/);
   assert.match(rail, /<p class="foot-status nl-status" id="rail-status" role="status">/);
   assert.match(rail, /<div class="nl-panel nl-panel-done" data-nl-done inert aria-hidden="true">/);
-  assert.equal((html.match(/<form[^>]*data-newsletter/g) || []).length, 2, 'the footer form and the sidebar form');
+  // a third copy sits inside the inert <template data-oldblog-prompt> (it is not on the page until js/oldblog-prompt.js opens it; see oldblog-prompt.test.mjs)
+  const onPage = html.replace(/<template[\s\S]*?<\/template>/g, '');
+  assert.equal((onPage.match(/<form[^>]*data-newsletter/g) || []).length, 2, 'the footer form and the sidebar form');
   const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(ids.filter((x, i) => ids.indexOf(x) !== i), [], 'no id twice on the page');
   const at = (s) => rail.indexOf(s);

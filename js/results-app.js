@@ -791,7 +791,13 @@ function start(root, opts = {}) {
   const examOwned = () => examParams(S.ex, S.tab);
   const centreOwned = () => ({ ...(SSR ? {} : { centre: S.ce.code }), cq: S.ce.cq, grade: S.ce.grade === NOT_GRADED ? 'none' : S.ce.grade, cno: S.ce.cno });
   const stateNow = () => Object.assign({}, history.state, { rs: 1, doc: DOC });
-  function replaceUrl() { history.replaceState(stateNow(), '', hrefFor(S.view === 'centre' ? centreOwned() : examOwned())); lastRoute = routeKey(location); }
+  // Typing and filters write the address with replaceState. That must not count as a new page in Google Analytics (its tag counts every
+  // replaceState), so MBMotion.replaceQuiet is used; without it the plain call is the fallback.
+  function replaceUrl() {
+    const url = hrefFor(S.view === 'centre' ? centreOwned() : examOwned());
+    if (window.MBMotion && window.MBMotion.replaceQuiet) window.MBMotion.replaceQuiet(stateNow(), '', url); else history.replaceState(stateNow(), '', url);
+    lastRoute = routeKey(location);
+  }
   function pushUrl(owned, extra) {
     history.replaceState(Object.assign(stateNow(), { y: window.scrollY }), '', location.href);
     history.pushState(Object.assign({ rs: 1, doc: DOC }, extra), '', hrefFor(owned));

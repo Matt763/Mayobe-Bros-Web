@@ -144,6 +144,9 @@ function renderPdf(m) {
 </figure>`;
 }
 
+// The play triangle on the poster button is drawn with CSS (.video-load-play::before), not with an <svg>: neutralise() below turns every raw <svg
+// tag of a document into visible text (a security rule for post authors), and it also runs over this trusted markup, which once printed
+// "<svg width=..." on top of the picture.
 function renderMedia(m) {
   const [, kind, caption, src, optText = ''] = m;
   const opts = {};
@@ -156,14 +159,19 @@ function renderMedia(m) {
     if (!id) return `<p><em>[video link not understood: ${escapeHtml(src)}]</em></p>`;
     const label = cap || 'this video';
     return `<figure class="video-figure video-embed" id="video-${++videoCount}" data-video-embed data-provider="youtube" data-embed-id="${id}" data-title="${attr(cap)}">
-<button class="video-load" type="button" aria-label="Play video: ${attr(label)}">${poster ? `<img src="${attr(poster)}" alt="" loading="lazy" decoding="async">` : ''}<span class="video-load-play" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><polygon points="7 4 20 12 7 20 7 4"/></svg></span><span class="video-load-note">Press play to watch. The video comes from YouTube, which is only contacted after you press play.</span></button>${figcap}
+<button class="video-load" type="button" aria-label="Play video: ${attr(label)}">${poster ? `<img src="${attr(poster)}" alt="" loading="lazy" decoding="async">` : ''}<span class="video-load-play" aria-hidden="true"></span></button>${figcap}
 </figure>`;
   }
   const ext = (src.split(/[?#]/)[0].split('.').pop() || '').toLowerCase();
   const type = MIME[ext] || 'video/mp4';
   const track = opts.captions ? `<track kind="captions" srclang="${attr(opts.lang || 'en')}" label="${attr(opts.label || 'English')}" src="${attr(absPath(opts.captions))}" default>` : '';
+  // sources="assets/video/clip-480.mp4:480 assets/video/clip-1080.mp4:1080" adds more files (the number is the picture height); size=720 is the height of
+  // the main file. With two or more sizes the player shows a Quality row (js/site.js gives Plyr the list).
+  const mainSize = /^\d{3,4}$/.test(opts.size || '') ? ` size="${opts.size}"` : '';
+  const more = (opts.sources || '').split(/\s+/).map((s) => s.match(/^(.+):(\d{3,4})$/)).filter(Boolean)
+    .map((m) => `<source src="${attr(absPath(m[1]))}" type="${MIME[(m[1].split(/[?#]/)[0].split('.').pop() || '').toLowerCase()] || 'video/mp4'}" size="${m[2]}">`).join('');
   return `<figure class="video-figure" id="video-${++videoCount}">
-<video controls playsinline preload="none"${poster ? ` poster="${attr(poster)}"` : ''}${cap ? ` aria-label="${attr(cap)}"` : ''}><source src="${attr(absPath(src))}" type="${type}">${track}Your browser cannot play this video. <a href="${attr(absPath(src))}">Download it</a>.</video>${figcap}
+<video controls playsinline preload="none"${poster ? ` poster="${attr(poster)}"` : ''}${cap ? ` aria-label="${attr(cap)}"` : ''}><source src="${attr(absPath(src))}" type="${type}"${mainSize}>${more}${track}Your browser cannot play this video. <a href="${attr(absPath(src))}">Download it</a>.</video>${figcap}
 </figure>`;
 }
 

@@ -41,7 +41,8 @@
 
   function wire(form) {
     var endpoint = form.getAttribute('data-endpoint') || '';
-    if (!endpoint) return;
+    if (!endpoint || form.__mbWired) return;
+    form.__mbWired = true;
     var q = function (s) { return form.querySelector(s); };
     var input = form.elements.email;
     var trap = form.elements.website;
@@ -116,6 +117,8 @@
       setState('sent');
       // the pressed button is gone, so focus moves to the new heading (read out by screen readers) without scrolling the page
       if (title) title.focus({ preventScroll: true });
+      // tells other scripts (the sign-up box for readers from the old blog) that a sign-up went through: no address is passed on
+      try { doc.dispatchEvent(new CustomEvent('mb:subscribed')); } catch (err) { /* very old browsers */ }
     }
     function showForm() {
       if (panelForm) { panelForm.removeAttribute('inert'); panelForm.removeAttribute('aria-hidden'); }
@@ -193,4 +196,6 @@
 
   var forms = doc.querySelectorAll('form[data-newsletter]');
   for (var i = 0; i < forms.length; i++) wire(forms[i]);
+  // a form added to the page later (the sign-up box for readers from the old blog) is wired with this
+  if (typeof window !== 'undefined') window.MBNewsletter = { wire: wire };
 })();

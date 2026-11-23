@@ -154,3 +154,19 @@ test('carousel of tables: every #### starts a slide, each table keeps its sidewa
   // no #### inside: nothing to slide, so the content is left as it is
   assert.doesNotMatch(markdown(':::carousel[x]\nplain text\n:::'), /tbl-carousel/);
 });
+
+test('a video poster button has no explanatory sentence and no raw <svg> (the owner does not want "Press play to watch..." on any video)', () => {
+  const html = markdown('::youtube[How it works](https://youtu.be/dQw4w9WgXcQ){poster=assets/posts/x.webp}');
+  assert.match(html, /<button class="video-load"[^>]*aria-label="Play video: How it works"/, 'the button is still named for screen readers');
+  assert.doesNotMatch(html, /Press play|only contacted|video-load-note/i);
+  // the play triangle is drawn with CSS: neutralise() turns a raw <svg> into visible text on the poster
+  assert.doesNotMatch(html, /<svg|&lt;svg/i);
+  assert.match(html, /<span class="video-load-play" aria-hidden="true"><\/span>/);
+});
+
+test('a ::video line with sources= gives every file a size (Plyr shows a Quality row)', () => {
+  const html = markdown('::video[Clip](assets/video/a-720.mp4){size=720 sources="assets/video/a-480.mp4:480 assets/video/a-1080.mp4:1080"}');
+  assert.match(html, /<source src="\/assets\/video\/a-720\.mp4" type="video\/mp4" size="720">/);
+  assert.match(html, /<source src="\/assets\/video\/a-480\.mp4" type="video\/mp4" size="480">/);
+  assert.match(html, /size="1080"/);
+});

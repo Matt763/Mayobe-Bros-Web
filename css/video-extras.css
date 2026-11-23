@@ -1,0 +1,128 @@
+/* ==========================================================================
+   Video players: the colours of Plyr and the extras of js/video-extras.js.
+   Loaded with Plyr (js/site.js, loadPlyr), only on pages that have a video.
+   ----
+   1. THEME. Plyr's own menus, tooltips, badges and controls take their colours from the site's tokens (css/style.css :root), so they
+      follow light and dark mode, the visitor's choice and the device setting, with nothing repeated here. Menus are the site's card
+      (surface, text, line, soft); the control bar sits on the picture, so it keeps a dark navy glass and the brand's light blue
+      (the dark-mode button colour) in both themes: dark blue on a dark picture could not be seen.
+   2. The Subtitles button and its list, the Quality and Shortcuts pages, the notes shown on the picture (keys and touch).
+   Every motion here is opacity or transform only and stops under "reduce motion". Keyframe names start with vx-.
+   ========================================================================== */
+
+/* ---------------------------------------------------------------- 1. theme */
+.plyr {
+  --vp-accent: #8ab6ff;
+  --vp-ink: #04112b;
+  --vp-glass: rgba(7, 11, 24, 0.9);
+  --plyr-color-main: var(--vp-accent);
+  --plyr-video-background: #05080f;
+  --plyr-video-controls-background: linear-gradient(to top, rgba(7, 11, 24, 0.92), rgba(7, 11, 24, 0.5) 62%, rgba(7, 11, 24, 0));
+  --plyr-video-control-color: #fff;
+  --plyr-video-control-color-hover: #fff;
+  --plyr-video-control-background-hover: rgba(138, 182, 255, 0.26);
+  --plyr-video-range-track-background: rgba(255, 255, 255, 0.28);
+  --plyr-video-progress-buffered-background: rgba(255, 255, 255, 0.42);
+  --plyr-range-thumb-background: #fff;
+  --plyr-focus-visible-color: var(--vp-accent);
+  --plyr-captions-background: rgba(5, 9, 20, 0.82);
+  /* the player's menus: the site's card */
+  --plyr-menu-background: var(--surface);
+  --plyr-menu-color: var(--text-2);
+  --plyr-menu-radius: 14px;
+  --plyr-menu-shadow: var(--shadow-lg), 0 0 0 1px var(--line-soft);
+  --plyr-menu-arrow-color: var(--text-3);
+  --plyr-menu-back-border-color: var(--line-soft);
+  --plyr-menu-back-border-shadow-color: var(--surface);
+  --plyr-control-toggle-checked-background: var(--link);
+  --plyr-badge-background: var(--soft);
+  --plyr-badge-text-color: var(--soft-text);
+  --plyr-tooltip-background: var(--surface);
+  --plyr-tooltip-color: var(--text);
+  --plyr-tooltip-radius: 8px;
+  --plyr-tooltip-shadow: var(--shadow-md), 0 0 0 1px var(--line-soft);
+  --plyr-font-size-menu: 0.95rem;
+}
+.plyr--video .plyr__menu__container .plyr__control:hover,
+.plyr--video .plyr__menu__container .plyr__control:focus-visible { background: var(--soft); color: var(--soft-text); }
+.plyr--video .plyr__menu__container .plyr__control:focus-visible { outline: 2px solid var(--link); outline-offset: -2px; }
+.plyr__menu__container .plyr__control[role="menuitemradio"]::before { background: var(--line); }
+.plyr__menu__container .plyr__control[role="menuitemradio"]:hover::before,
+.plyr__menu__container .plyr__control[role="menuitemradio"]:focus-visible::before { background: var(--text-3); }
+.plyr__menu__container .plyr__control[role="menuitemradio"][aria-checked="true"]::before { background: var(--link); }
+.plyr__menu__container .plyr__control[role="menuitemradio"][aria-checked="true"]::after { background: var(--bg); }
+.plyr__menu__container .plyr__control--back > span:first-child { font-weight: 700; color: var(--text); }
+.plyr__menu__container .plyr__menu__value { color: var(--text-3); font-size: 0.85em; }
+.plyr__menu__container .plyr__badge { border-radius: 6px; }
+.plyr__tooltip { font-weight: 600; }
+/* on the dark glass of the control bar a pressed or open button reads as a soft blue pill */
+.plyr--video .plyr__controls .plyr__control[aria-expanded="true"],
+.plyr--video .plyr__controls .plyr__control.is-on { color: #fff; }
+
+/* ------------------------------------------------ 2a. the Subtitles button */
+.plyr .video-cc, .plyr .vx-hastext { position: relative; display: inline-flex; align-items: center; gap: 0.4rem; }
+.plyr .vx-label { font-size: 0.82rem; font-weight: 700; letter-spacing: 0.01em; white-space: nowrap; }
+.plyr .vx-lang { display: none; padding: 0.05rem 0.38rem; border-radius: 999px; background: var(--vp-accent); color: var(--vp-ink); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.03em; line-height: 1.5; }
+.plyr .video-cc.is-on .vx-lang { display: inline-block; }
+.plyr .video-cc.is-on::after { content: none; }
+@media (max-width: 40rem) { .plyr .vx-label { display: none; } } /* the icon, the tooltip and the language chip say it on a phone */
+.video-figure.is-mini .plyr .vx-label { display: none; }
+
+/* ------------------------------------------------ 2b. the subtitle language list (opens upwards from the control bar) */
+.plyr .video-cc-menu { position: absolute; z-index: 6; right: 0.6rem; bottom: 3.6rem; display: flex; flex-direction: column; width: 16rem; max-width: calc(100% - 1.2rem); max-height: calc(100% - 4.4rem); padding: 0.3rem; border-radius: 14px; background: var(--surface); color: var(--text-2); box-shadow: var(--shadow-lg), 0 0 0 1px var(--line-soft); animation: vx-menu-in 0.2s var(--ease) both; }
+.plyr .video-cc-menu[hidden] { display: none; }
+.plyr .video-cc-title { margin: 0; padding: 0.55rem 0.7rem 0.35rem; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
+.plyr .video-cc-list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.plyr .video-cc-item { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; width: 100%; min-height: 2.75rem; padding: 0.4rem 0.7rem; border: 0; border-radius: 9px; background: none; color: inherit; font: inherit; font-size: 0.95rem; text-align: left; cursor: pointer; }
+.plyr .video-cc-item:hover, .plyr .video-cc-item:focus-visible { background: var(--soft); color: var(--soft-text); outline: none; }
+.plyr .video-cc-item:focus-visible { box-shadow: inset 0 0 0 2px var(--link); }
+.plyr .video-cc-item[aria-checked="true"] { font-weight: 700; color: var(--link); }
+.plyr .video-cc-item[aria-checked="true"]::after { content: ""; flex: none; width: 0.5rem; height: 0.9rem; margin-right: 0.2rem; border: solid currentColor; border-width: 0 2px 2px 0; transform: rotate(45deg) translateY(-2px); }
+.plyr .video-cc-note { margin: 0; padding: 0.6rem 0.7rem; font-size: 0.9rem; color: var(--text-3); }
+.plyr .video-cc-help { margin: 0; padding: 0.45rem 0.7rem 0.4rem; border-top: 1px solid var(--line-soft); font-size: 0.78rem; line-height: 1.4; color: var(--text-3); }
+@keyframes vx-menu-in { from { opacity: 0; transform: translateY(8px) scale(0.97); } to { opacity: 1; transform: none; } }
+
+/* ------------------------------------------------ 2c. pages we add to the settings menu: Quality and Shortcuts */
+.plyr .vx-page { max-height: var(--vx-room, 18rem); overflow-y: auto; overscroll-behavior: contain; }
+.plyr .vx-q-note { margin: 0; padding: 0.15rem 0.95rem 0.7rem; width: 13.5rem; box-sizing: content-box; white-space: normal; font-size: 0.78rem; line-height: 1.4; color: var(--text-3); }
+.plyr .vx-q-note:empty { display: none; }
+.plyr .vx-help { box-sizing: border-box; width: min(21rem, calc(100vw - 2.6rem)); padding: 0.4rem 0.95rem 0.9rem; }
+.plyr .vx-help-group + .vx-help-group { margin-top: 0.9rem; padding-top: 0.8rem; border-top: 1px solid var(--line-soft); }
+.plyr .vx-help h4 { margin: 0 0 0.35rem; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
+.plyr .vx-help-note { margin: 0 0 0.45rem; font-size: 0.78rem; line-height: 1.4; color: var(--text-3); }
+.plyr .vx-help dl { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 0.8rem; margin: 0; }
+.plyr .vx-help dt, .plyr .vx-help dd { margin: 0; padding: 0.32rem 0; border-top: 1px solid var(--line-soft); font-size: 0.88rem; line-height: 1.4; }
+.plyr .vx-help dt:first-of-type, .plyr .vx-help dt:first-of-type + dd { border-top: 0; }
+.plyr .vx-help dt { color: var(--text-2); }
+.plyr .vx-help dd { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.25rem; color: var(--text-2); }
+.plyr .vx-help .vx-help-touch dl { display: block; }
+.plyr .vx-help .vx-help-touch dt { padding-bottom: 0; border-top: 1px solid var(--line-soft); font-weight: 700; color: var(--text); }
+.plyr .vx-help .vx-help-touch dt:first-of-type { border-top: 0; }
+.plyr .vx-help .vx-help-touch dd { display: block; padding-top: 0.05rem; border-top: 0; color: var(--text-2); }
+.plyr .vx-help kbd { display: inline-block; min-width: 1.55rem; padding: 0.05rem 0.4rem; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 6px; background: var(--bg-alt); color: var(--text); font: 700 0.78rem/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; text-align: center; }
+
+/* ------------------------------------------------ 2d. quality: the player is laid out at the size of the level and scaled back into the picture */
+.plyr__video-embed iframe.vx-forced { width: var(--vx-w); height: var(--vx-h); max-width: none; transform-origin: 0 0; transform: scale(var(--vx-sx, 1), var(--vx-sy, 1)); }
+
+/* ------------------------------------------------ 2e. notes on the picture and touch */
+.plyr .plyr__video-wrapper { touch-action: pan-y pinch-zoom; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+.plyr--video .plyr__video-wrapper { -webkit-user-select: none; user-select: none; }
+.plyr .vx-hud { position: absolute; z-index: 5; left: 50%; top: 0.9rem; padding: 0.4rem 0.95rem; border-radius: 999px; background: var(--vp-glass); color: #fff; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14), 0 6px 18px rgba(0, 0, 0, 0.4); font-size: 0.9rem; font-weight: 700; line-height: 1.3; white-space: nowrap; opacity: 0; pointer-events: none; transform: translate(-50%, -6px); transition: opacity 0.18s ease, transform 0.24s var(--ease); }
+.plyr .vx-hud.is-on, .plyr.vx-holding .vx-hud { opacity: 1; transform: translate(-50%, 0); }
+.plyr .vx-seek { position: absolute; z-index: 4; top: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.15rem; width: 36%; color: #fff; font-size: 0.9rem; font-weight: 700; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6); opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
+.plyr .vx-seek--l { left: 0; background: radial-gradient(ellipse 100% 70% at 0 50%, rgba(138, 182, 255, 0.34), rgba(138, 182, 255, 0) 100%); }
+.plyr .vx-seek--r { right: 0; background: radial-gradient(ellipse 100% 70% at 100% 50%, rgba(138, 182, 255, 0.34), rgba(138, 182, 255, 0) 100%); }
+.plyr .vx-seek.is-on { opacity: 1; transition-duration: 0.1s; }
+.plyr .vx-seek.is-on .vx-seek-ico { animation: vx-nudge-l 0.5s var(--ease); }
+.plyr .vx-seek--r.is-on .vx-seek-ico { animation-name: vx-nudge-r; }
+.plyr .vx-seek-ico { display: block; line-height: 0; }
+@keyframes vx-nudge-l { from { transform: translateX(10px); } to { transform: none; } }
+@keyframes vx-nudge-r { from { transform: translateX(-10px); } to { transform: none; } }
+.plyr .vx-scrub { position: absolute; z-index: 5; left: 50%; top: 50%; padding: 0.55rem 1.1rem; border-radius: 14px; background: var(--vp-glass); color: #fff; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14), 0 10px 26px rgba(0, 0, 0, 0.45); font-size: 1.15rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: pre; opacity: 0; pointer-events: none; transform: translate(-50%, -50%) scale(0.94); transition: opacity 0.15s ease, transform 0.2s var(--ease); }
+.plyr .vx-scrub.is-on { opacity: 1; transform: translate(-50%, -50%); }
+@media (max-width: 40rem) { .plyr .vx-hud { font-size: 0.82rem; top: 0.6rem; } .plyr .vx-scrub { font-size: 1rem; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .plyr .video-cc-menu, .plyr .vx-seek.is-on .vx-seek-ico { animation: none; }
+  .plyr .vx-hud, .plyr .vx-seek, .plyr .vx-scrub { transition: none; }
+}

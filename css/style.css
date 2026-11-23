@@ -328,6 +328,19 @@ body.no-scroll { overflow: hidden; }
 .hero { min-height: max(30rem, calc(100vh - var(--header-h))); min-height: max(30rem, calc(100svh - var(--header-h))); }
 .hero-img { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; object-fit: cover; animation: hero-zoom 16s ease-out both; }
 @keyframes hero-zoom { from { transform: scale(1.08); } to { transform: scale(1); } }
+/* Home hero with a background video (js/hero-video.js). The picture under it is frame 1 of the loop, so it does not zoom (the swap must not jump);
+   the video fades in over it the moment it is really playing. Without script, with reduced motion or Save-Data the picture simply stays. */
+.hero-has-video .hero-img { animation: none; }
+.hero-video { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.7s ease; pointer-events: none; background: transparent; }
+.hero.is-video-playing .hero-video { opacity: 1; }
+.hero-video-toggle { position: absolute; z-index: 2; right: max(1rem, env(safe-area-inset-right)); bottom: 1rem; display: inline-grid; place-items: center; width: 2.75rem; height: 2.75rem; padding: 0; border: 1px solid rgba(255, 255, 255, 0.45); border-radius: 50%; background: rgba(5, 9, 20, 0.55); color: #fff; cursor: pointer; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); transition: background-color 0.2s, transform 0.25s var(--ease); }
+.hero-video-toggle[hidden] { display: none; }
+.hero-video-toggle:hover { background: rgba(5, 9, 20, 0.8); transform: scale(1.06); }
+.hero-video-toggle:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+.hero-video-toggle .i-play { display: none; }
+.hero-video-toggle[aria-pressed="true"] .i-pause { display: none; }
+.hero-video-toggle[aria-pressed="true"] .i-play { display: block; }
+@media (prefers-reduced-motion: reduce) { .hero-video, .hero-video-toggle { display: none !important; } }
 /* One shared gradient for every hero. The bottom is dark where the words sit, then it fades in many small steps
    (an eased curve, so there is no visible band). A soft dark top edge keeps the menu readable. The middle and the
    right stay clear, so the photo keeps its colour. */
@@ -1306,10 +1319,95 @@ html.is-listening { scroll-behavior: auto; }
 @media print { .video-figure.is-mini .plyr { position: static; width: auto; } .video-mini-tools, .video-mini-resize { display: none !important; } }
 .video-load { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; padding: 0; border: 0; border-radius: var(--radius-lg); overflow: hidden; background: linear-gradient(135deg, #0b1738, #1e3a9e); color: #fff; box-shadow: var(--shadow-lg); cursor: pointer; }
 .video-load img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.video-load::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(5, 9, 20, 0.85), rgba(5, 9, 20, 0.15) 60%); }
-.video-load-play { position: absolute; z-index: 1; left: 50%; top: 45%; display: grid; place-items: center; width: 4.5rem; height: 4.5rem; border-radius: 50%; background: #fff; color: #142a78; transform: translate(-50%, -50%); transition: transform 0.3s var(--ease); }
-.video-load:hover .video-load-play { transform: translate(-50%, -50%) scale(1.08); }
-.video-load-note { position: absolute; z-index: 1; left: 1rem; right: 1rem; bottom: 0.9rem; font-size: 0.9375rem; font-weight: 600; line-height: 1.4; text-align: left; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6); }
+.video-load::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(5, 9, 20, 0.35), rgba(5, 9, 20, 0) 55%); }
+/* One size for every play button (the poster button, the player's big button and the loading disc): small enough not to cover the picture. */
+:root { --play-size: 3.5rem; }
+@media (max-width: 40rem) { :root { --play-size: 3rem; } }
+.video-load-play { position: absolute; z-index: 1; left: 50%; top: 50%; display: grid; place-items: center; width: var(--play-size); height: var(--play-size); border-radius: 50%; background: #fff; color: #142a78; transform: translate(-50%, -50%); box-shadow: 0 0 0 calc(var(--play-size) * 0.1) rgba(255, 255, 255, 0.28), 0 6px 20px rgba(0, 0, 0, 0.4); transition: transform 0.3s var(--ease); }
+
+.video-load-play::before { content: ""; width: calc(var(--play-size) * 0.34); height: calc(var(--play-size) * 0.38); margin-left: calc(var(--play-size) * 0.06); background: currentColor; clip-path: polygon(0 0, 100% 50%, 0 100%); } /* the triangle is drawn here, not as an <svg> (see renderMedia in scripts/lib/markdown.mjs) */
+.video-load:hover .video-load-play, .video-load:focus-visible .video-load-play { transform: translate(-50%, -50%) scale(1.08); }
+.video-load:focus-visible { outline: 3px solid #fff; outline-offset: -6px; }
+/* The player's own big play button: white disc, dark triangle, soft ring and shadow, so it stands out on a dark or a bright frame
+   (it was the page's navy on a dark video before, which nearly vanished). */
+.plyr.plyr--video .plyr__control.plyr__control--overlaid { display: grid; place-items: center; width: var(--play-size); height: var(--play-size); padding: 0; background: #fff; color: #142a78; opacity: 1; box-shadow: 0 0 0 calc(var(--play-size) * 0.1) rgba(255, 255, 255, 0.28), 0 6px 20px rgba(0, 0, 0, 0.4); transition: transform 0.25s var(--ease), box-shadow 0.25s; }
+.plyr.plyr--video .plyr__control.plyr__control--overlaid:hover, .plyr.plyr--video .plyr__control.plyr__control--overlaid:focus-visible { background: #fff; color: #142a78; box-shadow: 0 0 0 calc(var(--play-size) * 0.14) rgba(255, 255, 255, 0.34), 0 8px 26px rgba(0, 0, 0, 0.45); }
+.plyr.plyr--video .plyr__control.plyr__control--overlaid:focus-visible { outline: 3px solid #fff; outline-offset: 4px; }
+/* Motion of the video players (poster button, big play button, play/pause icon, pause dim, loading ring). Everything is transform and opacity only
+   (cheap to draw, no layout shift) and all of it stops under prefers-reduced-motion. Keyframe names vid-* are unique to this block. */
+@keyframes vid-pop { from { opacity: 0; transform: translate(-50%, -50%) scale(0.5); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+/* the big button: springs in when the video is paused, bursts outwards and fades when it plays */
+.plyr.plyr--video .plyr__control.plyr__control--overlaid { transform: translate(-50%, -50%) scale(1); transition: opacity 0.28s ease, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), visibility 0s, scale 0.25s var(--ease), box-shadow 0.25s; }
+.plyr.plyr--video.plyr--paused .plyr__control.plyr__control--overlaid { animation: vid-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) backwards; }
+.plyr.plyr--video.plyr--playing .plyr__control.plyr__control--overlaid { opacity: 0; visibility: hidden; transform: translate(-50%, -50%) scale(1.5); transition: opacity 0.3s ease, transform 0.45s cubic-bezier(0.2, 0.7, 0.2, 1), visibility 0s 0.45s; }
+.plyr.plyr--video .plyr__control.plyr__control--overlaid:hover { scale: 1.07; }
+.plyr.plyr--video .plyr__control.plyr__control--overlaid:active { scale: 0.92; transition-duration: 0.28s, 0.12s, 0s, 0.1s, 0.2s; }
+/* the real controls: the play/pause, sound and full-screen icons cross-fade and turn into each other instead of switching */
+.plyr .plyr__control[data-plyr="mute"], .plyr .plyr__control[data-plyr="fullscreen"] { display: inline-grid; place-items: center; }
+.plyr .plyr__control[data-plyr="mute"] svg, .plyr .plyr__control[data-plyr="fullscreen"] svg { grid-area: 1 / 1; display: block; transition: opacity 0.2s ease, transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.plyr .plyr__control[data-plyr="mute"] .icon--pressed, .plyr .plyr__control[data-plyr="fullscreen"] .icon--pressed { opacity: 0; transform: scale(0.4) rotate(-70deg); }
+.plyr .plyr__control[data-plyr="mute"] .icon--not-pressed, .plyr .plyr__control[data-plyr="fullscreen"] .icon--not-pressed { opacity: 1; transform: none; }
+.plyr .plyr__control--pressed[data-plyr="mute"] .icon--pressed, .plyr .plyr__control--pressed[data-plyr="fullscreen"] .icon--pressed { opacity: 1; transform: none; }
+.plyr .plyr__control--pressed[data-plyr="mute"] .icon--not-pressed, .plyr .plyr__control--pressed[data-plyr="fullscreen"] .icon--not-pressed { opacity: 0; transform: scale(0.4) rotate(70deg); }
+/* The play and pause marks are one shape that turns into the other: two pieces (a left and a right half) whose clip-path moves between the halves of a
+   triangle and two bars, with the same number of corners so the browser can animate them. The control bar button and the big button use the same
+   mark, so a press reads the same everywhere; on "resume" the big disc swells and fades while its triangle becomes the bars (the pause mark), and when
+   the video pauses the disc springs back while the bars become the triangle. No SVG is drawn here: the pieces are ::before and ::after. */
+.plyr .plyr__control[data-plyr="play"]:not(.plyr__control--overlaid) { --glyph: 1.05rem; position: relative; min-width: 2.25rem; min-height: 2.25rem; } /* (:not: the big button is also data-plyr="play" and must stay position: absolute) */
+.plyr .plyr__control--overlaid { --glyph: calc(var(--play-size) * 0.4); }
+.plyr .plyr__control[data-plyr="play"] svg, .plyr .plyr__control--overlaid svg { display: none; }
+.plyr .plyr__control[data-plyr="play"]::before, .plyr .plyr__control[data-plyr="play"]::after, .plyr .plyr__control--overlaid::before, .plyr .plyr__control--overlaid::after {
+  content: ""; position: absolute; left: 50%; top: 50%; width: var(--glyph); height: var(--glyph); margin: calc(var(--glyph) / -2) 0 0 calc(var(--glyph) / -2); background: currentColor; pointer-events: none;
+  transition: clip-path 0.46s cubic-bezier(0.65, 0, 0.35, 1), transform 0.46s cubic-bezier(0.34, 1.3, 0.64, 1); will-change: clip-path;
+}
+/* play: the left half and the right half of one triangle (its centre of weight sits slightly right of the middle, so it is nudged) */
+.plyr .plyr__control[data-plyr="play"]::before, .plyr .plyr__control--overlaid::before { clip-path: polygon(14% 0%, 52% 23%, 52% 77%, 14% 100%); transform: translateX(6%); }
+.plyr .plyr__control[data-plyr="play"]::after, .plyr .plyr__control--overlaid::after { clip-path: polygon(52% 23%, 96% 50%, 96% 50%, 52% 77%); transform: translateX(6%); }
+/* pause: two bars (while the video plays; the big disc is leaving by then) */
+.plyr .plyr__control--pressed[data-plyr="play"]::before, .plyr.plyr--playing .plyr__control--overlaid::before { clip-path: polygon(16% 6%, 40% 6%, 40% 94%, 16% 94%); transform: none; }
+.plyr .plyr__control--pressed[data-plyr="play"]::after, .plyr.plyr--playing .plyr__control--overlaid::after { clip-path: polygon(60% 6%, 84% 6%, 84% 94%, 60% 94%); transform: none; }
+.plyr .plyr__control[data-plyr="play"]:active::before, .plyr .plyr__control[data-plyr="play"]:active::after { transform: scale(0.82); }
+/* a paused video is softly dimmed (the frame stays readable) and brightens as it plays */
+.plyr--video .plyr__video-wrapper::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(ellipse at center, rgba(5, 9, 20, 0.08) 30%, rgba(5, 9, 20, 0.5) 100%); opacity: 0; transition: opacity 0.5s ease; }
+.plyr--video.plyr--paused .plyr__video-wrapper::after { opacity: 1; }
+.plyr--video .plyr__controls { transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+/* While a YouTube video is being fetched (between the press on the poster and the first moving frame) the disc of the button stays where it was, its
+   triangle folds away, the disc shrinks to a small dot, and soft waves spread out from that dot one after another. When the picture moves the dot
+   flares and fades. The disc and the waves never grow bigger than the button's own surroundings. */
+.plyr .video-waves { position: absolute; z-index: 3; left: 50%; top: 50%; width: var(--play-size); height: var(--play-size); transform: translate(-50%, -50%); pointer-events: none; display: none; }
+.plyr.is-starting .video-waves { display: block; }
+.video-waves i { position: absolute; inset: 0; border-radius: 50%; border: 1.5px solid rgba(255, 255, 255, 0.9); background: rgba(255, 255, 255, 0.12); box-shadow: 0 0 8px rgba(5, 9, 20, 0.4); opacity: 0; animation: vid-wave 2.1s cubic-bezier(0.2, 0.6, 0.3, 1) 0.5s infinite; }
+.video-waves i:nth-child(2) { animation-delay: 1.2s; }
+.video-waves i:nth-child(3) { animation-delay: 1.9s; }
+.video-waves b { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 50%; background: #fff; color: #142a78; box-shadow: 0 0 0 calc(var(--play-size) * 0.1) rgba(255, 255, 255, 0.28), 0 6px 20px rgba(0, 0, 0, 0.4); animation: vid-dot 0.55s cubic-bezier(0.6, 0, 0.2, 1) 0.1s forwards, vid-pulse 0.7s ease-in-out 0.65s infinite; }
+.video-waves b::before { content: ""; width: calc(var(--play-size) * 0.34); height: calc(var(--play-size) * 0.38); margin-left: calc(var(--play-size) * 0.06); background: currentColor; clip-path: polygon(0 0, 100% 50%, 0 100%); animation: vid-fold 0.4s cubic-bezier(0.55, 0, 0.7, 0.2) forwards; }
+.video-waves.is-done { animation: vid-burst 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) forwards; }
+@keyframes vid-wave { 0% { transform: scale(0.26); opacity: 0; } 10% { opacity: 0.85; } 100% { transform: scale(2.1); opacity: 0; } }
+@keyframes vid-fold { to { transform: scale(0) rotate(90deg); opacity: 0; } }
+@keyframes vid-dot { to { transform: scale(0.26); } }
+@keyframes vid-pulse { 0%, 100% { scale: 1; } 50% { scale: 1.18; } }
+@keyframes vid-burst { 40% { transform: translate(-50%, -50%) scale(1.4); opacity: 1; } to { transform: translate(-50%, -50%) scale(1.8); opacity: 0; } }
+.plyr.is-starting .plyr__control.plyr__control--overlaid { opacity: 0; visibility: hidden; animation: none; }
+/* the picture of the poster button (the same <img>, moved here by js/site.js) stays under the waves until the first moving frame, then fades */
+.plyr .video-start-still { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; object-fit: cover; pointer-events: none; transition: opacity 0.5s ease, filter 0.6s ease; }
+.plyr.is-starting .video-start-still:not(.is-done) { filter: brightness(0.68); } /* the picture dims a little while it loads, so the waves read on a bright picture too */
+.plyr .video-start-still.is-done { opacity: 0; }
+/* The subtitles button, the quality and shortcuts pages, the keyboard and touch notes and the colours of the player's own menus live in css/video-extras.css
+   (loaded with Plyr, with js/video-extras.js). */
+/* the poster button: feels pressed */
+.video-load-play { transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s; }
+.video-load:active .video-load-play { transform: translate(-50%, -50%) scale(0.92); transition-duration: 0.12s; }
+.video-load img { transition: transform 0.6s var(--ease); }
+.video-load:hover img { transform: scale(1.03); }
+@media (prefers-reduced-motion: reduce) {
+  .plyr.plyr--video .plyr__control.plyr__control--overlaid, .plyr .plyr__control svg, .plyr .plyr__control::before, .plyr .plyr__control::after, .plyr--video .plyr__video-wrapper::after, .plyr--video .plyr__controls, .video-load-play, .video-load img { transition: none !important; animation: none !important; }
+  .plyr.is-starting .video-waves, .video-waves i, .video-waves b::before { animation: none !important; }
+  .video-waves i { display: none; }
+  .plyr .video-start-still { transition: none; filter: none !important; }
+  .video-load:hover img { transform: none; }
+}
+.video-error { margin: 0.75rem 0 0; padding: 0.75rem 1rem; border: 1px solid var(--line); border-radius: var(--radius-md, 10px); background: var(--surface); color: var(--text); font-size: 0.9688rem; text-align: center; }
+.video-error a { font-weight: 700; text-decoration: underline; }
 
 /* While an article is being read the page keeps scrolling by itself, so the header's frosted-glass blur is switched off
    (it is the most expensive thing to repaint on weak devices). */
@@ -2085,3 +2183,39 @@ html.mo-gliding { scroll-behavior: auto !important; overflow-anchor: none; }
 @media (max-width: 63.99rem) { .tbl-chips, .tbl-nav { display: none; } }
 @media (prefers-reduced-motion: reduce) { .tbl-slide.is-in { animation: none !important; } .tbl-chip, .tbl-btn { transition: none; } }
 @media print { .tbl-chips, .tbl-nav, .table-hint { display: none !important; } .tbl-slide { display: block !important; } }
+
+/* The sign-up box for readers who arrive from the old blog (js/oldblog-prompt.js; markup in oldBlogPrompt() in scripts/lib/render.mjs).
+   Not a modal: no backdrop, the page behind stays usable. A sheet at the bottom of a phone, a card at the bottom left from 40rem up
+   (the bottom right is taken by the back-to-top button and the small video window). Layer 54: above those two, under the drawer's
+   backdrop (55), the search (70), the Listen player (70) and the cookie notice (80); the script waits while any of them is on screen.
+   Only transform and opacity move. */
+.obp { position: fixed; z-index: 54; left: 0; right: 0; bottom: 0; max-height: min(36rem, calc(100dvh - 1rem)); overflow-y: auto; overscroll-behavior: contain; padding: 1rem 1.25rem calc(0.9rem + env(safe-area-inset-bottom)); background: var(--surface); color: var(--text); border: 1px solid var(--line-soft); border-bottom: 0; border-radius: 1.25rem 1.25rem 0 0; box-shadow: 0 -18px 50px -18px rgba(11, 18, 32, 0.45); transform: translate3d(0, 105%, 0); opacity: 0; visibility: hidden; transition: transform 0.5s var(--ease), opacity 0.3s, visibility 0s linear 0.5s; }
+.obp.is-open { transform: none; opacity: 1; visibility: visible; transition-delay: 0s; }
+.obp-x { position: absolute; top: 0.5rem; right: 0.5rem; display: grid; place-items: center; width: 2.75rem; height: 2.75rem; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--text-3); cursor: pointer; transition: background-color 0.2s, color 0.2s; }
+.obp-x:hover { background: var(--bg-alt); color: var(--text); }
+.obp-x:focus-visible { outline: 3px solid var(--ring, #2f6bff); outline-offset: 2px; }
+.obp-kicker { display: inline-flex; align-items: center; gap: 0.4rem; margin: 0 0 0.55rem; padding: 0.25rem 0.75rem 0.25rem 0.6rem; border-radius: 999px; background: var(--soft); color: var(--soft-text); font-size: 0.8125rem; font-weight: 700; line-height: 1.3; }
+.obp-title { margin: 0; padding-right: 2.75rem; font-size: 1.25rem; font-weight: 900; line-height: 1.2; }
+.obp-text { margin: 0.35rem 0 0.9rem; color: var(--text-2); font-size: 1rem; line-height: 1.5; }
+.obp .nl-mini .foot-form-note a { color: var(--link); text-decoration: underline; text-underline-offset: 2px; }
+.obp-later { display: block; min-height: 2.75rem; margin: 0.2rem 0 -0.4rem -0.5rem; padding: 0 0.5rem; border: 0; background: none; color: var(--text-3); font: inherit; font-size: 0.9375rem; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.obp-later:hover { color: var(--text); }
+.obp-later:focus-visible { outline: 3px solid var(--ring, #2f6bff); outline-offset: 2px; }
+.obp[data-done] .obp-later { display: none; }
+/* the box floats over the page, so its form need not keep the room of the "Check your inbox" card free (that is for forms inside the page): only the visible panel takes space */
+.obp .nl-panel-done, .obp .nl-form[data-state="sent"] .nl-panel-form { display: none; }
+.obp .nl-form[data-state="sent"] .nl-panel-done { display: grid; }
+/* narrow or short screens (phones, phones turned sideways): the line under the title goes (the kicker, the title and the note under the field say the same), and on a short one the field and button share a row */
+@media (max-width: 39.99rem), (max-height: 40rem) { .obp-text { display: none; } .obp-title { margin-bottom: 0.75rem; } }
+@media (max-height: 33rem) {
+  .obp { padding-top: 0.9rem; }
+  .obp-kicker { display: none; }
+  .obp .nl-mini .nl-field { flex-direction: row; align-items: center; gap: 0.5rem; }
+  .obp .nl-mini .nl-btn { width: auto; flex: none; padding: 0 1.1rem; }
+  .obp .nl-mini input[type="email"] { flex: 1 1 auto; min-width: 0; }
+}
+@media (min-width: 40rem) {
+  .obp { left: 1.25rem; right: auto; bottom: 1.25rem; width: 24rem; padding-bottom: 1.1rem; border-bottom: 1px solid var(--line-soft); border-radius: 1.25rem; box-shadow: var(--shadow-lg); transform: translate3d(0, 1.5rem, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .obp, .obp.is-open { transform: none; transition: opacity 0.15s, visibility 0s linear 0.15s; } .obp.is-open { transition-delay: 0s; } }
+@media print { .obp { display: none !important; } }

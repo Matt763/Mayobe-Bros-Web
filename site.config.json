@@ -15,6 +15,7 @@
   "logoSmall": "assets/img/logo-500.webp",
   "orgLogo": "assets/img/icon-512.png",
   "heroImage": "assets/img/hero.webp",
+  "heroVideo": { "src": "assets/video/home/mayobebros" },
   "ogImage": "assets/img/og-default.jpg",
   "heroBadge": "Knowledge & Insights",
   "footerText": "Clear, honest guides on education, jobs, money and technology for readers in Tanzania. Every article is checked against official sources and corrected in the open.",

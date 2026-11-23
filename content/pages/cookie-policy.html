@@ -3,7 +3,7 @@ title: Cookie Policy
 description: Exactly which cookies and browser storage Mayobe Bros uses, what each is for and how to change your choice.
 kind: legal
 order: 12
-updated: 2026-11-09
+updated: 2026-11-22
 ---
 <p>This page lists what {{site-name}} stores in your browser. Cookies are small text files. Browsers also have "local storage", which works in a similar way. We keep both to a minimum.</p>
 
@@ -17,6 +17,8 @@ updated: 2026-11-09
     <tr><td><code>mayobebros-mini-player</code></td><td>Local storage</td><td>Remembers where you moved the floating video window and how big you made it. Created only when you move or resize it.</td><td>Until you clear it (double-click the move button to reset)</td></tr>
     <tr><td><code>mayobebros-reader</code></td><td>Local storage</td><td>Remembers that you chose dark reading mode in the past paper reader. Created only when you switch that mode on or off.</td><td>Until you clear it (switch the mode off again to reset)</td></tr>
     <tr><td><code>mayobebros-listen-rate</code>, <code>mayobebros-listen-voice</code></td><td>Local storage</td><td>Remember the reading speed and the voice you picked for "Listen to this article". Created only when you change them.</td><td>Until you clear them</td></tr>
+    {{#newsletter}}<tr><td><code>mayobebros-from-oldblog</code></td><td>Session storage</td><td>If you arrive from our old blog, remembers this during your visit, so that the email sign-up box is shown once, after you finish an article. It then says the box was shown. Nothing is sent anywhere.</td><td>Until you close the tab</td></tr>{{/newsletter}}
+    {{#newsletter}}<tr><td><code>mayobebros-oldblog-prompt</code></td><td>Local storage</td><td>Remembers, as a date only, that you closed that sign-up box (it stays away for 14 days) or signed up for the newsletter (it stays away for a year). Created only when you close the box or sign up.</td><td>14 days after you close the box, a year after you sign up, or until you clear it</td></tr>{{/newsletter}}
     {{#comments}}<tr><td><code>mb_own</code></td><td>Local storage</td><td>The secret codes that let you edit or delete your own comments. Created when you comment, or when you press the button on the page the link in our email opens.</td><td>Until you clear it or delete the comment</td></tr>{{/comments}}
     {{#comments}}<tr><td><code>mb_stats</code></td><td>Session storage</td><td>Keeps comment and reaction counts for a minute so pages load faster.</td><td>Until you close the tab</td></tr>{{/comments}}
   </tbody>
@@ -24,7 +26,7 @@ updated: 2026-11-09
 <p>None of these identifies you by name, and none is used to track you across other websites.</p>
 
 {{#analytics}}<h2>Analytics cookies (Google Tag Manager and Google Analytics)</h2>
-<p>We use Google Tag Manager to measure how many people visit and which pages they read. Google may set cookies for this. We load it only after you press <strong>Accept</strong>. If you press <strong>Reject</strong>, nothing is loaded and no analytics cookies are set by us. You can change your choice any time with the <strong>Cookie choices</strong> link at the bottom of any page. Google explains its use of data in its <a href="https://policies.google.com/privacy" rel="noopener">Privacy Policy</a>.</p>
+<p>We use Google Analytics 4, loaded through Google Tag Manager, to measure how many people visit and which pages they read. It sets two cookies on our domain, both starting with <code>_ga</code>: <code>_ga</code> tells visitors apart (it lasts up to two years) and <code>_ga_</code> followed by an identifier keeps the session. Google Analytics keeps the data for 14 months. Candidate numbers typed into the results search are removed from page addresses before Google Analytics stores them. We load it only after you press <strong>Accept</strong>. If you press <strong>Reject</strong>, nothing is loaded and no analytics cookies are set by us. You can change your choice any time with the <strong>Cookie choices</strong> link at the bottom of any page. Google explains its use of data in its <a href="https://policies.google.com/privacy" rel="noopener">Privacy Policy</a>.</p>
 {{/analytics}}
 {{#comments}}<h2>Article read counts (no cookies, nothing stored)</h2>
 <p>Our own server counts how many people read each article, to order the Popular page. This stores nothing in your browser and sets no cookie. It counts a read only after an article has been open for about 20 seconds and you have scrolled part of it, and it skips browsers that send the Global Privacy Control or Do Not Track signal. See "Which articles are read most" in the <a href="{{base}}/privacy-policy/">Privacy Policy</a>.</p>

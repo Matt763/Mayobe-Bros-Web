@@ -295,3 +295,6 @@ Section heroes of Examination Past Papers, `assets/img/heroes/papers-csee.webp`,
 
 | `gta-6-cheat-codes-list-ps5-xbox.webp` | gta-6-cheat-codes-list-ps5-xbox.md | Drawn in code by Mayobe Bros (sunset, sun, palms, grid; also the cover of the PDF). Own work. |
 | `gta-6-cheat-codes-guide-cover.webp` | gta-6-cheat-codes-list-ps5-xbox.md | Cover page of the PDF, drawn in code by Mayobe Bros. Own work. |
+
+## Home hero video and picture (2026-11-22)
+`assets/video/home/mayobebros-*` and `assets/img/hero*.webp` (frame 1 of the video): a giraffe standing on a hill above farmland and a mountain, 1920x1080, 25 fps, 29 s, from the owner's download `5214219-hd_1920_1080_25fps.mp4`. The file name follows Pexels' scheme (video 5214219, Pexels licence: free for commercial use, credit not required). **Still to add here: the Pexels page link and the film-maker's name** (Pexels blocked an automatic lookup). Made with `scripts/tools/make-hero-video.mjs`.

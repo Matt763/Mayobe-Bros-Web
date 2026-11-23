@@ -155,7 +155,16 @@
     window.setTimeout(function () { for (var j = 0; j < pending.length; j++) finish(pending[j]); }, ENTER_FALLBACK);
   }
 
+  /* Writes the address bar without telling Google Analytics. The Google tag replaces history.replaceState on the page itself and
+     counts every change of address as a new page view, so typing in a search box (which writes ?q=) used to add a page view
+     with the typed words in it (found 2026-11-22). The method on History.prototype is the browser's own and is never replaced. */
+  function replaceQuiet(state, title, url) {
+    try { History.prototype.replaceState.call(window.history, state, title, url); }
+    catch (e) { window.history.replaceState(state, title, url); }
+  }
+
   window.MBMotion = {
+    replaceQuiet: replaceQuiet,
     LEAVE_MS: LEAVE_MS,
     GAP: GAP,
     easeInOutCubic: easeInOutCubic,

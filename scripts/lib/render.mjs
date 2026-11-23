@@ -201,7 +201,7 @@ export function createRenderer(ctx) {
     let apiOrigin = '';
     try { apiOrigin = api ? new URL(api).origin : ''; } catch { apiOrigin = ''; }
     const hashes = inlineScripts.map((t) => `'sha256-${createHash('sha256').update(t, 'utf8').digest('base64')}'`);
-    const google = ['https://*.google-analytics.com', 'https://*.analytics.google.com', 'https://*.googletagmanager.com', 'https://*.g.doubleclick.net', 'https://www.google.com'];
+    const google = ['https://*.google-analytics.com', 'https://analytics.google.com', 'https://*.analytics.google.com', 'https://*.googletagmanager.com', 'https://*.g.doubleclick.net', 'https://www.google.com'];
     const script = ["'self'", ...hashes];
     if (pdfjs) script.push("'wasm-unsafe-eval'"); // pdf.js decodes some scanned images with WebAssembly (past-papers pages only)
     const connect = ["'self'", apiOrigin, ...extraConnect];
@@ -417,6 +417,24 @@ ${skeleton ? `<style>${skeletonCss}</style>\n<script>${skeletonScript(assetUrl('
         </form>`;
   }
 
+  /* The sign-up box for readers who arrive from the old blog (mbagamc.blogspot.com). It sits in a <template>, so it is not part of the page
+     text and nothing in it is read or sent: js/site.js loads js/oldblog-prompt.js only for those readers, and that script puts a copy on
+     the page once, after the reader finishes the article. The form inside is the ordinary sign-up form (`newsletterForm`), wired by
+     js/subscribe.js (`window.MBNewsletter.wire`). Written only for articles, and only when the newsletter is on. */
+  function oldBlogPrompt() {
+    return `<template data-oldblog-prompt data-src="${assetUrl('js/oldblog-prompt.js')}">
+<section class="obp" role="region" aria-labelledby="obp-title" aria-describedby="obp-text" data-obp>
+  <button class="obp-x" type="button" data-obp-close aria-label="Close">${icon('x', 20)}</button>
+  <p class="obp-kicker">${icon('mail', 15)} From our old blog</p>
+  <h2 class="obp-title" id="obp-title">Thanks for reading. Stay in touch.</h2>
+  <p class="obp-text" id="obp-text">New articles are published here now. Get each one by email.</p>
+  ${newsletterForm('obp', true)}
+  <button class="obp-later" type="button" data-obp-close>Not now</button>
+  <p class="sr-only" role="status" data-obp-live></p>
+</section>
+</template>`;
+  }
+
   /* ------------------------------------------------------------- footer */
   function footer() {
     const socials = [['facebook', 'Facebook'], ['twitter', 'X'], ['instagram', 'Instagram'], ['linkedin', 'LinkedIn'], ['whatsapp', 'WhatsApp Channel']].filter(([k]) => config.social?.[k]);
@@ -430,7 +448,7 @@ ${skeleton ? `<style>${skeletonCss}</style>\n<script>${skeletonScript(assetUrl('
         <noscript><p class="foot-form-note foot-nojs">Email sign-up needs JavaScript. You can follow new articles with RSS instead.</p><a class="btn btn-primary btn-lg" href="${u('/rss/')}">${icon('rss', 18)} Follow with RSS</a></noscript>`
       : `<a class="btn btn-primary btn-lg" href="${u('/rss/')}">${icon('rss', 18)} Follow with RSS</a>`;
     return `<footer class="site-footer">
-  <div class="foot-cta">
+  <div class="foot-cta" id="subscribe">
     <div class="wrap foot-cta-in">
       <div>
         <h2>${newsletter ? 'Get new articles by email' : 'Learn something useful every week'}</h2>
@@ -479,7 +497,7 @@ ${body}
 ${meta.footer === false ? '' : footer()}
 ${SEARCH_MODAL()}
 <script src="${assetUrl('js/motion.js')}" defer></script>
-${config.turnstileSiteKey && !meta.app ? `<script src="${assetUrl('js/turnstile.js')}" defer></script>\n` : ''}${meta.notFound ? `<script src="${assetUrl('js/notfound.js')}" defer></script>\n<script src="${assetUrl('js/notfound-posts.js')}" defer></script>\n` : ''}<script src="${assetUrl('js/site.js')}" defer></script>${meta.listen ? `\n<script src="${assetUrl('js/listen.js')}" defer></script>` : ''}${meta.listen && copyGuard.mode !== 'off' ? `\n<script src="${assetUrl('js/copy-note.js')}" defer data-copy-mode="${copyGuard.mode}" data-copy-min="${copyGuard.minChars}"></script>` : ''}${!meta.app && body.includes('class="table-wrapper"') ? `\n<script src="${assetUrl('js/tables.js')}" defer></script>` : ''}${!meta.app && (body.includes('class="pagination"') || body.includes('hero-listing')) ? `\n<script src="${assetUrl('js/pager.js')}" defer></script>` : ''}${api && !meta.app ? `\n<script src="${assetUrl('js/engage.js')}" defer></script>` : ''}${api && meta.listen ? `\n<script src="${assetUrl('js/reads.js')}" defer></script>` : ''}${api && meta.contact ? `\n<script src="${assetUrl('js/contact.js')}" defer></script>` : ''}${api && meta.manage ? `\n<script src="${assetUrl('js/manage.js')}" defer></script>` : ''}${newsletter ? `\n<script src="${assetUrl('js/subscribe.js')}" defer></script>` : ''}${(meta.moduleScripts || []).map((f) => `\n<script type="module" src="${assetUrl(f)}"></script>`).join('')}${newsletter && meta.newsletterPage ? `\n<script src="${assetUrl('js/newsletter.js')}" defer></script>` : ''}${cfToken && !meta.manage && !meta.newsletterPage ?`\n<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${cfToken}"}'></script>` : ''}
+${config.turnstileSiteKey && !meta.app ? `<script src="${assetUrl('js/turnstile.js')}" defer></script>\n` : ''}${meta.notFound ? `<script src="${assetUrl('js/notfound.js')}" defer></script>\n<script src="${assetUrl('js/notfound-posts.js')}" defer></script>\n` : ''}<script src="${assetUrl('js/site.js')}" defer></script>${meta.heroVideo ? `\n<script src="${assetUrl('js/hero-video.js')}" defer></script>` : ''}${meta.listen ? `\n<script src="${assetUrl('js/listen.js')}" defer></script>` : ''}${meta.listen && copyGuard.mode !== 'off' ? `\n<script src="${assetUrl('js/copy-note.js')}" defer data-copy-mode="${copyGuard.mode}" data-copy-min="${copyGuard.minChars}"></script>` : ''}${!meta.app && body.includes('class="table-wrapper"') ? `\n<script src="${assetUrl('js/tables.js')}" defer></script>` : ''}${!meta.app && (body.includes('class="pagination"') || body.includes('hero-listing')) ? `\n<script src="${assetUrl('js/pager.js')}" defer></script>` : ''}${api && !meta.app ? `\n<script src="${assetUrl('js/engage.js')}" defer></script>` : ''}${api && meta.listen ? `\n<script src="${assetUrl('js/reads.js')}" defer></script>` : ''}${api && meta.contact ? `\n<script src="${assetUrl('js/contact.js')}" defer></script>` : ''}${api && meta.manage ? `\n<script src="${assetUrl('js/manage.js')}" defer></script>` : ''}${newsletter ? `\n<script src="${assetUrl('js/subscribe.js')}" defer></script>` : ''}${(meta.moduleScripts || []).map((f) => `\n<script type="module" src="${assetUrl(f)}"></script>`).join('')}${newsletter && meta.newsletterPage ? `\n<script src="${assetUrl('js/newsletter.js')}" defer></script>` : ''}${cfToken && !meta.manage && !meta.newsletterPage ?`\n<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${cfToken}"}'></script>` : ''}
 </body>
 </html>
 `;
@@ -502,17 +520,26 @@ ${config.turnstileSiteKey && !meta.app ? `<script src="${assetUrl('js/turnstile.
   const { mostRead } = popularOrder(posts, popularRanked);
   const popularList = () => popularOrder(posts, popularRanked).list;
 
-  function hero({ image, title, sub = '', extra = '', kind = 'page', h1 = true, kicker = '', alt = '', titleAttrs = '' }) {
+  // `video` (home page only): the base address of the converted clip (see scripts/tools/make-hero-video.mjs). The picture stays under it as the
+  // first frame (it IS frame 1 of the loop), so the page paints at once, and is all that is shown without script, with Save-Data, on a very slow
+  // network or with reduced motion. js/hero-video.js picks one size and format, starts it, and shows the pause button (WCAG 2.2.2).
+  function hero({ image, title, sub = '', extra = '', kind = 'page', h1 = true, kicker = '', alt = '', titleAttrs = '', video = '' }) {
     const tag = h1 ? 'h1' : 'h2';
-    return `<section class="hero hero-${kind}${/\/img\/heroes\//.test(image) ? ' hero-art' : ''}">
-  <img class="hero-img" src="${image}"${topicSet(image) ? ` srcset="${topicSet(image)}" sizes="100vw"` : ''} alt="${e(alt)}" fetchpriority="high" decoding="async">
+    const clip = video
+      ? `\n  <video class="hero-video" data-no-plyr muted loop playsinline preload="none" tabindex="-1" aria-hidden="true" disablepictureinpicture disableremoteplayback data-hero-video="${e(u('/' + video))}"></video>`
+      : '';
+    const toggle = video
+      ? `\n  <button class="hero-video-toggle" type="button" hidden aria-pressed="false" aria-label="Pause the background video" data-hero-video-toggle>${icon('pause', 20, 'i-pause')}${icon('play', 20, 'i-play')}</button>`
+      : '';
+    return `<section class="hero hero-${kind}${/\/img\/heroes\//.test(image) ? ' hero-art' : ''}${video ? ' hero-has-video' : ''}">
+  <img class="hero-img" src="${image}"${topicSet(image) ? ` srcset="${topicSet(image)}" sizes="100vw"` : ''} alt="${e(alt)}" fetchpriority="high" decoding="async">${clip}
   <div class="hero-scrim" aria-hidden="true"></div>
   <div class="hero-inner wrap">
     ${kicker ? `<p class="hero-kicker">${kicker}</p>` : ''}
     <${tag} class="hero-title"${titleAttrs}>${title}</${tag}>
     ${sub ? `<p class="hero-sub">${e(sub)}</p>` : ''}
     ${extra}
-  </div>
+  </div>${toggle}
 </section>`;
   }
 
@@ -756,6 +783,7 @@ ${config.turnstileSiteKey && !meta.app ? `<script src="${assetUrl('js/turnstile.
     const hero0 = hero({
       kind: 'home',
       image: heroImg,
+      video: config.heroVideo?.src || '',
       kicker: `<span class="pulse"></span>${e(config.heroBadge)}`,
       title: `${e(first)}${last ? ` <span>${e(last)}</span>` : ''}`,
       sub: config.slogan,
@@ -818,6 +846,7 @@ ${discover()}`;
         path: '/',
         preload: heroImg,
         adKind: 'home',
+        heroVideo: Boolean(config.heroVideo?.src),
         jsonLd: [{ '@context': 'https://schema.org', '@graph': [{ '@type': 'WebSite', '@id': abs('/') + '#website', name: config.name, alternateName: altNames, url: abs('/'), description: config.description, publisher: { '@id': abs('/') + '#organization' }, inLanguage: config.language }, orgJson()] }],
         bodyClass: 'page-home',
       },
@@ -1668,6 +1697,7 @@ ${related.length ? `<section class="section section-alt">
   </div>
 </section>` : ''}
 ${listenPlayer()}
+${newsletter ? oldBlogPrompt() : ''}
 <button class="to-top" type="button" data-to-top aria-label="Back to top" hidden>${icon('arrowUp', 20)}</button>`;
     const published = p.date.toISOString();
     const modified = (p.updated || p.date).toISOString();
