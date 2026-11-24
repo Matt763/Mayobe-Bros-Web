@@ -1,5 +1,7 @@
 ---
 title: "Studying HGE? Economics, Planning, Law and Teaching Degrees"
+metaTitle: "Kazi za HGE Combination Tanzania: Kozi na Pointi"
+metaDescription: "Kozi za uchumi, mipango miji, sheria na ualimu kwa HGE, kutoka TCU 2026/27. Jua sharti la Hisabati linaloweza kukuzuia kabla hujachagua."
 date: 2026-11-23
 author: Mclean Mbaga
 category: educational

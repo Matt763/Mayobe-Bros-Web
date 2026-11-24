@@ -18,6 +18,12 @@
         "image": "assets/img/topics/study-tips-2560.webp"
       },
       {
+        "name": "A-Level Subjects",
+        "slug": "a-level-subjects",
+        "description": "What each A-Level subject covers in Tanzania, topic by topic, with study advice and links to the right combinations.",
+        "image": "assets/img/topics/study-tips-2560.webp"
+      },
+      {
         "name": "Career Development",
         "slug": "career-development",
         "description": "Building skills and a career, step by step.",
@@ -155,7 +161,14 @@
     "slug": "video-games-updates",
     "description": "Video game news, reviews and updates.",
     "image": "assets/img/topics/video-games-updates-2560.webp",
-    "labels": []
+    "labels": [
+      {
+        "name": "Classic Games",
+        "slug": "classic-games",
+        "description": "Older games explained: what made them special and whether they are still worth playing today.",
+        "image": "assets/img/topics/video-games-updates-2560.webp"
+      }
+    ]
   },
   {
     "name": "Technology Solutions",

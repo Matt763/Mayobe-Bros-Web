@@ -1,5 +1,7 @@
 ---
 title: "HGK Combination: Teaching, Law, Kiswahili and Public Service Paths"
+metaTitle: "Kazi za HGK Combination Tanzania: Kozi na Pointi"
+metaDescription: "Umesikia kuwa HGK ni ya wanaoshindwa sayansi? Mwongozo wa TCU 2026/27 unaonyesha ualimu, sheria na kazi za jamii, pamoja na mipaka halisi ya HGK."
 date: 2026-11-23
 author: Mclean Mbaga
 category: educational

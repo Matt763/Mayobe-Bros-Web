@@ -1,5 +1,7 @@
 ---
 title: "PGM Combination: Jobs and Degrees in Land, Maps and Planning"
+metaTitle: "Kazi za PGM Combination Tanzania: Kozi na Pointi"
+metaDescription: "Geomatics, GIS, mipango miji, ardhi na uhandisi: kozi 13 za mfano za PGM kutoka TCU 2026/27, na masharti ya Chemistry yanayoweza kukuzuia."
 date: 2026-11-23
 author: Mclean Mbaga
 category: educational

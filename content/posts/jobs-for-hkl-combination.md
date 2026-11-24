@@ -1,5 +1,7 @@
 ---
 title: Is HKL a Good Combination? Degrees, Careers and Limits
+metaTitle: "Kazi za HKL Combination Tanzania: Kozi na Pointi"
+metaDescription: "HKL kwa ualimu, tafsiri na ukalimani, fasihi, sheria na uandishi wa habari: sifa za TCU 2026/27, pointi na milango ambayo HKL haifungui."
 date: 2026-11-23
 author: Mclean Mbaga
 category: educational

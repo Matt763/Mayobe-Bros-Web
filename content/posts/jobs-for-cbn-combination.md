@@ -1,5 +1,7 @@
 ---
 title: "CBN Combination: Nutrition, Nursing and Food Science Degrees"
+metaTitle: "Kazi za CBN Combination Tanzania: Kozi na Pointi"
+metaDescription: "CBN ni Chemistry, Biology na Food and Human Nutrition. Kozi za uuguzi, lishe na chakula, sifa za TCU 2026/27, na kwa nini kila chuo kina masharti yake."
 date: 2026-11-23
 author: Mclean Mbaga
 category: educational

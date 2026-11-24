@@ -1,5 +1,7 @@
 ---
 title: Jobs and Degrees You Can Study With the PCB Combination
+metaTitle: "Kazi za PCB Combination Tanzania: Mwongozo Kamili"
+metaDescription: "Udaktari, famasia, uuguzi, maabara na ualimu wa sayansi: kozi za PCB na pointi za TCU 2026/27. Pia kozi ambazo PCB haifikii na njia mbadala."
 date: 2026-04-24
 updated: 2026-11-23
 author: Mclean Mbaga

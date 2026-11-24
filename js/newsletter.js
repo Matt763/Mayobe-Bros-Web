@@ -1,4 +1,6 @@
 /* Mayobe Bros: the /newsletter/ page. It confirms a sign-up (#c=<code>) or stops the newsletter (#u=<code>) from the link in our email.
+   Opened with NO code (the goodbye email's "Subscribe again" button, or the address typed in) it is the sign-up page: it shows the ordinary
+   sign-up form from js/subscribe.js, which sends the address and asks for a confirmation link, and when that has been sent the card says so.
    Nothing is sent when the page opens: email scanners and link previewers open links too, so the API is called only when a person
    presses the button (the go function below). Nothing is stored in the browser.
    Every press ends in a sentence that says what happened: done, "Link is invalid or expired" (one wording for a wrong, old or used
@@ -12,8 +14,9 @@
   var box = doc.querySelector('[data-newsletter-page]');
   if (!box || API === '/v1') return;
   var $ = function (s) { return box.querySelector(s); };
-  var title = $('[data-nl-title]'), text = $('[data-nl-text]'), button = $('[data-nl-go]'), status = $('[data-nl-status]'), help = $('[data-nl-help]'), next = $('[data-next]');
+  var title = $('[data-nl-title]'), text = $('[data-nl-text]'), button = $('[data-nl-go]'), status = $('[data-nl-status]'), help = $('[data-nl-help]'), next = $('[data-next]'), signup = $('[data-nl-signup]');
   var WAIT_MS = 15000;
+  var signing = false; // true while the sign-up form is the screen
 
   // Read the code from the address bar once, then take it (and any query string) out of the address,
   // so it is not in history, the back button or a shared screenshot.
@@ -66,8 +69,24 @@
 
   if (kind === 'c') show('mail', 'Confirm your subscription', 'Press the button to finish signing up.', 'Confirm subscription');
   else if (kind === 'u') show('mail', 'Stop newsletter emails', 'Press the button to stop receiving them.', 'Unsubscribe');
-  else if (!frag) show('info', 'Open the email link', 'This page opens from the link in our email.');
+  else if (!frag && signup) {
+    // no code: someone who unsubscribed (the goodbye email's "Subscribe again" button) or who typed the address. The form starts hidden in the HTML
+    // and is shown only here, so a confirm or unsubscribe screen never carries it.
+    show('mail', 'Subscribe to our newsletter', 'Enter your email address to get new articles.');
+    if (help) help.hidden = true; // the form's note already links the Privacy Policy and the row under the card links Contact
+    signup.hidden = false;
+    signing = true;
+  } else if (!frag) show('info', 'Open the email link', 'This page opens from the link in our email.');
   else show('info', 'Link is invalid or expired', 'Open the link from the email again.');
+
+  // js/subscribe.js fires mb:subscribed on the document when the sign-up went through (no address is passed on). The card then says what to do
+  // next in the page's own style (drawn check, new heading, focus on it) and the form goes away. It is ignored on every other screen.
+  doc.addEventListener('mb:subscribed', function () {
+    if (!signing) return;
+    signing = false;
+    signup.hidden = true;
+    outcome('ok', 'is-ok', 'Check your inbox', 'If the address can receive email, a link is on its way. Open it to finish.', 'Check your inbox.', { noHelp: true });
+  });
 
   // One POST that gives up after 15 seconds. The first answer wins: a late reply after the timeout is ignored.
   function post(url, body) {

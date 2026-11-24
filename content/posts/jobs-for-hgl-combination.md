@@ -1,5 +1,7 @@
 ---
 title: HGL Combination: Degrees, Law and Jobs You Can Reach
+metaTitle: "Kazi za HGL Combination Tanzania: Kozi na Pointi"
+metaDescription: "Sheria, uandishi wa habari, ualimu na utawala wa umma: kozi zinazokubali HGL kwa mwongozo wa TCU 2026/27, pointi zinazohitajika na mipaka ya HGL."
 date: 2026-11-23
 author: Mclean Mbaga
 category: educational

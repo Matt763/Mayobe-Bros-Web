@@ -1,5 +1,7 @@
 ---
 title: "ECA Combination: Accounting, Finance and Business Careers"
+metaTitle: "Kazi za ECA Combination Tanzania: Kozi na NBAA"
+metaDescription: "Kozi za uhasibu, benki, kodi na ununuzi zinazokubali ECA, sifa za TCU 2026/27 na njia ya NBAA. Pia: ECA haifungui udaktari wala uhandisi."
 date: 2026-11-23
 author: Mclean Mbaga
 category: educational

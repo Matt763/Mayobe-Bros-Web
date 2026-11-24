@@ -1,5 +1,7 @@
 ---
 title: "CBG Combination in Tanzania: Degrees, Jobs and Limits"
+metaTitle: "Kazi za CBG Combination Tanzania: Umemaliza CBG?"
+metaDescription: "Kilimo, misitu, wanyamapori, mazingira, lishe na baadhi ya kozi za afya: CBG kutoka mwongozo wa TCU 2026/27. Haifungui udaktari, meno wala famasia."
 date: 2026-11-23
 author: Mclean Mbaga
 category: educational

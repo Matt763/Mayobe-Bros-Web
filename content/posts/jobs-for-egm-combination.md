@@ -1,5 +1,7 @@
 ---
 title: "EGM Combination: Degrees and Jobs for Economics, Geography, Maths"
+metaTitle: "Kazi za EGM Combination Tanzania: Kozi na Pointi"
+metaDescription: "Uchumi, takwimu, actuarial, mipango na ualimu: kozi 9 za mfano za EGM kutoka TCU 2026/27. EGM haifungui udaktari, uuguzi wala famasia."
 date: 2026-11-23
 author: Mclean Mbaga
 category: educational

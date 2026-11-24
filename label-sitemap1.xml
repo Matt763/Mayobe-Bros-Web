@@ -3,8 +3,9 @@
 <!-- mb-sitemap type=label part=1 of=1 start=1 -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://mayobebros.com/category/educational/online-learning/</loc><lastmod>2026-11-04</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://mayobebros.com/category/educational/study-tips/</loc><lastmod>2026-11-23</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://mayobebros.com/category/educational/career-development/</loc><lastmod>2026-11-04</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://mayobebros.com/category/educational/study-tips/</loc><lastmod>2026-11-24</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://mayobebros.com/category/educational/a-level-subjects/</loc><lastmod>2026-11-24</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://mayobebros.com/category/educational/career-development/</loc><lastmod>2026-11-24</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
   <url><loc>https://mayobebros.com/category/educational/results/</loc><lastmod>2026-11-17</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
   <url><loc>https://mayobebros.com/category/educational/results/csee/</loc><lastmod>2026-11-10</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
   <url><loc>https://mayobebros.com/category/educational/results/acsee/</loc><lastmod>2026-11-17</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
@@ -14,11 +15,12 @@
   <url><loc>https://mayobebros.com/category/educational/results/dsee/</loc><lastmod>2026-11-10</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
   <url><loc>https://mayobebros.com/category/educational/results/qt/</loc><lastmod>2026-11-10</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
   <url><loc>https://mayobebros.com/category/educational/results/guides/</loc><lastmod>2026-11-04</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://mayobebros.com/category/business-ideas/startups/</loc><lastmod>2026-11-04</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://mayobebros.com/category/business-ideas/startups/</loc><lastmod>2026-11-24</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
   <url><loc>https://mayobebros.com/category/business-ideas/e-commerce/</loc><lastmod>2026-11-04</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
   <url><loc>https://mayobebros.com/category/business-ideas/marketing/</loc><lastmod>2026-11-04</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://mayobebros.com/category/video-games-updates/classic-games/</loc><lastmod>2026-11-24</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
   <url><loc>https://mayobebros.com/category/technology-solutions/smartphones/</loc><lastmod>2026-11-04</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://mayobebros.com/category/technology-solutions/software/</loc><lastmod>2026-11-04</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://mayobebros.com/category/technology-solutions/software/</loc><lastmod>2026-11-24</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
   <url><loc>https://mayobebros.com/category/technology-solutions/ai-tools/</loc><lastmod>2026-11-04</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
   <url><loc>https://mayobebros.com/category/technology-solutions/cyber-security/</loc><lastmod>2026-11-04</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
 </urlset>

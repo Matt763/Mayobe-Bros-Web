@@ -1,5 +1,7 @@
 ---
 title: "PCM Combination Degrees and Jobs: Engineering and Beyond"
+metaTitle: "Kazi za PCM Combination Tanzania: Kozi na Pointi"
+metaDescription: "Uhandisi, jiolojia, hali ya hewa, kompyuta na ualimu wa sayansi: kozi za PCM kutoka TCU 2026/27. PCM haifungui udaktari wala famasia."
 date: 2026-11-23
 author: Mclean Mbaga
 category: educational

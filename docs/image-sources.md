@@ -342,3 +342,14 @@ Each picture is a real, openly licensed photograph from Wikimedia Commons (licen
 | File in `assets/posts/` | Used by | Source and licence |
 | --- | --- | --- |
 | `heslb-2026-27-loan-allocation-latest-news.webp` | heslb-2026-27-loan-allocation-latest-news.md | University of Dodoma main building, Job de Graaf, CC BY 2.0, https://commons.wikimedia.org/wiki/File:University_of_Dodoma.jpg (cropped 16:9, converted to WebP) |
+
+## Covers taken from the owner's earlier blog (2026-11-24)
+Owner's instruction: "you can use my images". Downloaded from the old Blogger posts, converted to WebP (1400 px wide at most). Whether each was bought, licensed or generated was **not recorded: owner to confirm**. Game artwork from the old GTA posts was not used (it shows Rockstar logos).
+
+| File in `assets/posts/` | Used by | Source |
+| --- | --- | --- |
+| `how-to-stay-motivated-when-studying-tanzania.webp` | same name | old post /2020/05/10-quotes-that-will-get-you-through.html, owner's archive, licence not recorded |
+| `side-business-while-employed-tanzania.webp` | same name | old post /2024/11/biashara-zenye-faida-unazoweza.html, owner's archive, licence not recorded |
+| `small-business-ideas-tanzania-how-to-choose.webp` | same name | old post /2025/06/biashara-zinazolipa-zaidi-tanzania.html, looks like an illustration or AI picture, owner's archive |
+| `world-heritage-places-at-risk-from-climate-change.webp` | same name | old post /2021/06/talii-maeneo-haya-7-kabla-hayajapotea.html, owner's archive, licence not recorded |
+| `how-to-use-past-papers-to-pass-necta-exams.webp` | same name | old post /2021/06/umuhimu-wa-past-paper-kwa-wanafunzi-wote.html, owner's archive, licence not recorded |

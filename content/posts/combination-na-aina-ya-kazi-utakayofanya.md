@@ -1,5 +1,7 @@
 ---
 title: How Your A-Level Combination Affects Your Career in Tanzania
+metaTitle: "Combination na Aina ya Kazi Utakayofanya Tanzania"
+metaDescription: "Kazi 192 na masomo yanayoendana nazo, miongozo ya combination 11 na pointi za TCU 2026/27. Ni ramani ya kuchagua, si masharti rasmi ya kujiunga."
 date: 2026-04-10
 updated: 2026-11-23
 author: Mclean Mbaga

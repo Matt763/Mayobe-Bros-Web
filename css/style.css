@@ -1978,6 +1978,13 @@ main.is-switching .hero-listing + .section > .wrap > *:not(.subnav) { animation:
 .st-btn { min-width: 14rem; min-height: 3.1rem; margin: 1.75rem 0 0; }
 .st-btn[aria-busy="true"] { cursor: progress; opacity: 1; }
 .st-btn[aria-busy="true"]::before { content: ""; width: 1.05em; height: 1.05em; margin-right: 0.5rem; border: 2.5px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: st-spin 0.8s linear infinite; }
+/* /newsletter/ opened with no code (the goodbye email's "Subscribe again" button): the ordinary sign-up form (the small version, .nl-mini) inside the card.
+   js/newsletter.js shows it only then; it starts hidden in the HTML so nothing can be sent without the script. */
+.st-signup { width: 100%; max-width: 24rem; margin: 1.6rem auto 0; text-align: left; }
+.st-signup .nl-form { width: 100%; }
+/* the card itself says "Check your inbox" (js/newsletter.js), so the form's own confirmation card, whose height the small form reserves for the sidebar, is not needed here */
+.st-signup .nl-panel-done { display: none; }
+.st-signup .nl-mini .nl-panel-form .foot-form-note { margin-top: 0.9rem; }
 .st-status { margin: 1rem 0 0; font-size: 0.9375rem; line-height: 1.5; }
 .st-status:empty { display: none; }
 .st-status.is-err { color: var(--err); }
@@ -2184,40 +2191,98 @@ html.mo-gliding { scroll-behavior: auto !important; overflow-anchor: none; }
 @media (prefers-reduced-motion: reduce) { .tbl-slide.is-in { animation: none !important; } .tbl-chip, .tbl-btn { transition: none; } }
 @media print { .tbl-chips, .tbl-nav, .table-hint { display: none !important; } .tbl-slide { display: block !important; } }
 
-/* The sign-up box for readers who arrive from the old blog (js/oldblog-prompt.js; markup in oldBlogPrompt() in scripts/lib/render.mjs).
-   Not a modal: no backdrop, the page behind stays usable. A sheet at the bottom of a phone, a card at the bottom left from 40rem up
-   (the bottom right is taken by the back-to-top button and the small video window). Layer 54: above those two, under the drawer's
-   backdrop (55), the search (70), the Listen player (70) and the cookie notice (80); the script waits while any of them is on screen.
-   Only transform and opacity move. */
-.obp { position: fixed; z-index: 54; left: 0; right: 0; bottom: 0; max-height: min(36rem, calc(100dvh - 1rem)); overflow-y: auto; overscroll-behavior: contain; padding: 1rem 1.25rem calc(0.9rem + env(safe-area-inset-bottom)); background: var(--surface); color: var(--text); border: 1px solid var(--line-soft); border-bottom: 0; border-radius: 1.25rem 1.25rem 0 0; box-shadow: 0 -18px 50px -18px rgba(11, 18, 32, 0.45); transform: translate3d(0, 105%, 0); opacity: 0; visibility: hidden; transition: transform 0.5s var(--ease), opacity 0.3s, visibility 0s linear 0.5s; }
-.obp.is-open { transform: none; opacity: 1; visibility: visible; transition-delay: 0s; }
-.obp-x { position: absolute; top: 0.5rem; right: 0.5rem; display: grid; place-items: center; width: 2.75rem; height: 2.75rem; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--text-3); cursor: pointer; transition: background-color 0.2s, color 0.2s; }
-.obp-x:hover { background: var(--bg-alt); color: var(--text); }
+/* The sign-up modal for readers who arrive from the old blog (js/oldblog-prompt.js; markup in oldBlogPrompt() in scripts/lib/render.mjs).
+   A real modal (changed 2026-11-24, owner's request: "super smooth animated and fluidish modal pop"): a native <dialog> opened with
+   showModal(), so it sits in the browser's top layer (above every z-index here, the cookie notice included, which the script waits for),
+   the page behind is inert and Esc is handled by the browser. The dialog is a transparent full-screen frame; the scrim (a real element, so
+   a finger dragging the sheet can fade it) and the card are its children. A bottom sheet below 40rem (grab handle, follows a finger, flick
+   or drag down closes), a centred card from 40rem up. The entrance, the exit and the spring back are Web Animations started by the script
+   (transform and opacity only, so they run on the compositor); the only CSS keyframes are the soft decoration inside the card (obp-*:
+   slow drifting light for a few seconds, one sheen, one ring). Reduced motion: a plain quick fade, the decoration is removed. Background scrolling is locked
+   with body.obp-lock (the same overflow rule as body.no-scroll, with the scrollbar's room kept so nothing shifts). */
+dialog.obp { position: fixed; top: var(--obp-vt, 0px); left: 0; right: auto; bottom: auto; width: 100%; height: var(--obp-vh, 100%); max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: transparent; color: var(--text); overflow: hidden; overscroll-behavior: contain; container: obp / size; }
+dialog.obp:not([open]) { display: none; }
+dialog.obp[open] { display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); place-items: end center; } /* a definite row, so the card's max-height (a percentage) can hold it inside a short window */
+dialog.obp::backdrop { background: transparent; }
+dialog.obp.is-fallback { z-index: 90; }
+body.obp-lock { overflow: hidden; }
+:root:has(body.obp-lock) { scrollbar-gutter: stable; }
+.obp-scrim { position: absolute; inset: 0; background: rgba(7, 13, 43, 0.56); -webkit-backdrop-filter: blur(6px) saturate(1.15); backdrop-filter: blur(6px) saturate(1.15); opacity: var(--obp-fade, 1); touch-action: none; }
+/* the blur is the one costly layer on a weak machine: the script adds is-lite (no blur, a deeper tint) when the device reports little memory or Save-Data, or when frames after the entrance are slow; people who ask for less transparency never get it */
+.obp.is-lite .obp-scrim { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(7, 13, 43, 0.68); }
+@media (prefers-reduced-transparency: reduce) { .obp-scrim { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(7, 13, 43, 0.68); } }
+.obp-card { position: relative; z-index: 1; display: flex; flex-direction: column; width: 100%; max-width: 30rem; max-height: calc(100% - 0.5rem); background: var(--surface); color: var(--text); border: 1px solid var(--line-soft); border-bottom: 0; border-radius: 1.75rem 1.75rem 0 0; box-shadow: 0 -24px 64px -28px rgba(7, 13, 43, 0.65); transform: translate3d(0, var(--obp-dy, 0px), 0); }
+/* the spring may carry the sheet a little past its place: this keeps the sheet's colour under the bottom edge so no gap shows */
+.obp-card::after { content: ''; position: absolute; left: -1px; right: -1px; top: calc(100% - 1px); height: 8rem; background: var(--surface); border: 1px solid var(--line-soft); border-top: 0; }
+/* decoration: a brand strip, two slow lights and one sheen (aria-hidden, no pointer events, transform and opacity only) */
+.obp-glow { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none; }
+.obp-glow::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 4px; background: linear-gradient(90deg, #3f9b4d, var(--link)); }
+.obp-glow i { position: absolute; width: 17rem; height: 17rem; border-radius: 50%; }
+.obp-glow i:nth-child(1) { top: -9rem; right: -7rem; background: radial-gradient(closest-side, color-mix(in srgb, var(--link) 28%, transparent), transparent); animation: obp-drift-a 14s ease-in-out 2 alternate; }
+.obp-glow i:nth-child(2) { bottom: -10rem; left: -8rem; background: radial-gradient(closest-side, color-mix(in srgb, var(--ok) 24%, transparent), transparent); animation: obp-drift-b 17s ease-in-out 2 alternate; }
+.obp-glow b { position: absolute; top: 0; bottom: 0; left: 0; width: 45%; background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--link) 16%, transparent), transparent); opacity: 0; transform: translate3d(-120%, 0, 0) skewX(-16deg); animation: obp-sheen 1.6s var(--ease) 0.7s 1 both; }
+@keyframes obp-drift-a { to { transform: translate3d(-3.5rem, 3rem, 0) scale(1.15); } }
+@keyframes obp-drift-b { to { transform: translate3d(4rem, -3rem, 0) scale(1.1); } }
+@keyframes obp-sheen { 0% { opacity: 0; transform: translate3d(-120%, 0, 0) skewX(-16deg); } 25% { opacity: 1; } 100% { opacity: 0; transform: translate3d(330%, 0, 0) skewX(-16deg); } }
+@keyframes obp-pop { 0% { transform: scale(0.55); } 100% { transform: scale(1); } }
+@keyframes obp-ring { 0% { opacity: 0.6; transform: scale(0.92); } 100% { opacity: 0; transform: scale(1.5); } }
+.obp-grab { position: relative; flex: none; display: grid; place-items: center; height: 1.75rem; touch-action: none; cursor: grab; }
+.obp-grab span { width: 2.5rem; height: 0.3125rem; border-radius: 999px; background: var(--line); }
+.obp-x { position: absolute; z-index: 2; top: 0.625rem; right: 0.625rem; display: grid; place-items: center; width: 2.75rem; height: 2.75rem; padding: 0; border: 0; border-radius: 50%; background: var(--bg-alt); color: var(--text-2); cursor: pointer; transition: background-color 0.2s, color 0.2s; }
+.obp-x:hover { background: var(--surface-2); color: var(--text); }
 .obp-x:focus-visible { outline: 3px solid var(--ring, #2f6bff); outline-offset: 2px; }
-.obp-kicker { display: inline-flex; align-items: center; gap: 0.4rem; margin: 0 0 0.55rem; padding: 0.25rem 0.75rem 0.25rem 0.6rem; border-radius: 999px; background: var(--soft); color: var(--soft-text); font-size: 0.8125rem; font-weight: 700; line-height: 1.3; }
-.obp-title { margin: 0; padding-right: 2.75rem; font-size: 1.25rem; font-weight: 900; line-height: 1.2; }
-.obp-text { margin: 0.35rem 0 0.9rem; color: var(--text-2); font-size: 1rem; line-height: 1.5; }
+.obp-body { position: relative; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0.75rem 1.375rem calc(1rem + env(safe-area-inset-bottom)); }
+.obp-top { display: flex; align-items: center; gap: 0.75rem; margin: 0 2.75rem 0.9rem 0; }
+.obp-badge { position: relative; flex: none; display: grid; place-items: center; width: 3rem; height: 3rem; border-radius: 50%; background: var(--btn-bg); color: var(--btn-text); animation: obp-pop 0.7s var(--ease) 0.2s both; }
+.obp-badge::before { content: ''; position: absolute; inset: -5px; border: 2px solid var(--btn-bg); border-radius: 50%; opacity: 0; animation: obp-ring 1.5s var(--ease) 0.75s 1 both; }
+.obp-kicker { padding: 0.25rem 0.75rem; border-radius: 999px; background: var(--soft); color: var(--soft-text); font-size: 0.8125rem; font-weight: 700; line-height: 1.3; }
+.obp-title { margin: 0; font-size: 1.5rem; font-weight: 900; line-height: 1.2; }
+.obp-title:focus { outline: none; }
+.obp-text { margin: 0.5rem 0 1.1rem; color: var(--text-2); font-size: 1rem; line-height: 1.55; }
 .obp .nl-mini .foot-form-note a { color: var(--link); text-decoration: underline; text-underline-offset: 2px; }
-.obp-later { display: block; min-height: 2.75rem; margin: 0.2rem 0 -0.4rem -0.5rem; padding: 0 0.5rem; border: 0; background: none; color: var(--text-3); font: inherit; font-size: 0.9375rem; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.obp-later { display: block; min-height: 2.75rem; margin: 0.4rem auto -0.25rem; padding: 0 0.75rem; border: 0; background: none; color: var(--text-3); font: inherit; font-size: 0.9375rem; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .obp-later:hover { color: var(--text); }
 .obp-later:focus-visible { outline: 3px solid var(--ring, #2f6bff); outline-offset: 2px; }
-.obp[data-done] .obp-later { display: none; }
-/* the box floats over the page, so its form need not keep the room of the "Check your inbox" card free (that is for forms inside the page): only the visible panel takes space */
-.obp .nl-panel-done, .obp .nl-form[data-state="sent"] .nl-panel-form { display: none; }
-.obp .nl-form[data-state="sent"] .nl-panel-done { display: grid; }
-/* narrow or short screens (phones, phones turned sideways): the line under the title goes (the kicker, the title and the note under the field say the same), and on a short one the field and button share a row */
-@media (max-width: 39.99rem), (max-height: 40rem) { .obp-text { display: none; } .obp-title { margin-bottom: 0.75rem; } }
-@media (max-height: 33rem) {
-  .obp { padding-top: 0.9rem; }
-  .obp-kicker { display: none; }
-  .obp .nl-mini .nl-field { flex-direction: row; align-items: center; gap: 0.5rem; }
-  .obp .nl-mini .nl-btn { width: auto; flex: none; padding: 0 1.1rem; }
-  .obp .nl-mini input[type="email"] { flex: 1 1 auto; min-width: 0; }
+/* the confirmation card shares the form's grid cell (the ordinary sign-up markup), so the sheet keeps its height when the form turns into "Check your inbox"; here the tick sits beside the words to keep that cell short */
+.obp .nl-mini .nl-panel-done { grid-template-columns: auto minmax(0, 1fr); align-items: center; }
+/* the sheet below 40rem: a finger can take the handle or the heading and pull it down (js/oldblog-prompt.js) */
+@media (max-width: 39.99rem) {
+  .obp-head { touch-action: none; -webkit-user-select: none; user-select: none; }
+  .obp-grab:active { cursor: grabbing; }
 }
 @media (min-width: 40rem) {
-  .obp { left: 1.25rem; right: auto; bottom: 1.25rem; width: 24rem; padding-bottom: 1.1rem; border-bottom: 1px solid var(--line-soft); border-radius: 1.25rem; box-shadow: var(--shadow-lg); transform: translate3d(0, 1.5rem, 0); }
+  dialog.obp[open] { place-items: center; }
+  .obp-card { width: 27rem; max-height: calc(100% - 2rem); border-bottom: 1px solid var(--line-soft); border-radius: 1.75rem; box-shadow: var(--shadow-lg), 0 0 0 1px rgba(7, 13, 43, 0.04); }
+  .obp-card::after, .obp-grab { display: none; }
+  .obp-body { padding: 1.75rem 1.75rem 1.5rem; }
 }
-@media (prefers-reduced-motion: reduce) { .obp, .obp.is-open { transform: none; transition: opacity 0.15s, visibility 0s linear 0.15s; } .obp.is-open { transition-delay: 0s; } }
+/* short windows (a phone turned sideways, or the on-screen keyboard open: the script sizes the dialog to the visible part): the line under the title goes, then the badge row, and the field and button share a row */
+@container obp (max-height: 36rem) { .obp-text { display: none; } .obp-title { margin-bottom: 0.9rem; } }
+@container obp (max-height: 30rem) {
+  .obp-top { display: none; }
+  .obp-title { margin-right: 2.75rem; font-size: 1.25rem; }
+  .obp-body { padding-top: 1rem; }
+  .obp .nl-mini .nl-field { flex-direction: row; align-items: center; gap: 0.5rem; }
+  .obp .nl-mini .nl-btn { width: auto; flex: none; padding: 0 0.85rem; }
+  .obp .nl-mini .nl-btn-ico { display: none; }
+  .obp .nl-mini input[type="email"] { flex: 1 1 auto; min-width: 0; padding: 0 0.8rem; }
+  /* the confirmation card shares the form's cell, so it is drawn smaller here too: the empty room under a short form stays small */
+  .obp .nl-mini .nl-panel-done { gap: 0.6rem; padding: 0.6rem 0.75rem; }
+  .obp .nl-mini .nl-check svg { width: 32px; height: 32px; }
+  .obp .nl-mini .nl-done-title { font-size: 1rem; }
+  .obp .nl-mini .nl-done-body, .obp .nl-mini .nl-done-body strong { font-size: 0.8125rem; line-height: 1.4; }
+  .obp .nl-mini .nl-done-help { margin-top: 0.25rem; font-size: 0.75rem; line-height: 1.4; }
+}
+/* the narrowest phones cannot hold the field and the button side by side without cutting the field's hint */
+@container obp (max-height: 30rem) and (max-width: 23.5rem) {
+  .obp .nl-mini .nl-field { flex-direction: column; align-items: stretch; gap: 0.5rem; }
+  .obp .nl-mini .nl-btn { width: 100%; }
+  .obp .nl-mini .nl-btn-ico { display: inline-flex; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .obp-glow i, .obp-glow b { display: none; }
+  .obp-badge, .obp-badge::before { animation: none; }
+}
 @media print { .obp { display: none !important; } }
 
 /* Picture credit in an article (2026-11-23): an italic-only line right after a picture is a small caption, not body text (the combination guides credit every photograph this way) */

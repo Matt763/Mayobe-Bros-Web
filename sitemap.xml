@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <?xml-stylesheet type="text/xsl" href="/sitemap.xsl"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <sitemap><loc>https://mayobebros.com/pages-sitemap1.xml</loc><lastmod>2026-11-23</lastmod></sitemap>
-  <sitemap><loc>https://mayobebros.com/posts-sitemap1.xml</loc><lastmod>2026-11-23</lastmod></sitemap>
+  <sitemap><loc>https://mayobebros.com/pages-sitemap1.xml</loc><lastmod>2026-11-24</lastmod></sitemap>
+  <sitemap><loc>https://mayobebros.com/posts-sitemap1.xml</loc><lastmod>2026-11-24</lastmod></sitemap>
   <sitemap><loc>https://mayobebros.com/posts-sitemap2.xml</loc><lastmod>2026-11-23</lastmod></sitemap>
-  <sitemap><loc>https://mayobebros.com/category-sitemap1.xml</loc><lastmod>2026-11-23</lastmod></sitemap>
-  <sitemap><loc>https://mayobebros.com/label-sitemap1.xml</loc><lastmod>2026-11-23</lastmod></sitemap>
-  <sitemap><loc>https://mayobebros.com/image-sitemap1.xml</loc><lastmod>2026-11-23</lastmod></sitemap>
+  <sitemap><loc>https://mayobebros.com/category-sitemap1.xml</loc><lastmod>2026-11-24</lastmod></sitemap>
+  <sitemap><loc>https://mayobebros.com/label-sitemap1.xml</loc><lastmod>2026-11-24</lastmod></sitemap>
+  <sitemap><loc>https://mayobebros.com/image-sitemap1.xml</loc><lastmod>2026-11-24</lastmod></sitemap>
   <sitemap><loc>https://mayobebros.com/image-sitemap2.xml</loc><lastmod>2026-11-23</lastmod></sitemap>
   <sitemap><loc>https://mayobebros.com/video-sitemap1.xml</loc><lastmod>2026-11-23</lastmod></sitemap>
 </sitemapindex>

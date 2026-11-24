@@ -2,6 +2,21 @@
 <?xml-stylesheet type="text/xsl" href="/sitemap.xsl"?>
 <!-- mb-sitemap type=image part=1 of=2 start=1 next=/image-sitemap2.xml -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url><loc>https://mayobebros.com/post/business-ideas/startups/small-business-ideas-tanzania-how-to-choose/</loc><lastmod>2026-11-24</lastmod>
+    <image:image><image:loc>https://mayobebros.com/assets/posts/small-business-ideas-tanzania-how-to-choose.webp</image:loc><image:title>An illustration of a woman, a man with a laptop and a young man with a phone at a food stall with fresh fruit</image:title></image:image>
+  </url>
+  <url><loc>https://mayobebros.com/post/educational/study-tips/how-to-stay-motivated-when-studying-tanzania/</loc><lastmod>2026-11-24</lastmod>
+    <image:image><image:loc>https://mayobebros.com/assets/posts/how-to-stay-motivated-when-studying-tanzania.webp</image:loc><image:title>A woman in a striped shirt standing among sunflowers with her arms raised and her face turned to the sky</image:title></image:image>
+  </url>
+  <url><loc>https://mayobebros.com/post/educational/study-tips/how-to-use-past-papers-to-pass-necta-exams/</loc><lastmod>2026-11-24</lastmod>
+    <image:image><image:loc>https://mayobebros.com/assets/posts/how-to-use-past-papers-to-pass-necta-exams.webp</image:loc><image:title>A student's hand holding a pencil over an exam answer sheet with rows of marked circles</image:title></image:image>
+  </url>
+  <url><loc>https://mayobebros.com/post/business-ideas/startups/side-business-while-employed-tanzania/</loc><lastmod>2026-11-24</lastmod>
+    <image:image><image:loc>https://mayobebros.com/assets/posts/side-business-while-employed-tanzania.webp</image:loc><image:title>A woman in a light blazer standing by a window and looking at a tablet</image:title></image:image>
+  </url>
+  <url><loc>https://mayobebros.com/post/world-histories/world-heritage-places-at-risk-from-climate-change/</loc><lastmod>2026-11-24</lastmod>
+    <image:image><image:loc>https://mayobebros.com/assets/posts/world-heritage-places-at-risk-from-climate-change.webp</image:loc><image:title>A sea turtle, a clownfish and a blue tang swimming over colourful coral on a reef</image:title></image:image>
+  </url>
   <url><loc>https://mayobebros.com/post/educational/study-tips/jobs-for-cbg-combination/</loc><lastmod>2026-11-23</lastmod>
     <image:image><image:loc>https://mayobebros.com/assets/posts/jobs-for-cbg-combination.webp</image:loc><image:title>Green grassy slopes of the Uluguru Mountains with farm terraces, with a CBG combination badge listing three subjects</image:title></image:image>
     <image:image><image:loc>https://mayobebros.com/assets/posts/jobs-for-cbg-combination-2.webp</image:loc><image:title>People under a tree around a man holding a white chicken, labelled &amp;quot;Agriculture and animal science&amp;quot;</image:title></image:image>
@@ -604,20 +619,5 @@
   </url>
   <url><loc>https://mayobebros.com/post/educational/career-development/first-job-in-tanzania-nssf-paperwork-and-nerves/</loc><lastmod>2026-11-04</lastmod>
     <image:image><image:loc>https://mayobebros.com/assets/posts/first-job-in-tanzania-nssf-paperwork-and-nerves.webp</image:loc><image:title>A man in a blue checked shirt seen from behind sitting at a desk with books and a notebook in front of a white brick wall</image:title></image:image>
-  </url>
-  <url><loc>https://mayobebros.com/post/jobs-and-internships/first-week-at-a-new-job-tanzania-what-to-do/</loc><lastmod>2026-11-04</lastmod>
-    <image:image><image:loc>https://mayobebros.com/assets/posts/first-week-at-a-new-job-tanzania-what-to-do.webp</image:loc><image:title>Two people sit at a meeting table with open notebooks, a pen, a laptop and a book on the desk</image:title></image:image>
-  </url>
-  <url><loc>https://mayobebros.com/post/world-histories/zanzibar-slave-trade-and-how-it-ended/</loc><lastmod>2026-11-04</lastmod>
-    <image:image><image:loc>https://mayobebros.com/assets/posts/zanzibar-slave-trade-and-how-it-ended.webp</image:loc><image:title>Christ Church Anglican Cathedral in Stone Town, Zanzibar, with its clock tower and curved end wall, seen from the street</image:title></image:image>
-  </url>
-  <url><loc>https://mayobebros.com/post/educational/results/necta-acsee-results-2019/</loc><lastmod>2026-11-10</lastmod>
-    <image:image><image:loc>https://mayobebros.com/assets/posts/necta-acsee-results-2019.webp</image:loc><image:title>Secondary school students in light blue shirts and checked skirts stand in a group holding tree seedlings in front of a yellow school building, cut by a diagonal edge from a burgundy panel holding the</image:title></image:image>
-  </url>
-  <url><loc>https://mayobebros.com/post/educational/results/necta-csee-results-2019/</loc><lastmod>2026-11-10</lastmod>
-    <image:image><image:loc>https://mayobebros.com/assets/posts/necta-csee-results-2019.webp</image:loc><image:title>Deep ink-blue cover with platinum lettering, a waving Tanzanian flag inside a thin arch on the left and the round NECTA logo above the words, with the words NECTA CSEE Results 2019</image:title></image:image>
-  </url>
-  <url><loc>https://mayobebros.com/post/educational/results/necta-dsee-results-2018/</loc><lastmod>2026-11-10</lastmod>
-    <image:image><image:loc>https://mayobebros.com/assets/posts/necta-dsee-results-2018.webp</image:loc><image:title>Dark olive-green cover with bronze lettering: the round NECTA logo and the words at the left and a waving Tanzanian flag inside a thin gilded arch at the right NECTA DSEE Results 2018</image:title></image:image>
   </url>
 </urlset>

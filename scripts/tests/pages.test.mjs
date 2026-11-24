@@ -287,13 +287,59 @@ test('/manage/ and /newsletter/ are bare status pages: logo, one card, a quiet l
     }
     assert.match(html, /<p class="st-links">/, slug);
     assert.match(html, new RegExp(`js/${slug === 'manage' ? 'manage' : 'newsletter'}\\.js`), `${slug}: its own script`);
-    assert.equal((html.match(/<script src=/g) || []).length, 2, `${slug}: its own script and the theme script, nothing else`);
+    // /manage/ loads its own script and the theme script, nothing else. /newsletter/ also holds the sign-up form (see the test below), so it
+    // adds the two scripts that form needs: Turnstile's loader and the shared sign-up script.
+    assert.equal((html.match(/<script src=/g) || []).length, slug === 'manage' ? 2 : 4, `${slug}: only the scripts this page needs`);
   }
   // every state the script can show has its picture
   const { html } = statusHtml('manage');
   for (const i of ['st-i-mail', 'st-i-ok', 'st-i-info', 'st-i-err', 'st-spin']) assert.ok(html.includes(i), i);
   assert.match(html, /data-state="mail"/);
   assert.match(html, /role="status" aria-live="polite" data-manage-status/);
+});
+
+// The goodbye email's "Subscribe again" button opens /newsletter/ with no code. The page must let a person sign up right there (it used to
+// say "Open the email link" and offer nothing). The form is the ordinary one (js/subscribe.js) and starts hidden, so without JavaScript nothing can be sent.
+test('/newsletter/ holds a hidden sign-up form for people who arrive with no code, with Turnstile and a policy that allows it (and /manage/ does not get either)', () => {
+  const { html } = statusHtml('newsletter');
+  const block = html.match(/<div[^>]*data-nl-signup[^>]*>[\s\S]*?<\/form>\s*<\/div>/);
+  assert.ok(block, 'a [data-nl-signup] block that wraps the form');
+  assert.match(block[0], /^<div[^>]*\shidden[\s>]/, 'the block starts hidden: js/newsletter.js shows it only when there is no code');
+  const form = block[0].match(/<form[^>]*>/)[0];
+  assert.match(form, /data-newsletter/);
+  assert.match(form, /data-endpoint="https:\/\/api\.test\/v1\/newsletter\/subscribe"/, 'the same sign-up route as the footer form');
+  assert.match(form, /\shidden[\s>]/, 'the form itself starts hidden');
+  assert.match(block[0], /<input[^>]*type="email"[^>]*name="email"[^>]*required/);
+  assert.match(block[0], /name="website"[^>]*tabindex="-1"/, 'the honeypot is there');
+  const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
+  assert.equal(new Set(ids).size, ids.length, 'ids never repeat on the page');
+  // scripts: Turnstile's loader runs before the sign-up script (which asks for it when it wires the form), and both before the page script
+  const srcs = [...html.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1].replace(/\?.*$/, ''));
+  assert.deepEqual(srcs.map((s) => s.split('/').pop()), ['status-theme.js', 'turnstile.js', 'subscribe.js', 'newsletter.js']);
+  assert.match(html, /<html[^>]*data-turnstile="[^"]+"/, 'the key the loader reads');
+  // the policy lets Cloudflare's check load and talk, on this page only
+  const csp = (h) => h.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)[1];
+  const directive = (c, name) => (c.split('; ').find((d) => d.startsWith(`${name} `)) || '');
+  const p = csp(html);
+  for (const d of ['script-src', 'connect-src', 'frame-src']) assert.match(directive(p, d), /https:\/\/challenges\.cloudflare\.com/, `${d} allows Turnstile`);
+  assert.doesNotMatch(p, /youtube|googletagmanager|cloudflareinsights|googlesyndication/, 'nothing else is opened up');
+  assert.doesNotMatch(directive(p, 'script-src'), /unsafe-inline/, 'no unsafe-inline for scripts');
+  const manage = statusHtml('manage').html;
+  assert.doesNotMatch(csp(manage), /challenges\.cloudflare\.com/, '/manage/ stays closed to it');
+  assert.doesNotMatch(manage, /data-turnstile|turnstile\.js|subscribe\.js|data-nl-signup/);
+  // the page still has no header, footer or article list: it is a bare status page with one extra form inside its card
+  for (const bad of ['<header', '<footer', 'next-reads', 'js/site.js']) assert.ok(!html.includes(bad), `must not contain ${bad}`);
+  assert.equal((html.match(/<h1\b/g) || []).length, 1);
+});
+
+test('/newsletter/ without a Turnstile key still builds: the form is there and no Turnstile script or host is added', () => {
+  const config = { ...JSON.parse(fs.readFileSync(path.join(ROOT, 'site.config.json'), 'utf8')), newsletterAction: 'api', commentsApi: 'https://api.test/', turnstileSiteKey: '' };
+  const dir = path.join(ROOT, 'content', 'pages');
+  const { data, body } = parseFrontMatter(fs.readFileSync(path.join(dir, 'newsletter.html'), 'utf8'));
+  const pg = { slug: 'newsletter', title: String(data.title), heading: data.heading || '', subtitle: '', description: String(data.description || ''), kind: data.kind, menu: false, order: 91, hero: '', updated: null, html: body };
+  const html = createRenderer({ config, categories: [], posts: [], pages: [pg], authors: [], versions: {} }).staticPage(pg);
+  assert.match(html, /data-nl-signup/);
+  assert.doesNotMatch(html, /turnstile/i);
 });
 
 test('{{latest-posts:9}} is a build error', () => {
@@ -364,13 +410,19 @@ test('every page ships a policy that allows its one inline script by hash and ne
   }
 });
 
-test('the bare email-link pages get the tightest policy: no third parties at all, no frames', () => {
+// /manage/ gets the tightest policy there is. /newsletter/ is the same except for one thing: it holds the sign-up form, so (like every other form
+// on the site, and only while a Turnstile key is set) it lets Cloudflare's check load, talk and show its frame. Nothing else is opened up.
+test('the bare email-link pages get the tightest policy: no third parties, no frames (the sign-up page lets only Cloudflare\'s check in)', () => {
+  const key = JSON.parse(fs.readFileSync(path.join(ROOT, 'site.config.json'), 'utf8')).turnstileSiteKey;
   for (const file of ['manage/index.html', 'newsletter/index.html']) {
     const f = path.join(ROOT, file);
     if (!fs.existsSync(f)) continue;
     const csp = cspOf(fs.readFileSync(f, 'utf8'));
-    assert.deepEqual(directive(csp, 'frame-src'), ["'none'"], file);
+    const check = file.startsWith('newsletter') && key ? ['https://challenges.cloudflare.com'] : [];
+    assert.deepEqual(directive(csp, 'frame-src'), check.length ? check : ["'none'"], file);
     for (const d of ['script-src', 'connect-src', 'img-src']) assert.ok(directive(csp, d).every((x) => !/youtube|google|cloudflareinsights|doubleclick/.test(x)), `${file} ${d}`);
+    const third = (d) => directive(csp, d).filter((x) => /^https:/.test(x) && !/^https:\/\/[a-z0-9-]+\.workers\.dev$/.test(x) && !check.includes(x));
+    for (const d of ['script-src', 'img-src', 'frame-src']) assert.deepEqual(third(d), [], `${file} ${d}: no host beyond ${check.join(', ') || 'our own'}`);
   }
 });
 

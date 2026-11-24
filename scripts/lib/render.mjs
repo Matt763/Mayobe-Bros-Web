@@ -197,7 +197,7 @@ export function createRenderer(ctx) {
      protection without a real header), and a policy cannot be checked by a test alone: after changing a host, load a post, press play on a video
      and press Accept with the browser console open. When ads are switched on (adsense.autoAds), re-test ads: Google's host list changes. */
   const adsOn = !!(adsenseId && config.adsense?.autoAds);
-  function contentSecurityPolicy(inlineScripts, bare, extraConnect = [], pdfjs = false) {
+  function contentSecurityPolicy(inlineScripts, bare, extraConnect = [], pdfjs = false, turnstile = false) {
     let apiOrigin = '';
     try { apiOrigin = api ? new URL(api).origin : ''; } catch { apiOrigin = ''; }
     const hashes = inlineScripts.map((t) => `'sha256-${createHash('sha256').update(t, 'utf8').digest('base64')}'`);
@@ -219,8 +219,9 @@ export function createRenderer(ctx) {
         img.push('https:'); // ad creatives come from many hosts
         frame.push('https://googleads.g.doubleclick.net', 'https://tpc.googlesyndication.com', 'https://*.googlesyndication.com', 'https://*.doubleclick.net', 'https://*.adtrafficquality.google', 'https://www.google.com');
       }
-      if (config.turnstileSiteKey) { script.push('https://challenges.cloudflare.com'); connect.push('https://challenges.cloudflare.com'); frame.push('https://challenges.cloudflare.com'); }
     }
+    // Cloudflare's check for the sign-up, contact and comment forms: on normal pages, and on a bare status page only when it holds such a form (/newsletter/)
+    if (config.turnstileSiteKey && (!bare || turnstile)) { script.push('https://challenges.cloudflare.com'); connect.push('https://challenges.cloudflare.com'); frame.push('https://challenges.cloudflare.com'); }
     const uniq = (a) => [...new Set(a.filter(Boolean))].join(' ');
     return [
       "default-src 'self'", `script-src ${uniq(script)}`, "style-src 'self' 'unsafe-inline'", `img-src ${uniq(img)}`, `connect-src ${uniq(connect)}`,
@@ -228,13 +229,13 @@ export function createRenderer(ctx) {
     ].join('; ');
   }
   // Puts the policy first in <head> (right after the viewport tag, before any script) and a referrer policy on pages that do not set their own.
-  function withPolicy(headHtml, bare, noReferrer, extraConnect = [], pdfjs = false) {
+  function withPolicy(headHtml, bare, noReferrer, extraConnect = [], pdfjs = false, turnstile = false) {
     const inline = [...headHtml.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
-    const tag = `<meta http-equiv="Content-Security-Policy" content="${e(contentSecurityPolicy(inline, bare, extraConnect, pdfjs))}">${noReferrer ? '' : '\n<meta name="referrer" content="strict-origin-when-cross-origin">'}`;
+    const tag = `<meta http-equiv="Content-Security-Policy" content="${e(contentSecurityPolicy(inline, bare, extraConnect, pdfjs, turnstile))}">${noReferrer ? '' : '\n<meta name="referrer" content="strict-origin-when-cross-origin">'}`;
     return headHtml.replace('<meta name="viewport" content="width=device-width, initial-scale=1">', (m) => `${m}\n${tag}`);
   }
 
-  function head({ title, description, path, share = '', imageAlt = '', type = 'website', jsonLd = [], noindex = false, article = null, preload = '', noReferrer = false, bare = false, skeleton = false, connect = [], pdfjs = false }) {
+  function head({ title, description, path, share = '', imageAlt = '', type = 'website', jsonLd = [], noindex = false, article = null, preload = '', noReferrer = false, bare = false, skeleton = false, connect = [], pdfjs = false, turnstile = false }) {
     // the brand is added only when the whole title still fits in search results (about 60 characters)
     // a title that already ends with the brand ("NECTA CSEE RESULTS 2025 | MAYOBE BROS") is not branded twice, and og:title / twitter:title drop it
     const brandTail = new RegExp(`\\s*\\|\\s*${config.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'i');
@@ -284,7 +285,7 @@ export function createRenderer(ctx) {
 <meta name="twitter:image" content="${img}">${si.alt ? `\n<meta name="twitter:image:alt" content="${e(si.alt)}">` : ''}${art}${preload ? `\n<link rel="preload" as="image" href="${preload}"${topicSet(preload) ? ` imagesrcset="${topicSet(preload)}" imagesizes="100vw"` : ''} fetchpriority="high">` : ''}${api ? `\n<link rel="preconnect" href="${new URL(api).origin}" crossorigin>` : ''}
 <script>(function(){var d=document.documentElement,t=null;d.classList.add('js');try{t=localStorage.getItem('theme')}catch(e){}if(t==='dark')d.classList.add('dark');else if(t==='light')d.classList.add('light');else if(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)d.classList.add('dark')})();</script>
 ${skeleton ? `<style>${skeletonCss}</style>\n<script>${skeletonScript(assetUrl('css/style.css'))}</script>\n<link rel="preload" as="style" href="${assetUrl('css/style.css')}">` : `<link rel="stylesheet" href="${assetUrl('css/style.css')}">`}${jsonLd.map((j) => `\n<script type="application/ld+json">${json(j)}</script>`).join('')}`;
-    return withPolicy(out, bare, noReferrer, connect, pdfjs);
+    return withPolicy(out, bare, noReferrer, connect, pdfjs, turnstile);
   }
 
   /* ------------------------------------------------------------- header */
@@ -316,7 +317,7 @@ ${skeleton ? `<style>${skeletonCss}</style>\n<script>${skeletonScript(assetUrl('
     // phones and tablets: a label with sections (Results) is a nested accordion: its own link first, then every section
     // every row of the phone menu has an icon that says what it is about (a new category or label needs an entry here; a tag is the fallback)
     const CAT_ICON = { educational: 'graduationCap', 'business-ideas': 'lightbulb', 'world-histories': 'globe', 'video-games-updates': 'gamepad', 'technology-solutions': 'cpu', 'jobs-and-internships': 'briefcase', 'tanzania-news': 'newspaper' };
-    const LABEL_ICON = { 'online-learning': 'monitorPlay', 'study-tips': 'bookOpen', 'career-development': 'briefcase', results: 'award', 'examination-past-papers': 'fileText', startups: 'rocket', 'e-commerce': 'cart', marketing: 'megaphone', smartphones: 'smartphone', software: 'code', 'ai-tools': 'sparkles', 'cyber-security': 'shield' };
+    const LABEL_ICON = { 'online-learning': 'monitorPlay', 'study-tips': 'bookOpen', 'a-level-subjects': 'graduationCap', 'classic-games': 'gamepad', 'career-development': 'briefcase', results: 'award', 'examination-past-papers': 'fileText', startups: 'rocket', 'e-commerce': 'cart', marketing: 'megaphone', smartphones: 'smartphone', software: 'code', 'ai-tools': 'sparkles', 'cyber-security': 'shield' };
     const subIcon = (name) => `<span class="drawer-subico" aria-hidden="true">${icon(name, 17)}</span>`;
     const drawerLabelFor = (c) => (l) => {
       const href = u(`/category/${c.slug}/${l.slug}/`);
@@ -417,21 +418,31 @@ ${skeleton ? `<style>${skeletonCss}</style>\n<script>${skeletonScript(assetUrl('
         </form>`;
   }
 
-  /* The sign-up box for readers who arrive from the old blog (mbagamc.blogspot.com). It sits in a <template>, so it is not part of the page
+  /* The sign-up modal for readers who arrive from the old blog (mbagamc.blogspot.com). It sits in a <template>, so it is not part of the page
      text and nothing in it is read or sent: js/site.js loads js/oldblog-prompt.js only for those readers, and that script puts a copy on
-     the page once, after the reader finishes the article. The form inside is the ordinary sign-up form (`newsletterForm`), wired by
-     js/subscribe.js (`window.MBNewsletter.wire`). Written only for articles, and only when the newsletter is on. */
+     the page once, after the reader finishes the article, and opens it with showModal() (a native <dialog>: top layer, the page behind is
+     inert). The form inside is the ordinary sign-up form (`newsletterForm`), wired by js/subscribe.js (`window.MBNewsletter.wire`).
+     Written only for articles, and only when the newsletter is on. The scrim is its own element (not ::backdrop) so the script can tie its
+     opacity to a finger dragging the sheet down; .obp-glow is decoration only (aria-hidden). */
   function oldBlogPrompt() {
     return `<template data-oldblog-prompt data-src="${assetUrl('js/oldblog-prompt.js')}">
-<section class="obp" role="region" aria-labelledby="obp-title" aria-describedby="obp-text" data-obp>
-  <button class="obp-x" type="button" data-obp-close aria-label="Close">${icon('x', 20)}</button>
-  <p class="obp-kicker">${icon('mail', 15)} From our old blog</p>
-  <h2 class="obp-title" id="obp-title">Thanks for reading. Stay in touch.</h2>
-  <p class="obp-text" id="obp-text">New articles are published here now. Get each one by email.</p>
-  ${newsletterForm('obp', true)}
-  <button class="obp-later" type="button" data-obp-close>Not now</button>
-  <p class="sr-only" role="status" data-obp-live></p>
-</section>
+<dialog class="obp" aria-modal="true" aria-labelledby="obp-title" aria-describedby="obp-text" data-obp>
+  <div class="obp-scrim" data-obp-scrim aria-hidden="true"></div>
+  <div class="obp-card" data-obp-card>
+    <div class="obp-glow" aria-hidden="true"><i></i><i></i><b></b></div>
+    <div class="obp-grab" data-obp-drag aria-hidden="true"><span></span></div>
+    <button class="obp-x" type="button" data-obp-close aria-label="Close">${icon('x', 20)}</button>
+    <div class="obp-body">
+      <div class="obp-head" data-obp-drag>
+        <div class="obp-top"><span class="obp-badge" aria-hidden="true">${icon('mail', 24)}</span><span class="obp-kicker">From our old blog</span></div>
+        <h2 class="obp-title" id="obp-title" tabindex="-1">Thanks for reading. Stay in touch.</h2>
+      </div>
+      <p class="obp-text" id="obp-text">New articles are published here now. Get each one by email.</p>
+      ${newsletterForm('obp', true)}
+      <button class="obp-later" type="button" data-obp-close data-obp-later>Not now</button>
+    </div>
+  </div>
+</dialog>
 </template>`;
   }
 
@@ -1198,9 +1209,12 @@ ${discover()}`;
      answer, and one quiet line of links. No header, hero, footer, article list, cookie notice or search: nothing here but the
      purpose. The card is drawn by js/manage.js or js/newsletter.js (data-state: mail, busy, ok, info, err) and css/style.css (.page-status). */
   function statusPage(pg, inner) {
-    const meta = { title: pg.title, description: pg.description, path: `/${pg.slug}/`, noindex: true, noReferrer: true, bare: true, jsonLd: [] };
+    // /newsletter/ also holds the sign-up form (for someone who arrives with no code, such as from the goodbye email's "Subscribe again"
+    // button), so it alone loads Turnstile and the sign-up script and has its policy opened to Cloudflare's check
+    const signup = newsletter && pg.slug === 'newsletter' && /<form[^>]*\bdata-newsletter\b/.test(inner);
+    const meta = { title: pg.title, description: pg.description, path: `/${pg.slug}/`, noindex: true, noReferrer: true, bare: true, jsonLd: [], turnstile: signup };
     return `<!doctype html>
-<html lang="${config.language}" data-base="${base}"${api ? ` data-api="${e(api)}"` : ''}>
+<html lang="${config.language}" data-base="${base}"${api ? ` data-api="${e(api)}"` : ''}${signup && config.turnstileSiteKey ? ` data-turnstile="${e(config.turnstileSiteKey)}"` : ''}>
 <head>
 ${head(meta)}
 </head>
@@ -1212,7 +1226,7 @@ ${head(meta)}
 ${inner}
   <p class="st-links"><a href="${u('/')}">Go to ${e(config.name)}</a><span aria-hidden="true">&middot;</span><a href="${u('/contact/')}">Contact us</a><span aria-hidden="true">&middot;</span><a href="${u('/privacy-policy/')}">Privacy</a></p>
 </main>
-<script src="${assetUrl('js/status-theme.js')}" defer></script>${api && pg.slug === 'manage' ? `\n<script src="${assetUrl('js/manage.js')}" defer></script>` : ''}${newsletter && pg.slug === 'newsletter' ? `\n<script src="${assetUrl('js/newsletter.js')}" defer></script>` : ''}
+<script src="${assetUrl('js/status-theme.js')}" defer></script>${api && pg.slug === 'manage' ? `\n<script src="${assetUrl('js/manage.js')}" defer></script>` : ''}${signup && config.turnstileSiteKey ? `\n<script src="${assetUrl('js/turnstile.js')}" defer></script>` : ''}${signup ? `\n<script src="${assetUrl('js/subscribe.js')}" defer></script>` : ''}${newsletter && pg.slug === 'newsletter' ? `\n<script src="${assetUrl('js/newsletter.js')}" defer></script>` : ''}
 </body>
 </html>
 `;
@@ -1247,6 +1261,9 @@ ${inner}
       if (!/^[1-6]$/.test(n)) throw new Error(`content/pages/${pg.slug}.html: {{latest-posts:${n}}} needs a number from 1 to 6`);
       return latestPosts(Number(n));
     });
+    // {{signup-form}}: the ordinary newsletter sign-up form (the small version), only when the newsletter is on. Filled after the heading ids so its
+    // own headings get none. /newsletter/ uses it for people who open the page with no code (js/newsletter.js shows it then).
+    withIds.html = withIds.html.replace(/\{\{signup-form\}\}/g, () => (newsletter ? newsletterForm('nlp', true) : ''));
     if (pg.kind === 'status') return statusPage(pg, withIds.html);
     const isDoc = pg.kind === 'legal';
     const toc = withIds.toc.filter((t) => t.level === 2 || t.level === 3);
