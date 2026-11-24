@@ -83,7 +83,7 @@ Which one should you use? Either, as long as you know which one you are talking 
 
 ## Where does tax fit into the price?
 
-Tax is not a surprise bill at the end if you plan for it. This section tells you what TRA states on its own pages, as checked in November 2026. Rules and amounts can change, so confirm on the TRA website before you decide.
+Tax is not a surprise bill at the end if you plan for it. This section tells you what TRA states on its own pages and in the Finance Act 2026, as checked in November 2026. Rules and amounts can change, so confirm on the TRA website before you decide.
 
 **Income tax for small traders.** TRA says an individual trader whose yearly turnover does not pass TSh 200 million can fall under the presumptive tax system, where tax depends on turnover (your total sales), not on profit. Under TSh 4 million of turnover a year the tax is nil. For turnover above TSh 11 million up to TSh 200 million, the tax is 4% of turnover. There are lower bands in between, and the amount is smaller when your records are complete. For a full explanation, read our post on [presumptive tax for small business](/post/business-ideas/startups/small-business-tax-tanzania-presumptive-tax-explained/).
 

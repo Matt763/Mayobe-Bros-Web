@@ -11,9 +11,12 @@ imageCredit: Photo: CC0, via rawpixel
 imageSource: https://www.rawpixel.com/image/5912338/image-background-public-domain-note
 tags: [small business, tax, tra, tanzania]
 metaTitle: Small Business Tax in Tanzania: Presumptive Tax Explained
+updated: 2026-11-24
 ---
 
-Tax is a worry for many new owners. Often the fear is bigger than the real bill. If you run a small business alone, Tanzania has a simple turnover-based tax. This post turns the official table into plain words with worked examples. It is general information, not tax advice. All figures are as checked in November 2026 on the TRA website. Tax rules can change every year, usually after the national budget, so confirm the current table with TRA before you rely on a number.
+Tax is a worry for many new owners. Often the fear is bigger than the real bill. If you run a small business alone, Tanzania has a simple turnover-based tax. This post turns the official table into plain words with worked examples. It is general information, not tax advice. All figures were checked in November 2026 on the TRA website and in the Finance Act 2026. Tax rules can change every year, usually after the national budget, so confirm the current table with TRA before you rely on a number.
+
+**Update, 24 November 2026:** the Finance Act 2026 raised the rate for the top band from 3.5 percent to 4 percent from 1 July 2026. TRA's income tax page still showed 3.5 percent when we checked on 24 November, so we use the rate in the Act and say where the two differ.
 
 ## The short answer
 
@@ -22,7 +25,7 @@ If you are a resident individual whose only income is from a business in Tanzani
 - Turnover up to TSh 4,000,000: no tax.
 - New taxpayer: TRA's table says no tax for the first 12 months of the business, if you qualify and claim it.
 - Above TSh 4,000,000, the tax is higher with incomplete records than with complete records, up to TSh 11,000,000.
-- Above TSh 11,000,000 and up to TSh 200,000,000, TRA's table shows 4 percent of turnover.
+- Above TSh 11,000,000 and up to TSh 200,000,000, the Finance Act 2026 sets 4 percent of turnover (it was 3.5 percent before 1 July 2026, and TRA's page still showed 3.5 percent on 24 November 2026).
 - Keeping complete records lowers your tax in the middle bands.
 
 ## Who falls under the presumptive tax?
@@ -42,7 +45,7 @@ If you do not meet the conditions, you are taxed on your taxable income instead.
 
 ## The tax table in plain words
 
-Here is the table as read on the TRA page in November 2026.
+Here is the table from TRA's income tax page and the Finance Act 2026, as read in November 2026. The top row uses the rate from the Act.
 
 | Yearly turnover | Tax with incomplete records | Tax with complete records |
 | --- | --- | --- |
@@ -51,7 +54,7 @@ Here is the table as read on the TRA page in November 2026.
 | Above TSh 7,000,000 up to TSh 11,000,000 | TSh 250,000 | TSh 90,000 plus 3% of the turnover above TSh 7,000,000 |
 | Above TSh 11,000,000 up to TSh 200,000,000 | 4% of turnover | 4% of turnover |
 
-The TRA page uses one cell for the last band, which we read as the same 4 percent for both record types. Check the live table to be sure.
+The Finance Act 2026 uses one cell for the last band, so the same 4 percent applies whichever records you keep. TRA's page still printed 3.5 percent for this band on 24 November 2026, probably because it had not been updated yet. If you are close to this band, ask TRA which rate it is applying to you.
 
 ### Worked examples (made up for learning)
 
@@ -128,6 +131,7 @@ Taxes become less scary when you know the numbers. A small step now saves a lot 
 ## Sources and further reading
 
 - [Income tax for individuals, Tanzania Revenue Authority](https://tra.go.tz/page/income-tax-for-individuals)
+- [The Finance Act, 2026 (First Schedule amendment, section 27), Tanzania Revenue Authority](https://www.tra.go.tz/images/uploads/acts/THE_FINANCE_ACT,_2026.pdf)
 - [Starting Business, Tanzania Revenue Authority](https://tra.go.tz/page/starting-business-income-for-individuals-and-paying-taxes)
 - [Paying taxes, Tanzania Revenue Authority](https://tra.go.tz/page/paying-taxes)
 - [EFD and VFD, Tanzania Revenue Authority](https://tra.go.tz/page/efd-vfd-suppliers)
